@@ -30,6 +30,11 @@
     .schedule-card{border:1px solid #ead9d3;border-left:4px solid var(--green-700);border-radius:10px;padding:8px 7px 7px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.03);cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}.schedule-card:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(16,24,40,.08)}
     .schedule-card.cancelled{opacity:.58;border-left-color:#98a2b3;background:#fafafa}
     .schedule-card.conflict{border-color:#f04438;border-left-color:#d92d20;background:#fff5f5;box-shadow:0 0 0 2px rgba(217,45,32,.08)}
+    .schedule-card.pending-substitute{border-color:#f79009;border-left-color:#f79009;background:#fffaeb;box-shadow:0 0 0 2px rgba(247,144,9,.08)}
+    .schedule-staffing-badge{display:inline-flex;align-items:center;width:max-content;padding:3px 6px;border-radius:999px;font-size:9.5px;font-weight:900;white-space:nowrap}
+    .schedule-staffing-badge.pending{background:#fef0c7;color:#b54708}
+    .schedule-staffing-badge.substituted{background:#f4ebff;color:#6941c6}
+    .schedule-original-worker{font-size:10px;color:#7f56d9;margin-top:2px}
     .schedule-conflict-badge{display:inline-flex;align-items:center;width:max-content;margin-top:2px;padding:3px 6px;border-radius:999px;background:#fee4e2;color:#b42318;font-size:9.5px;font-weight:900;white-space:nowrap}
     .schedule-card-time{font-size:12.5px;font-weight:900;color:#1f2937;display:flex;flex-direction:column;align-items:flex-start;gap:3px}.schedule-card-time>span:first-child{white-space:nowrap}
     .schedule-card-case{font-size:13px;font-weight:900;margin-top:5px;line-height:1.3;color:#344054}
@@ -140,7 +145,7 @@
 
   function scheduleConflictIds(rows=state.scheduleRows){
     const ids = new Set();
-    const active = rows.filter(x=>x.schedule_status!=='cancelled');
+    const active = rows.filter(x=>x.schedule_status!=='cancelled' && x.staffing_status!=='pending_substitute');
     for(let i=0;i<active.length;i++){
       for(let j=i+1;j<active.length;j++){
         const a = active[i], b = active[j];
@@ -335,7 +340,7 @@
   async function scheduleScopeRows(row,scope){
     if(!row?.recurrence_group_id || scope==='single') return [row];
     let query=db.from('service_schedules')
-      .select('id,service_date,start_time,end_time,case_id,care_worker_id,schedule_status,recurrence_group_id,notes')
+      .select('id,service_date,start_time,end_time,case_id,care_worker_id,original_care_worker_id,staffing_status,leave_request_id,schedule_status,recurrence_group_id,notes')
       .eq('recurrence_group_id',row.recurrence_group_id)
       .order('service_date')
       .order('start_time');
@@ -568,9 +573,10 @@
         const targetIds=new Set(targets.map(x=>x.id));
         const dates=proposed.map(x=>x.service_date).sort();
         const existingRes=await db.from('service_schedules')
-          .select('id,service_date,start_time,end_time,schedule_status')
+          .select('id,service_date,start_time,end_time,schedule_status,staffing_status')
           .eq('care_worker_id',workerId)
           .neq('schedule_status','cancelled')
+          .neq('staffing_status','pending_substitute')
           .gte('service_date',dates[0])
           .lte('service_date',dates[dates.length-1]);
         if(existingRes.error) throw existingRes.error;
@@ -613,6 +619,11 @@
         updated_by:state.user.id,
         updated_at:new Date().toISOString()
       };
+
+      if(scope==='single' && row.staffing_status==='pending_substitute' && workerId!==row.care_worker_id){
+        updatePayload.original_care_worker_id=row.original_care_worker_id || row.care_worker_id;
+        updatePayload.staffing_status='substituted';
+      }
 
       if(scope==='single'){
         updatePayload.service_date=date;
@@ -712,10 +723,11 @@
 
     try{
       const conflictRes = await db.from('service_schedules')
-        .select('id,start_time,end_time,schedule_status')
+        .select('id,start_time,end_time,schedule_status,staffing_status')
         .eq('service_date',date)
         .eq('care_worker_id',workerId)
         .neq('schedule_status','cancelled')
+        .neq('staffing_status','pending_substitute')
         .lt('start_time',end)
         .gt('end_time',start)
         .limit(1);
@@ -787,7 +799,7 @@
           .order('worker_name'),
 
         db.from('service_schedules')
-          .select('id,service_date,start_time,end_time,case_id,care_worker_id,schedule_status,recurrence_group_id,notes')
+          .select('id,service_date,start_time,end_time,case_id,care_worker_id,original_care_worker_id,staffing_status,leave_request_id,schedule_status,recurrence_group_id,notes')
           .gte('service_date', scheduleDateISO(start))
           .lte('service_date', scheduleDateISO(end))
           .order('service_date')
@@ -870,7 +882,7 @@
           <h1>📅 排班管理</h1>
           <p>查看每週服務班表，並建立單次服務班次。</p>
         </div>
-        <div class="actions"><button id="scheduleAddBtn" class="btn primary">＋ 新增班表</button></div>
+        <div class="actions"><button id="scheduleLeaveBtn" class="btn">請假／代班</button><button id="scheduleAddBtn" class="btn primary">＋ 新增班表</button></div>
       </div>
 
       <section class="schedule-stats">
@@ -946,12 +958,14 @@
                         const items = scheduleItemsFor(row.id);
 
                         return `
-                          <article class="schedule-card ${row.schedule_status==='cancelled'?'cancelled':''} ${conflictIds.has(row.id)?'conflict':''}" data-schedule-id="${row.id}" title="點一下編輯班表">
+                          <article class="schedule-card ${row.schedule_status==='cancelled'?'cancelled':''} ${row.staffing_status==='pending_substitute'?'pending-substitute':''} ${conflictIds.has(row.id)?'conflict':''}" data-schedule-id="${row.id}" title="點一下編輯班表">
                             <div class="schedule-card-time">
                               <span>${scheduleTimeLabel(row.start_time)}–${scheduleTimeLabel(row.end_time)}</span>
                               <span class="schedule-status ${row.schedule_status}">
                                 ${scheduleStatusLabel(row.schedule_status)}
                               </span>
+                              ${row.staffing_status==='pending_substitute'?'<span class="schedule-staffing-badge pending">⚠ 待代班</span>':''}
+                              ${row.staffing_status==='substituted'?'<span class="schedule-staffing-badge substituted">代班</span>':''}
                               ${conflictIds.has(row.id)?'<span class="schedule-conflict-badge">⚠ 排班衝突</span>':''}
                             </div>
 
@@ -960,8 +974,9 @@
                             </div>
 
                             <div class="schedule-card-worker">
-                              👤 ${escapeHTML(scheduleWorkerName(row.care_worker_id))}
+                              ${row.staffing_status==='pending_substitute'?'原居服員：':'👤 '}${escapeHTML(scheduleWorkerName(row.care_worker_id))}
                             </div>
+                            ${row.staffing_status==='substituted' && row.original_care_worker_id?'<div class="schedule-original-worker">原排班：'+escapeHTML(scheduleWorkerName(row.original_care_worker_id))+'</div>':''}
 
                             ${
                               items.length
