@@ -51,6 +51,9 @@
     .schedule-auto-time{background:#f8fafc!important;color:#475467!important;font-weight:900}
     .schedule-remove-item{width:34px;height:34px;padding:0!important;display:grid;place-items:center}
     .schedule-form-note{padding:9px 10px;border:1px solid #f0ded7;background:#fff8f5;border-radius:9px;font-size:11px;line-height:1.5;color:#7d4b3b}
+    .schedule-delete-wrap{display:flex;justify-content:flex-start;margin-top:2px}
+    .schedule-delete-btn{border-color:#fda29b!important;background:#fff!important;color:#b42318!important}
+    .schedule-delete-btn:hover{background:#fef3f2!important}
     @media(max-width:700px){.schedule-service-head,.schedule-service-row{grid-template-columns:minmax(0,1fr) 18px 68px 34px;gap:4px}}
     @media(max-width:1180px){.schedule-board{min-width:1120px;grid-template-columns:repeat(7,minmax(160px,1fr))}}
     @media(max-width:820px){.schedule-stats{grid-template-columns:repeat(2,1fr)}.schedule-toolbar .spacer{display:none}.schedule-week-title{order:-1;width:100%;text-align:left}.schedule-toolbar select{flex:1}}
@@ -316,6 +319,7 @@
       $('scheduleAddStart').addEventListener('change',updateScheduleEndTime);
       $('scheduleAddStart').addEventListener('input',updateScheduleEndTime);
       $('scheduleAddServiceItem').addEventListener('click',()=>addScheduleServiceRow());
+      $('scheduleDeleteBtn').addEventListener('click',()=>deleteSchedule(scheduleId));
       updateScheduleEndTime();
     }catch(err){
       console.error(err);
@@ -389,6 +393,7 @@
 
             <div class="field full"><label>備註</label><textarea id="scheduleAddNotes" placeholder="例如：家屬特別交代、當日服務注意事項">${escapeHTML(row.notes||'')}</textarea></div>
             <div class="field full"><div class="schedule-form-note">修改服務碼別、支數或開始時間後，結束時間會自動重新計算。若修改後與其他班表重疊，系統會再次跳出警告。</div></div>
+            <div class="field full"><div class="schedule-delete-wrap"><button id="scheduleDeleteBtn" type="button" class="btn schedule-delete-btn">刪除班表</button></div></div>
           </div>
         `,
         onConfirm:()=>saveScheduleEdit(scheduleId)
@@ -409,6 +414,48 @@
       toast('載入班表資料失敗：'+(err?.message||err),'error');
     }finally{
       showLoading(false);
+    }
+  }
+
+  async function deleteSchedule(scheduleId){
+    const row = state.scheduleRows.find(x=>x.id===scheduleId);
+    if(!row){
+      toast('找不到這筆班表，請重新整理後再試。','error');
+      return;
+    }
+
+    const ok = confirm(
+      '確定要刪除這筆班表嗎？\n\n' +
+      scheduleDateLabel(new Date(row.service_date+'T00:00:00')) + ' ' +
+      scheduleTimeLabel(row.start_time) + '–' + scheduleTimeLabel(row.end_time) + '\n' +
+      scheduleCaseName(row.case_id) + '／' + scheduleWorkerName(row.care_worker_id) +
+      '\n\n刪除後無法復原。'
+    );
+    if(!ok) return;
+
+    const deleteBtn = $('scheduleDeleteBtn');
+    if(deleteBtn) deleteBtn.disabled = true;
+    showLoading(true);
+
+    try{
+      const res = await db.from('service_schedules')
+        .delete()
+        .eq('id',scheduleId)
+        .select('id');
+
+      if(res.error) throw res.error;
+      if(!(res.data || []).length) throw new Error('班表未刪除，可能沒有權限或資料已不存在。');
+
+      closeModal();
+      await loadScheduleWeek();
+      renderSchedulePage();
+      toast('班表已刪除。','success');
+    }catch(err){
+      console.error(err);
+      toast('刪除班表失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+      if(deleteBtn && document.body.contains(deleteBtn)) deleteBtn.disabled = false;
     }
   }
 
