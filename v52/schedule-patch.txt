@@ -359,6 +359,63 @@
     dateInput.title=grouped?'整組或後續修改會保留每一班原本的服務日期。':'';
   }
 
+  function updateScheduleStaffingActionUI(row){
+    const actionSelect=$('scheduleStaffingAction');
+    if(!actionSelect || !row) return;
+
+    const action=actionSelect.value || 'pending';
+    const workerSelect=$('scheduleAddWorker');
+    const statusSelect=$('scheduleAddStatus');
+    const scopeSelect=$('scheduleEditScope');
+    const hint=$('scheduleStaffingHint');
+    const originalWorkerId=row.original_care_worker_id || row.care_worker_id;
+
+    // 請假／代班是單次班表異動，不連動整組固定排班。
+    if(scopeSelect){
+      scopeSelect.value='single';
+      scopeSelect.disabled=true;
+    }
+
+    if(statusSelect){
+      statusSelect.disabled=false;
+      if(statusSelect.value==='cancelled' && action!=='cancel'){
+        statusSelect.value=row.schedule_status==='cancelled'?'confirmed':row.schedule_status;
+      }
+    }
+
+    if(action==='pending'){
+      if(workerSelect){
+        workerSelect.value=originalWorkerId;
+        workerSelect.disabled=true;
+      }
+      if(hint) hint.textContent='此班維持「待代班」，之後仍可再次開啟班表指定代班或恢復原排班。';
+    }else if(action==='substitute'){
+      if(workerSelect){
+        workerSelect.disabled=false;
+        if(workerSelect.value===originalWorkerId) workerSelect.value='';
+      }
+      if(hint) hint.textContent='請在下方「居服員」選擇實際代班人員；若時間重疊，系統仍會先警告。';
+    }else if(action==='restore'){
+      if(workerSelect){
+        workerSelect.value=originalWorkerId;
+        workerSelect.disabled=true;
+      }
+      if(hint) hint.textContent='儲存後會解除「待代班」，恢復原居服員排班；請假紀錄仍會保留。';
+    }else if(action==='cancel'){
+      if(workerSelect){
+        workerSelect.value=originalWorkerId;
+        workerSelect.disabled=true;
+      }
+      if(statusSelect){
+        statusSelect.value='cancelled';
+        statusSelect.disabled=true;
+      }
+      if(hint) hint.textContent='此班會保留紀錄，但班表狀態改為「已取消」。';
+    }
+
+    updateScheduleEditScopeUI();
+  }
+
   async function openEditScheduleModal(scheduleId){
     if(!canUseScheduleAdmin()) return;
     const row = state.scheduleRows.find(x=>x.id===scheduleId);
@@ -399,6 +456,18 @@
                   <option value="all">整組固定班表</option>
                 </select>
                 <div class="schedule-recurrence-preview">選擇「這一班及之後」或「整組」時，各班原本的服務日期會保留，只同步修改時間、個案、居服員、服務項目、狀態與備註。</div>
+              </div>`:''
+            }
+            ${row.staffing_status==='pending_substitute'?`
+              <div class="field full">
+                <label>代班處理 *</label>
+                <select id="scheduleStaffingAction">
+                  <option value="pending" selected>維持待代班</option>
+                  <option value="substitute">指定代班居服員</option>
+                  <option value="restore">解除待代班，恢復原排班</option>
+                  <option value="cancel">取消服務</option>
+                </select>
+                <div id="scheduleStaffingHint" class="schedule-recurrence-preview"></div>
               </div>`:''
             }
             <div class="field"><label>服務日期 *</label><input id="scheduleAddDate" type="date" value="${row.service_date}"></div>
@@ -451,7 +520,9 @@
       $('scheduleAddServiceItem').addEventListener('click',()=>addScheduleServiceRow());
       $('scheduleDeleteBtn').addEventListener('click',()=>deleteSchedule(scheduleId));
       $('scheduleEditScope')?.addEventListener('change',updateScheduleEditScopeUI);
+      $('scheduleStaffingAction')?.addEventListener('change',()=>updateScheduleStaffingActionUI(row));
       updateScheduleEditScopeUI();
+      updateScheduleStaffingActionUI(row);
       updateScheduleEndTime();
     }catch(err){
       console.error(err);
@@ -518,6 +589,9 @@
     }
 
     const scope=row.recurrence_group_id ? ($('scheduleEditScope')?.value||'single') : 'single';
+    const staffingAction=row.staffing_status==='pending_substitute'
+      ? ($('scheduleStaffingAction')?.value||'pending')
+      : null;
     const date=$('scheduleAddDate')?.value;
     const start=$('scheduleAddStart')?.value;
     const end=$('scheduleAddEnd')?.value;
@@ -536,6 +610,13 @@
     if(!date||!start||!caseId||!workerId){
       toast('請完整填寫日期、開始時間、個案與居服員。','error');
       return;
+    }
+    if(staffingAction==='substitute'){
+      const originalWorkerId=row.original_care_worker_id || row.care_worker_id;
+      if(workerId===originalWorkerId){
+        toast('請選擇不同於原排班的代班居服員。','error');
+        return;
+      }
     }
     if(!end){
       toast('目前選擇的服務項目沒有可計算的服務時間，請確認服務碼別與支數。','error');
@@ -568,8 +649,8 @@
         service_date:scope==='single'?date:target.service_date
       }));
 
-      // 檢查修改後與其他班表是否重疊；被本次修改的班表彼此不算衝突。
-      if(status!=='cancelled'){
+      // 檢查修改後與其他班表是否重疊；維持「待代班」時不視為已安排人力。
+      if(status!=='cancelled' && staffingAction!=='pending'){
         const targetIds=new Set(targets.map(x=>x.id));
         const dates=proposed.map(x=>x.service_date).sort();
         const existingRes=await db.from('service_schedules')
@@ -620,9 +701,24 @@
         updated_at:new Date().toISOString()
       };
 
-      if(scope==='single' && row.staffing_status==='pending_substitute' && workerId!==row.care_worker_id){
-        updatePayload.original_care_worker_id=row.original_care_worker_id || row.care_worker_id;
-        updatePayload.staffing_status='substituted';
+      if(scope==='single' && row.staffing_status==='pending_substitute'){
+        const originalWorkerId=row.original_care_worker_id || row.care_worker_id;
+        updatePayload.original_care_worker_id=originalWorkerId;
+
+        if(staffingAction==='pending'){
+          updatePayload.care_worker_id=originalWorkerId;
+          updatePayload.staffing_status='pending_substitute';
+        }else if(staffingAction==='substitute'){
+          updatePayload.care_worker_id=workerId;
+          updatePayload.staffing_status='substituted';
+        }else if(staffingAction==='restore'){
+          updatePayload.care_worker_id=originalWorkerId;
+          updatePayload.staffing_status='normal';
+        }else if(staffingAction==='cancel'){
+          updatePayload.care_worker_id=originalWorkerId;
+          updatePayload.staffing_status='normal';
+          updatePayload.schedule_status='cancelled';
+        }
       }
 
       if(scope==='single'){
