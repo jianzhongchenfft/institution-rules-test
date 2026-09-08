@@ -275,8 +275,8 @@
 
       if(conflictRes.error) throw conflictRes.error;
       if((conflictRes.data || []).length){
-        toast('此居服員在這個時段已有其他班表，請先確認時間。','error');
-        return;
+        const proceed = confirm('⚠️ 排班時間重疊\n\n此居服員在同一天的這個時段已有其他班表。\n\n仍要建立這筆班表嗎？');
+        if(!proceed) return;
       }
 
       const scheduleRes = await db.from('service_schedules')
