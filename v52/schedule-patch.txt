@@ -27,14 +27,14 @@
     .schedule-day.today .schedule-day-name,.schedule-day.today .schedule-day-date{color:var(--green-800)}
     .schedule-day-body{padding:9px;display:grid;gap:8px;align-content:start}
     .schedule-empty{padding:18px 6px;text-align:center;color:#98a2b3;font-size:11px}
-    .schedule-card{border:1px solid #ead9d3;border-left:4px solid var(--green-700);border-radius:10px;padding:9px 9px 8px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+    .schedule-card{border:1px solid #ead9d3;border-left:4px solid var(--green-700);border-radius:10px;padding:8px 7px 7px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.03)}
     .schedule-card.cancelled{opacity:.58;border-left-color:#98a2b3;background:#fafafa}
-    .schedule-card-time{font-size:13px;font-weight:900;color:#1f2937;display:flex;align-items:center;justify-content:space-between;gap:6px}
-    .schedule-card-case{font-size:13px;font-weight:900;margin-top:6px;line-height:1.35;color:#344054}
-    .schedule-card-worker{font-size:11px;color:#667085;margin-top:4px}
-    .schedule-items{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
-    .schedule-item{font-size:10.5px;font-weight:900;padding:3px 6px;border-radius:999px;background:#fff3ed;color:#a45d49;border:1px solid #f0d4ca}
-    .schedule-card-note{font-size:10.5px;color:#7a6b65;margin-top:6px;line-height:1.45;white-space:pre-wrap}
+    .schedule-card-time{font-size:12.5px;font-weight:900;color:#1f2937;display:flex;flex-direction:column;align-items:flex-start;gap:3px}.schedule-card-time>span:first-child{white-space:nowrap}
+    .schedule-card-case{font-size:13px;font-weight:900;margin-top:5px;line-height:1.3;color:#344054}
+    .schedule-card-worker{font-size:10.8px;color:#667085;margin-top:3px}
+    .schedule-items{display:grid;justify-items:start;gap:3px;margin-top:6px}
+    .schedule-item{display:inline-flex;width:max-content;font-size:10.5px;font-weight:900;padding:2px 6px;border-radius:999px;background:#fff3ed;color:#a45d49;border:1px solid #f0d4ca;line-height:1.25}
+    .schedule-card-note{font-size:10.5px;color:#7a6b65;margin-top:5px;line-height:1.4;white-space:pre-wrap}
     .schedule-status{font-size:9.5px;padding:3px 6px;border-radius:999px;font-weight:900;white-space:nowrap}
     .schedule-status.planned{background:#f2f4f7;color:#667085}
     .schedule-status.confirmed{background:#eef7f1;color:#237a4b}
