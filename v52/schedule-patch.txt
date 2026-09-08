@@ -319,7 +319,6 @@
       $('scheduleAddStart').addEventListener('change',updateScheduleEndTime);
       $('scheduleAddStart').addEventListener('input',updateScheduleEndTime);
       $('scheduleAddServiceItem').addEventListener('click',()=>addScheduleServiceRow());
-      $('scheduleDeleteBtn').addEventListener('click',()=>deleteSchedule(scheduleId));
       updateScheduleEndTime();
     }catch(err){
       console.error(err);
@@ -408,6 +407,7 @@
       $('scheduleAddStart').addEventListener('change',updateScheduleEndTime);
       $('scheduleAddStart').addEventListener('input',updateScheduleEndTime);
       $('scheduleAddServiceItem').addEventListener('click',()=>addScheduleServiceRow());
+      $('scheduleDeleteBtn').addEventListener('click',()=>deleteSchedule(scheduleId));
       updateScheduleEndTime();
     }catch(err){
       console.error(err);
