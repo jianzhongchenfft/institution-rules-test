@@ -1,1 +1,407 @@
-// V5.2 排班管理模組
+// V5.2 排班管理：第一版只讀週班表
+(() => {
+  const scheduleStyle = document.createElement('style');
+  scheduleStyle.id = 'v52-schedule-style';
+  scheduleStyle.textContent = `
+    .schedule-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .schedule-toolbar .spacer{flex:1}
+    .schedule-week-title{font-size:14px;font-weight:900;color:#344054;min-width:220px;text-align:center}
+    .schedule-filter-label{font-size:11px;font-weight:900;color:var(--muted)}
+    .schedule-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .schedule-board-shell{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px}
+    .schedule-board{display:grid;grid-template-columns:repeat(7,minmax(180px,1fr));min-width:1260px}
+    .schedule-day{min-height:520px;border-right:1px solid var(--line);background:#fff}
+    .schedule-day:last-child{border-right:0}
+    .schedule-day-head{position:sticky;top:0;z-index:2;background:#fffaf8;border-bottom:1px solid var(--line);padding:10px 11px}
+    .schedule-day-name{font-size:11px;font-weight:900;color:#667085}
+    .schedule-day-date{font-size:16px;font-weight:900;color:#344054;margin-top:3px}
+    .schedule-day.today .schedule-day-head{background:#fff3ed}
+    .schedule-day.today .schedule-day-date{color:var(--green-800)}
+    .schedule-day-body{padding:9px;display:grid;gap:8px;align-content:start}
+    .schedule-empty{padding:18px 6px;text-align:center;color:#98a2b3;font-size:11px}
+    .schedule-card{border:1px solid #ead9d3;border-left:4px solid var(--green-700);border-radius:10px;padding:9px 9px 8px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+    .schedule-card.cancelled{opacity:.58;border-left-color:#98a2b3;background:#fafafa}
+    .schedule-card-time{font-size:13px;font-weight:900;color:#1f2937;display:flex;align-items:center;justify-content:space-between;gap:6px}
+    .schedule-card-case{font-size:13px;font-weight:900;margin-top:6px;line-height:1.35;color:#344054}
+    .schedule-card-worker{font-size:11px;color:#667085;margin-top:4px}
+    .schedule-items{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+    .schedule-item{font-size:10.5px;font-weight:900;padding:3px 6px;border-radius:999px;background:#fff3ed;color:#a45d49;border:1px solid #f0d4ca}
+    .schedule-card-note{font-size:10.5px;color:#7a6b65;margin-top:6px;line-height:1.45;white-space:pre-wrap}
+    .schedule-status{font-size:9.5px;padding:3px 6px;border-radius:999px;font-weight:900;white-space:nowrap}
+    .schedule-status.planned{background:#f2f4f7;color:#667085}
+    .schedule-status.confirmed{background:#eef7f1;color:#237a4b}
+    .schedule-status.completed{background:#eff8ff;color:#175cd3}
+    .schedule-status.cancelled{background:#fef3f2;color:#b42318}
+    @media(max-width:820px){.schedule-stats{grid-template-columns:repeat(2,1fr)}.schedule-toolbar .spacer{display:none}.schedule-week-title{order:-1;width:100%;text-align:left}.schedule-toolbar select{flex:1}}
+  `;
+  document.head.appendChild(scheduleStyle);
+
+  const scheduleModule = modules.find(m => m.id === 'schedule');
+  if(scheduleModule){
+    scheduleModule.ready = true;
+    scheduleModule.crumb = '每週服務班表';
+  }
+
+  function scheduleMonday(date){
+    const d = new Date(date);
+    d.setHours(0,0,0,0);
+    const offset = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - offset);
+    return d;
+  }
+
+  function scheduleAddDays(date, days){
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+
+  function scheduleDateISO(date){
+    return isoDate(date);
+  }
+
+  function scheduleDateLabel(date){
+    return `${date.getMonth()+1}/${date.getDate()}`;
+  }
+
+  function scheduleWeekLabel(start){
+    const end = scheduleAddDays(start, 6);
+    return `${start.getFullYear()}年${start.getMonth()+1}月${start.getDate()}日－${end.getFullYear()}年${end.getMonth()+1}月${end.getDate()}日`;
+  }
+
+  function scheduleTimeLabel(value){
+    return String(value || '').slice(0,5);
+  }
+
+  function scheduleMinutes(value){
+    const [h,m] = String(value || '00:00').split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  function scheduleQty(value){
+    const n = Number(value);
+    if(!Number.isFinite(n)) return value || '1';
+    return Number.isInteger(n) ? String(n) : String(n).replace(/0+$/,'').replace(/\.$/,'');
+  }
+
+  function scheduleStatusLabel(value){
+    return ({planned:'已排定',confirmed:'已確認',completed:'已完成',cancelled:'已取消'})[value] || value || '—';
+  }
+
+  function canUseScheduleAdmin(){
+    return !!state.profile && ['supervisor','business_manager','organization_manager','admin'].includes(state.profile.role);
+  }
+
+  Object.assign(state, {
+    scheduleWeekStart: scheduleDateISO(scheduleMonday(new Date())),
+    scheduleWorkerFilter: 'all',
+    scheduleRows: [],
+    scheduleWorkers: [],
+    scheduleCases: [],
+    scheduleItems: [],
+    scheduleLoading: false
+  });
+
+  function scheduleWorkerName(id){
+    return state.scheduleWorkers.find(x=>x.id===id)?.worker_name || '未指定居服員';
+  }
+
+  function scheduleCaseName(id){
+    return state.scheduleCases.find(x=>x.id===id)?.case_name || '未找到個案';
+  }
+
+  function scheduleItemsFor(scheduleId){
+    return state.scheduleItems.filter(x=>x.schedule_id===scheduleId);
+  }
+
+  async function loadScheduleWeek(){
+    if(!canUseScheduleAdmin()) return;
+    state.scheduleLoading = true;
+    showLoading(true);
+
+    try{
+      const start = new Date(state.scheduleWeekStart + 'T00:00:00');
+      const end = scheduleAddDays(start, 6);
+
+      const [workersRes, schedulesRes] = await Promise.all([
+        db.from('care_workers')
+          .select('id,worker_name,employment_status')
+          .eq('employment_status','active')
+          .order('worker_name'),
+
+        db.from('service_schedules')
+          .select('id,service_date,start_time,end_time,case_id,care_worker_id,schedule_status,notes')
+          .gte('service_date', scheduleDateISO(start))
+          .lte('service_date', scheduleDateISO(end))
+          .order('service_date')
+          .order('start_time')
+      ]);
+
+      if(workersRes.error) throw workersRes.error;
+      if(schedulesRes.error) throw schedulesRes.error;
+
+      state.scheduleWorkers = workersRes.data || [];
+      state.scheduleRows = schedulesRes.data || [];
+
+      const scheduleIds = [...new Set(state.scheduleRows.map(x=>x.id))];
+      const caseIds = [...new Set(state.scheduleRows.map(x=>x.case_id).filter(Boolean))];
+
+      const [casesRes, itemsRes] = await Promise.all([
+        caseIds.length
+          ? db.from('care_cases').select('id,case_name').in('id',caseIds)
+          : Promise.resolve({data:[],error:null}),
+
+        scheduleIds.length
+          ? db.from('schedule_service_items')
+              .select('id,schedule_id,service_group,service_code,service_name,quantity')
+              .in('schedule_id',scheduleIds)
+              .order('service_code')
+          : Promise.resolve({data:[],error:null})
+      ]);
+
+      if(casesRes.error) throw casesRes.error;
+      if(itemsRes.error) throw itemsRes.error;
+
+      state.scheduleCases = casesRes.data || [];
+      state.scheduleItems = itemsRes.data || [];
+
+    }catch(err){
+      console.error(err);
+      toast('讀取班表失敗：' + (err?.message || err), 'error');
+    }finally{
+      state.scheduleLoading = false;
+      showLoading(false);
+    }
+  }
+
+  function renderSchedulePage(){
+    if(state.page !== 'schedule') return;
+
+    if(!canUseScheduleAdmin()){
+      $('content').innerHTML = `
+        <div class="page-head"><div><h1>📅 排班管理</h1><p>每週服務班表</p></div></div>
+        <div class="empty"><div class="icon">🔒</div><h3>目前沒有管理端排班權限</h3><p>居服員手機版班表會在下一階段另外製作。</p></div>`;
+      return;
+    }
+
+    const start = new Date(state.scheduleWeekStart + 'T00:00:00');
+    const todayISO = scheduleDateISO(new Date());
+    const dayNames = ['週一','週二','週三','週四','週五','週六','週日'];
+
+    let visible = state.scheduleRows;
+
+    if(state.scheduleWorkerFilter !== 'all'){
+      visible = visible.filter(x=>x.care_worker_id === state.scheduleWorkerFilter);
+    }
+
+    const activeRows = visible.filter(x=>x.schedule_status !== 'cancelled');
+    const workerCount = new Set(activeRows.map(x=>x.care_worker_id)).size;
+    const caseCount = new Set(activeRows.map(x=>x.case_id)).size;
+
+    const totalHours =
+      activeRows.reduce((sum,x)=>{
+        return sum + Math.max(
+          0,
+          scheduleMinutes(x.end_time) - scheduleMinutes(x.start_time)
+        );
+      },0) / 60;
+
+    $('content').innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1>📅 排班管理</h1>
+          <p>先以週班表確認排班資訊；本版暫不提供新增或修改。</p>
+        </div>
+      </div>
+
+      <section class="schedule-stats">
+        <article class="stat-card">
+          <div class="stat-head"><span>本週班次</span><span class="stat-icon">📅</span></div>
+          <div class="stat-value">${activeRows.length}</div>
+          <div class="stat-foot">不含已取消班次</div>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-head"><span>居服員</span><span class="stat-icon">👥</span></div>
+          <div class="stat-value">${workerCount}</div>
+          <div class="stat-foot">本週有排班的人員</div>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-head"><span>服務個案</span><span class="stat-icon">👤</span></div>
+          <div class="stat-value">${caseCount}</div>
+          <div class="stat-foot">本週有服務的個案</div>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-head"><span>服務時數</span><span class="stat-icon">⏱</span></div>
+          <div class="stat-value">${totalHours.toFixed(totalHours % 1 ? 1 : 0)}</div>
+          <div class="stat-foot">依排班時間加總</div>
+        </article>
+      </section>
+
+      <div class="schedule-toolbar">
+        <button id="schedulePrev" class="btn">← 上一週</button>
+        <button id="scheduleToday" class="btn">本週</button>
+        <button id="scheduleNext" class="btn">下一週 →</button>
+
+        <div class="schedule-week-title">${scheduleWeekLabel(start)}</div>
+
+        <span class="spacer"></span>
+
+        <span class="schedule-filter-label">居服員</span>
+
+        <select id="scheduleWorkerFilter">
+          <option value="all">全部居服員</option>
+          ${state.scheduleWorkers.map(w=>`
+            <option value="${w.id}" ${state.scheduleWorkerFilter===w.id?'selected':''}>
+              ${escapeHTML(w.worker_name)}
+            </option>
+          `).join('')}
+        </select>
+
+        <button id="scheduleReload" class="btn">↻ 重新整理</button>
+      </div>
+
+      <div class="schedule-board-shell">
+        <div class="schedule-board">
+          ${dayNames.map((name,index)=>{
+            const date = scheduleAddDays(start,index);
+            const dateISO = scheduleDateISO(date);
+
+            const rows = visible
+              .filter(x=>x.service_date===dateISO)
+              .sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));
+
+            return `
+              <section class="schedule-day ${dateISO===todayISO?'today':''}">
+                <div class="schedule-day-head">
+                  <div class="schedule-day-name">${name}</div>
+                  <div class="schedule-day-date">${scheduleDateLabel(date)}</div>
+                </div>
+
+                <div class="schedule-day-body">
+                  ${
+                    rows.length
+                    ? rows.map(row=>{
+                        const items = scheduleItemsFor(row.id);
+
+                        return `
+                          <article class="schedule-card ${row.schedule_status==='cancelled'?'cancelled':''}">
+                            <div class="schedule-card-time">
+                              <span>${scheduleTimeLabel(row.start_time)}–${scheduleTimeLabel(row.end_time)}</span>
+                              <span class="schedule-status ${row.schedule_status}">
+                                ${scheduleStatusLabel(row.schedule_status)}
+                              </span>
+                            </div>
+
+                            <div class="schedule-card-case">
+                              ${escapeHTML(scheduleCaseName(row.case_id))}
+                            </div>
+
+                            <div class="schedule-card-worker">
+                              👤 ${escapeHTML(scheduleWorkerName(row.care_worker_id))}
+                            </div>
+
+                            ${
+                              items.length
+                              ? `<div class="schedule-items">
+                                  ${items.map(item=>`
+                                    <span class="schedule-item">
+                                      ${escapeHTML(item.service_code)} ×${scheduleQty(item.quantity)}
+                                    </span>
+                                  `).join('')}
+                                </div>`
+                              : ''
+                            }
+
+                            ${
+                              row.notes
+                              ? `<div class="schedule-card-note">${escapeHTML(row.notes)}</div>`
+                              : ''
+                            }
+                          </article>
+                        `;
+                      }).join('')
+                    : '<div class="schedule-empty">本日無班表</div>'
+                  }
+                </div>
+              </section>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    $('schedulePrev').addEventListener('click', async()=>{
+      state.scheduleWeekStart =
+        scheduleDateISO(scheduleAddDays(start,-7));
+      await loadScheduleWeek();
+      renderSchedulePage();
+    });
+
+    $('scheduleToday').addEventListener('click', async()=>{
+      state.scheduleWeekStart =
+        scheduleDateISO(scheduleMonday(new Date()));
+      await loadScheduleWeek();
+      renderSchedulePage();
+    });
+
+    $('scheduleNext').addEventListener('click', async()=>{
+      state.scheduleWeekStart =
+        scheduleDateISO(scheduleAddDays(start,7));
+      await loadScheduleWeek();
+      renderSchedulePage();
+    });
+
+    $('scheduleWorkerFilter').addEventListener('change',e=>{
+      state.scheduleWorkerFilter = e.target.value;
+      renderSchedulePage();
+    });
+
+    $('scheduleReload').addEventListener('click', async()=>{
+      await loadScheduleWeek();
+      renderSchedulePage();
+      toast('已重新整理班表','success');
+    });
+  }
+
+  const baseNavigateForSchedule = navigate;
+
+  navigate = function(id){
+    if(id !== 'schedule'){
+      return baseNavigateForSchedule(id);
+    }
+
+    const m = modules.find(x=>x.id==='schedule') || modules[0];
+
+    state.page = 'schedule';
+
+    renderNav();
+
+    $('topTitle').textContent = m.label;
+    $('crumb').textContent = m.crumb;
+
+    $('sidebar').classList.remove('open');
+
+    window.scrollTo({
+      top:0,
+      behavior:'auto'
+    });
+
+    if(!canUseScheduleAdmin()){
+      renderSchedulePage();
+      return;
+    }
+
+    $('content').innerHTML = `
+      <div class="empty compact">
+        <div class="icon">📅</div>
+        <h3>正在載入班表</h3>
+        <p>請稍候。</p>
+      </div>
+    `;
+
+    loadScheduleWeek().then(renderSchedulePage);
+  };
+})();
