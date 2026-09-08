@@ -8,15 +8,23 @@
     .schedule-week-title{font-size:14px;font-weight:900;color:#344054;min-width:220px;text-align:center}
     .schedule-filter-label{font-size:11px;font-weight:900;color:var(--muted)}
     .schedule-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .schedule-stats .stat-card{padding:9px 12px!important}
+    .schedule-stats .stat-head{font-size:11.5px!important}
+    .schedule-stats .stat-icon{width:26px!important;height:26px!important;font-size:12px!important}
+    .schedule-stats .stat-value{font-size:22px!important;margin-top:3px!important;line-height:1!important}
+    .schedule-stats .stat-foot{font-size:10.5px!important;margin-top:2px!important}
     .schedule-board-shell{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px}
-    .schedule-board{display:grid;grid-template-columns:repeat(7,minmax(180px,1fr));min-width:1260px}
-    .schedule-day{min-height:520px;border-right:1px solid var(--line);background:#fff}
+    .schedule-board{display:grid;width:100%;min-width:0;grid-template-columns:repeat(7,minmax(0,1fr))}
+    .schedule-day{min-width:0;min-height:520px;border-right:1px solid var(--line);background:#fff}
     .schedule-day:last-child{border-right:0}
     .schedule-day-head{position:sticky;top:0;z-index:2;background:#fffaf8;border-bottom:1px solid var(--line);padding:10px 11px}
-    .schedule-day-name{font-size:11px;font-weight:900;color:#667085}
+    .schedule-day-name{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:900;color:#667085}
     .schedule-day-date{font-size:16px;font-weight:900;color:#344054;margin-top:3px}
-    .schedule-day.today .schedule-day-head{background:#fff3ed}
-    .schedule-day.today .schedule-day-date{color:var(--green-800)}
+    .schedule-today-badge{display:inline-flex;align-items:center;padding:2px 5px;border-radius:999px;background:#dc9479;color:#fff;font-size:9px;font-weight:900;line-height:1.2}
+    .schedule-day.weekend .schedule-day-head{background:#fff6f2}
+    .schedule-day.weekend .schedule-day-name,.schedule-day.weekend .schedule-day-date{color:#a96f5c}
+    .schedule-day.today .schedule-day-head{background:#fff0e9}
+    .schedule-day.today .schedule-day-name,.schedule-day.today .schedule-day-date{color:var(--green-800)}
     .schedule-day-body{padding:9px;display:grid;gap:8px;align-content:start}
     .schedule-empty{padding:18px 6px;text-align:center;color:#98a2b3;font-size:11px}
     .schedule-card{border:1px solid #ead9d3;border-left:4px solid var(--green-700);border-radius:10px;padding:9px 9px 8px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.03)}
@@ -32,6 +40,7 @@
     .schedule-status.confirmed{background:#eef7f1;color:#237a4b}
     .schedule-status.completed{background:#eff8ff;color:#175cd3}
     .schedule-status.cancelled{background:#fef3f2;color:#b42318}
+    @media(max-width:1180px){.schedule-board{min-width:1120px;grid-template-columns:repeat(7,minmax(160px,1fr))}}
     @media(max-width:820px){.schedule-stats{grid-template-columns:repeat(2,1fr)}.schedule-toolbar .spacer{display:none}.schedule-week-title{order:-1;width:100%;text-align:left}.schedule-toolbar select{flex:1}}
   `;
   document.head.appendChild(scheduleStyle);
@@ -274,9 +283,9 @@
               .sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));
 
             return `
-              <section class="schedule-day ${dateISO===todayISO?'today':''}">
+              <section class="schedule-day ${index>=5?'weekend':''} ${dateISO===todayISO?'today':''}">
                 <div class="schedule-day-head">
-                  <div class="schedule-day-name">${name}</div>
+                  <div class="schedule-day-name"><span>${name}</span>${dateISO===todayISO?'<span class="schedule-today-badge">今天</span>':''}</div>
                   <div class="schedule-day-date">${scheduleDateLabel(date)}</div>
                 </div>
 
