@@ -36,17 +36,19 @@
     .schedule-item{display:inline-flex;width:max-content;font-size:10.5px;font-weight:900;padding:2px 6px;border-radius:999px;background:#fff3ed;color:#a45d49;border:1px solid #f0d4ca;line-height:1.25}
     .schedule-card-note{font-size:10.5px;color:#7a6b65;margin-top:5px;line-height:1.4;white-space:pre-wrap}
     .schedule-status{font-size:9.5px;padding:3px 6px;border-radius:999px;font-weight:900;white-space:nowrap}
+    .schedule-status.unnotified{background:#fffaeb;color:#b54708}
     .schedule-status.planned{background:#f2f4f7;color:#667085}
     .schedule-status.confirmed{background:#eef7f1;color:#237a4b}
     .schedule-status.completed{background:#eff8ff;color:#175cd3}
     .schedule-status.cancelled{background:#fef3f2;color:#b42318}
     .schedule-service-editor{display:grid;gap:7px}
-    .schedule-service-head{display:grid;grid-template-columns:minmax(0,1fr) 86px 34px;gap:7px;padding:0 2px;font-size:10.5px;font-weight:900;color:#667085}
-    .schedule-service-row{display:grid;grid-template-columns:minmax(0,1fr) 86px 34px;gap:7px;align-items:center}
+    .schedule-service-head{display:grid;grid-template-columns:minmax(0,1fr) 20px 86px 34px;gap:7px;padding:0 2px;font-size:10.5px;font-weight:900;color:#667085;align-items:center}
+    .schedule-service-row{display:grid;grid-template-columns:minmax(0,1fr) 20px 86px 34px;gap:7px;align-items:center}
     .schedule-service-row input{text-transform:uppercase}
+    .schedule-service-times{text-align:center;font-weight:900;color:#667085}
     .schedule-remove-item{width:34px;height:34px;padding:0!important;display:grid;place-items:center}
     .schedule-form-note{padding:9px 10px;border:1px solid #f0ded7;background:#fff8f5;border-radius:9px;font-size:11px;line-height:1.5;color:#7d4b3b}
-    @media(max-width:560px){.schedule-service-head,.schedule-service-row{grid-template-columns:minmax(0,1fr) 72px 34px}}
+    @media(max-width:560px){.schedule-service-head,.schedule-service-row{grid-template-columns:minmax(0,1fr) 18px 72px 34px}}
     @media(max-width:1180px){.schedule-board{min-width:1120px;grid-template-columns:repeat(7,minmax(160px,1fr))}}
     @media(max-width:820px){.schedule-stats{grid-template-columns:repeat(2,1fr)}.schedule-toolbar .spacer{display:none}.schedule-week-title{order:-1;width:100%;text-align:left}.schedule-toolbar select{flex:1}}
   `;
@@ -101,7 +103,7 @@
   }
 
   function scheduleStatusLabel(value){
-    return ({planned:'已排定',confirmed:'已確認',completed:'已完成',cancelled:'已取消'})[value] || value || '—';
+    return ({unnotified:'尚未照會',planned:'已排定',confirmed:'已確認',completed:'已完成',cancelled:'已取消'})[value] || value || '—';
   }
 
   function canUseScheduleAdmin(){
@@ -142,6 +144,7 @@
     row.className = 'schedule-service-row';
     row.innerHTML = `
       <input class="schedule-service-code" placeholder="例如 BA04" value="${escapeHTML(code)}">
+      <span class="schedule-service-times">×</span>
       <input class="schedule-service-qty" type="number" min="0.01" step="0.01" value="${escapeHTML(quantity)}">
       <button type="button" class="btn schedule-remove-item" title="移除">×</button>
     `;
@@ -192,7 +195,7 @@
         html:`
           <div class="form-grid">
             <div class="field"><label>服務日期 *</label><input id="scheduleAddDate" type="date" value="${defaultDate}"></div>
-            <div class="field"><label>班表狀態 *</label><select id="scheduleAddStatus"><option value="confirmed">已確認</option><option value="planned">已排定</option></select></div>
+            <div class="field"><label>班表狀態 *</label><select id="scheduleAddStatus"><option value="confirmed">已確認</option><option value="unnotified">尚未照會</option><option value="planned">已排定</option></select></div>
 
             <div class="field"><label>開始時間 *</label><input id="scheduleAddStart" type="time" value="09:00"></div>
             <div class="field"><label>結束時間 *</label><input id="scheduleAddEnd" type="time" value="10:00"></div>
@@ -203,7 +206,7 @@
             <div class="field full">
               <label>服務項目 *</label>
               <div class="schedule-service-editor">
-                <div class="schedule-service-head"><span>服務碼</span><span>支數</span><span></span></div>
+                <div class="schedule-service-head"><span>服務碼</span><span class="schedule-service-times">×</span><span>支數</span><span></span></div>
                 <div id="scheduleServiceRows"></div>
                 <div><button id="scheduleAddServiceItem" type="button" class="btn sm">＋ 新增服務項目</button></div>
               </div>
