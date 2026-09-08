@@ -1,5 +1,3 @@
-les = new Set(['business_manager','organization_manager','admin']);
-
   const modules = [
     {section:'每天工作', id:'dashboard', icon:'🏠', label:'首頁', crumb:'工作儀表板', ready:true},
     {section:'每天工作', id:'cases', icon:'👤', label:'個案管理', crumb:'個案資料與服務管理', features:['個案基本資料','服務狀態與照顧計畫','家訪／電訪紀錄','異動與暫停服務','個案相關文件']},
