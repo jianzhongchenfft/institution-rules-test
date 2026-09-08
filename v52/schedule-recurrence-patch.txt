@@ -285,9 +285,10 @@
       const minDate=dates[0];
       const maxDate=dates[dates.length-1];
       const existingRes=await db.from('service_schedules')
-        .select('id,service_date,start_time,end_time,schedule_status')
+        .select('id,service_date,start_time,end_time,schedule_status,staffing_status')
         .eq('care_worker_id',workerId)
         .neq('schedule_status','cancelled')
+        .neq('staffing_status','pending_substitute')
         .gte('service_date',minDate)
         .lte('service_date',maxDate);
       if(existingRes.error) throw existingRes.error;
