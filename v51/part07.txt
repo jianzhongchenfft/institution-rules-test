@@ -28,6 +28,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
       eval(await scheduleRes.text());
 
+      const recurrenceRes = await fetch('v52/schedule-recurrence-patch.txt',{cache:'no-store'});
+      if(!recurrenceRes.ok) throw new Error(`v52/schedule-recurrence-patch.txt 載入失敗（${recurrenceRes.status}）`);
+      eval(await recurrenceRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
