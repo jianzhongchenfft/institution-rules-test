@@ -85,8 +85,8 @@
 (() => {
   'use strict';
 
-  const SUPABASE_URL = 'https://rdgaxgfzhraayjjwtvag.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_TTjQ16DpC1tFmyvbNlrv2Q_jVoS810J';
+  const SUPABASE_URL = 'https://nvjbsxnejydwmolbhqyq.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_jieDWPiyesXSdFU-4ccM3Q_ReewicoO';
   const STORAGE_BUCKET = 'regulation-files';
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
