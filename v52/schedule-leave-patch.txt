@@ -1,0 +1,406 @@
+// V5.2 排班管理：請假／代班
+(() => {
+  const leaveStyle = document.createElement('style');
+  leaveStyle.id = 'v52-schedule-leave-style';
+  leaveStyle.textContent = `
+    .leave-all-day{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:900;color:#475467}
+    .leave-all-day input{width:auto;margin:0}
+    .leave-affected-list{display:grid;gap:10px}
+    .leave-affected-card{border:1px solid var(--line);border-radius:11px;padding:10px 11px;background:#fff}
+    .leave-affected-card.pending{border-color:#f7c66c;background:#fffbeb}
+    .leave-affected-card.substitute{border-color:#c7b9ff;background:#fbfaff}
+    .leave-affected-card.cancel{border-color:#fda29b;background:#fff7f6}
+    .leave-affected-main{display:grid;gap:3px}
+    .leave-affected-time{font-size:12.5px;font-weight:900;color:#344054}
+    .leave-affected-case{font-size:13px;font-weight:900;color:#1f2937}
+    .leave-affected-items{font-size:10.5px;color:#667085}
+    .leave-action-grid{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px;margin-top:9px;align-items:end}
+    .leave-substitute-field{display:none}
+    .leave-substitute-field.show{display:block}
+    .leave-summary{padding:9px 10px;border-radius:9px;background:#fff8f5;border:1px solid #f0ded7;font-size:11px;line-height:1.5;color:#7d4b3b}
+    @media(max-width:650px){.leave-action-grid{grid-template-columns:1fr}}
+  `;
+  document.head.appendChild(leaveStyle);
+
+  let leaveDraft = null;
+
+  function leaveISO(date){
+    const d = new Date(date);
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function leaveTime(value){
+    return String(value || '').slice(0,5);
+  }
+
+  function leaveDateLabel(value){
+    const d = new Date(value + 'T00:00:00');
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  }
+
+  function leaveWorkerName(id){
+    return leaveDraft?.workers?.find(x=>x.id===id)?.worker_name || '未指定';
+  }
+
+  function leaveCaseName(id){
+    return leaveDraft?.cases?.find(x=>x.id===id)?.case_name || '未找到個案';
+  }
+
+  function leaveItemsFor(scheduleId){
+    return (leaveDraft?.items || []).filter(x=>x.schedule_id===scheduleId);
+  }
+
+  function leaveScheduleOverlaps(row,startDate,startTime,endDate,endTime,isAllDay){
+    const rowStart = new Date(`${row.service_date}T${leaveTime(row.start_time)}:00`);
+    const rowEnd = new Date(`${row.service_date}T${leaveTime(row.end_time)}:00`);
+    const leaveStart = isAllDay
+      ? new Date(startDate+'T00:00:00')
+      : new Date(`${startDate}T${startTime}:00`);
+    const leaveEnd = isAllDay
+      ? new Date(endDate+'T23:59:59')
+      : new Date(`${endDate}T${endTime}:00`);
+    return rowStart < leaveEnd && rowEnd > leaveStart;
+  }
+
+  function toggleLeaveAllDay(){
+    const checked = $('leaveAllDay')?.checked;
+    if($('leaveStartTime')) $('leaveStartTime').disabled = !!checked;
+    if($('leaveEndTime')) $('leaveEndTime').disabled = !!checked;
+  }
+
+  async function openLeaveModal(){
+    showLoading(true);
+    try{
+      const workersRes = await db.from('care_workers')
+        .select('id,worker_name,employment_status')
+        .eq('employment_status','active')
+        .order('worker_name');
+      if(workersRes.error) throw workersRes.error;
+      const workers = workersRes.data || [];
+      if(!workers.length){
+        toast('目前沒有在職居服員。','error');
+        return;
+      }
+
+      const today = leaveISO(new Date());
+      openModal({
+        title:'請假／代班管理',
+        confirmText:'下一步：查看受影響班表',
+        large:true,
+        html:`
+          <div class="form-grid">
+            <div class="field full"><label>請假居服員 *</label>
+              <select id="leaveWorker"><option value="">請選擇居服員</option>${workers.map(w=>`<option value="${w.id}">${escapeHTML(w.worker_name)}</option>`).join('')}</select>
+            </div>
+
+            <div class="field"><label>請假開始日期 *</label><input id="leaveStartDate" type="date" value="${today}"></div>
+            <div class="field"><label>請假開始時間 *</label><input id="leaveStartTime" type="time" value="08:00"></div>
+            <div class="field"><label>請假結束日期 *</label><input id="leaveEndDate" type="date" value="${today}"></div>
+            <div class="field"><label>請假結束時間 *</label><input id="leaveEndTime" type="time" value="18:00"></div>
+
+            <div class="field full">
+              <label class="leave-all-day"><input id="leaveAllDay" type="checkbox"> 整日請假</label>
+            </div>
+
+            <div class="field full"><label>原因</label><textarea id="leaveReason" placeholder="例如：身體不適、家庭因素"></textarea></div>
+            <div class="field full"><div class="leave-summary">下一步會自動找出請假期間內這位居服員原本已安排的班表，再逐筆決定「待代班、指定代班或取消服務」。</div></div>
+          </div>
+        `,
+        onConfirm:findAffectedSchedules
+      });
+
+      $('leaveAllDay').addEventListener('change',toggleLeaveAllDay);
+      toggleLeaveAllDay();
+    }catch(err){
+      console.error(err);
+      toast('載入請假資料失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  async function findAffectedSchedules(){
+    const workerId = $('leaveWorker')?.value;
+    const startDate = $('leaveStartDate')?.value;
+    const startTime = $('leaveStartTime')?.value;
+    const endDate = $('leaveEndDate')?.value;
+    const endTime = $('leaveEndTime')?.value;
+    const isAllDay = !!$('leaveAllDay')?.checked;
+    const reason = $('leaveReason')?.value?.trim() || null;
+
+    if(!workerId || !startDate || !endDate){
+      toast('請選擇居服員並填寫請假日期。','error');
+      return;
+    }
+    if(!isAllDay && (!startTime || !endTime)){
+      toast('請填寫請假開始與結束時間。','error');
+      return;
+    }
+    if(endDate < startDate || (!isAllDay && endDate===startDate && endTime<=startTime)){
+      toast('請假結束時間必須晚於開始時間。','error');
+      return;
+    }
+
+    const btn = $('modalConfirm');
+    if(btn) btn.disabled = true;
+    showLoading(true);
+
+    try{
+      const schedulesRes = await db.from('service_schedules')
+        .select('id,service_date,start_time,end_time,case_id,care_worker_id,original_care_worker_id,staffing_status,schedule_status,notes')
+        .eq('care_worker_id',workerId)
+        .neq('schedule_status','cancelled')
+        .gte('service_date',startDate)
+        .lte('service_date',endDate)
+        .order('service_date')
+        .order('start_time');
+      if(schedulesRes.error) throw schedulesRes.error;
+
+      const affected = (schedulesRes.data || []).filter(row=>
+        leaveScheduleOverlaps(row,startDate,startTime,endDate,endTime,isAllDay)
+      );
+
+      const caseIds = [...new Set(affected.map(x=>x.case_id).filter(Boolean))];
+      const scheduleIds = affected.map(x=>x.id);
+
+      const [workersRes,casesRes,itemsRes] = await Promise.all([
+        db.from('care_workers').select('id,worker_name,employment_status').eq('employment_status','active').order('worker_name'),
+        caseIds.length ? db.from('care_cases').select('id,case_name').in('id',caseIds) : Promise.resolve({data:[],error:null}),
+        scheduleIds.length ? db.from('schedule_service_items').select('schedule_id,service_code,quantity').in('schedule_id',scheduleIds).order('service_code') : Promise.resolve({data:[],error:null})
+      ]);
+      if(workersRes.error) throw workersRes.error;
+      if(casesRes.error) throw casesRes.error;
+      if(itemsRes.error) throw itemsRes.error;
+
+      leaveDraft = {
+        workerId,startDate,startTime,endDate,endTime,isAllDay,reason,
+        schedules:affected,
+        workers:workersRes.data || [],
+        cases:casesRes.data || [],
+        items:itemsRes.data || []
+      };
+
+      openLeaveAffectedModal();
+    }catch(err){
+      console.error(err);
+      toast('讀取受影響班表失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+      if(btn && document.body.contains(btn)) btn.disabled = false;
+    }
+  }
+
+  function openLeaveAffectedModal(){
+    if(!leaveDraft) return;
+    const workerName = leaveWorkerName(leaveDraft.workerId);
+    const schedules = leaveDraft.schedules || [];
+
+    openModal({
+      title:'請假／代班處理',
+      confirmText:'確認並套用',
+      large:true,
+      html:`
+        <div class="form-grid">
+          <div class="field full">
+            <div class="leave-summary">
+              <b>${escapeHTML(workerName)}</b>｜${leaveDraft.startDate} ${leaveDraft.isAllDay?'整日':leaveDraft.startTime}
+              ～ ${leaveDraft.endDate} ${leaveDraft.isAllDay?'整日':leaveDraft.endTime}<br>
+              共影響 <b>${schedules.length}</b> 筆班表。${leaveDraft.reason?'<br>原因：'+escapeHTML(leaveDraft.reason):''}
+            </div>
+          </div>
+
+          <div class="field full">
+            ${schedules.length
+              ? `<div class="leave-affected-list">
+                  ${schedules.map(row=>{
+                    const items=leaveItemsFor(row.id);
+                    return `
+                      <div class="leave-affected-card pending" data-leave-card="${row.id}">
+                        <div class="leave-affected-main">
+                          <div class="leave-affected-time">${leaveDateLabel(row.service_date)}　${leaveTime(row.start_time)}–${leaveTime(row.end_time)}</div>
+                          <div class="leave-affected-case">${escapeHTML(leaveCaseName(row.case_id))}</div>
+                          <div class="leave-affected-items">${items.length?items.map(i=>escapeHTML(i.service_code)+' ×'+Number(i.quantity)).join('、'):'未設定服務項目'}</div>
+                        </div>
+                        <div class="leave-action-grid">
+                          <div class="field"><label>處理方式</label>
+                            <select data-leave-action="${row.id}">
+                              <option value="pending" selected>待代班</option>
+                              <option value="substitute">指定代班居服員</option>
+                              <option value="cancel">取消服務</option>
+                            </select>
+                          </div>
+                          <div class="field leave-substitute-field" data-leave-substitute-wrap="${row.id}"><label>代班居服員</label>
+                            <select data-leave-substitute="${row.id}">
+                              <option value="">請選擇代班居服員</option>
+                              ${leaveDraft.workers.filter(w=>w.id!==leaveDraft.workerId).map(w=>`<option value="${w.id}">${escapeHTML(w.worker_name)}</option>`).join('')}
+                            </select>
+                          </div>
+                        </div>
+                      </div>`;
+                  }).join('')}
+                </div>`
+              : '<div class="empty compact"><div class="icon">✅</div><h3>沒有受影響班表</h3><p>仍可儲存本次請假紀錄。</p></div>'
+            }
+          </div>
+        </div>
+      `,
+      onConfirm:applyLeaveAndSubstitution
+    });
+
+    document.querySelectorAll('[data-leave-action]').forEach(select=>{
+      select.addEventListener('change',()=>{
+        const id=select.dataset.leaveAction;
+        const wrap=document.querySelector(`[data-leave-substitute-wrap="${id}"]`);
+        const card=document.querySelector(`[data-leave-card="${id}"]`);
+        wrap?.classList.toggle('show',select.value==='substitute');
+        card?.classList.remove('pending','substitute','cancel');
+        card?.classList.add(select.value);
+      });
+    });
+  }
+
+  function leaveSelectedActions(){
+    return (leaveDraft?.schedules || []).map(row=>{
+      const action=document.querySelector(`[data-leave-action="${row.id}"]`)?.value || 'pending';
+      const substituteWorkerId=document.querySelector(`[data-leave-substitute="${row.id}"]`)?.value || null;
+      return {row,action,substituteWorkerId};
+    });
+  }
+
+  async function leaveConflictCount(actions){
+    const substitutions=actions.filter(x=>x.action==='substitute' && x.substituteWorkerId);
+    if(!substitutions.length) return 0;
+
+    const affectedIds=new Set(actions.map(x=>x.row.id));
+    let count=0;
+
+    const groups=new Map();
+    substitutions.forEach(item=>{
+      if(!groups.has(item.substituteWorkerId)) groups.set(item.substituteWorkerId,[]);
+      groups.get(item.substituteWorkerId).push(item);
+    });
+
+    for(const [workerId,group] of groups){
+      const dates=group.map(x=>x.row.service_date).sort();
+      const res=await db.from('service_schedules')
+        .select('id,service_date,start_time,end_time,schedule_status,staffing_status')
+        .eq('care_worker_id',workerId)
+        .neq('schedule_status','cancelled')
+        .neq('staffing_status','pending_substitute')
+        .gte('service_date',dates[0])
+        .lte('service_date',dates[dates.length-1]);
+      if(res.error) throw res.error;
+
+      group.forEach(item=>{
+        const conflict=(res.data||[]).some(existing=>
+          !affectedIds.has(existing.id) &&
+          existing.service_date===item.row.service_date &&
+          existing.start_time<item.row.end_time &&
+          existing.end_time>item.row.start_time
+        );
+        if(conflict) count++;
+      });
+    }
+    return count;
+  }
+
+  async function applyLeaveAndSubstitution(){
+    if(!leaveDraft) return;
+    const actions=leaveSelectedActions();
+
+    if(actions.some(x=>x.action==='substitute' && !x.substituteWorkerId)){
+      toast('請為所有「指定代班」的班表選擇代班居服員。','error');
+      return;
+    }
+
+    const btn=$('modalConfirm');
+    if(btn) btn.disabled=true;
+    showLoading(true);
+
+    try{
+      const conflictCount=await leaveConflictCount(actions);
+      if(conflictCount){
+        const ok=confirm(
+          '⚠️ 代班時間衝突\n\n' +
+          '有 '+conflictCount+' 筆代班與新居服員既有班表時間重疊。\n\n' +
+          '仍要套用本次請假／代班處理嗎？'
+        );
+        if(!ok) return;
+      }
+
+      const leaveRes=await db.from('care_worker_leaves')
+        .insert({
+          care_worker_id:leaveDraft.workerId,
+          start_date:leaveDraft.startDate,
+          start_time:leaveDraft.isAllDay?null:leaveDraft.startTime,
+          end_date:leaveDraft.endDate,
+          end_time:leaveDraft.isAllDay?null:leaveDraft.endTime,
+          is_all_day:leaveDraft.isAllDay,
+          reason:leaveDraft.reason,
+          created_by:state.user.id
+        })
+        .select('id')
+        .single();
+      if(leaveRes.error) throw leaveRes.error;
+
+      const leaveId=leaveRes.data.id;
+      for(const item of actions){
+        const base={
+          original_care_worker_id:item.row.original_care_worker_id || item.row.care_worker_id,
+          leave_request_id:leaveId,
+          updated_by:state.user.id,
+          updated_at:new Date().toISOString()
+        };
+
+        let payload;
+        if(item.action==='pending'){
+          payload={
+            ...base,
+            staffing_status:'pending_substitute'
+          };
+        }else if(item.action==='substitute'){
+          payload={
+            ...base,
+            care_worker_id:item.substituteWorkerId,
+            staffing_status:'substituted'
+          };
+        }else{
+          payload={
+            ...base,
+            schedule_status:'cancelled',
+            staffing_status:'normal'
+          };
+        }
+
+        const updateRes=await db.from('service_schedules')
+          .update(payload)
+          .eq('id',item.row.id)
+          .select('id');
+        if(updateRes.error) throw updateRes.error;
+        if(!(updateRes.data||[]).length) throw new Error('有班表未能完成異動。');
+      }
+
+      closeModal();
+      leaveDraft=null;
+      navigate('schedule');
+      toast('請假／代班處理已完成。','success');
+    }catch(err){
+      console.error(err);
+      toast('請假／代班處理失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+      if(btn && document.body.contains(btn)) btn.disabled=false;
+    }
+  }
+
+  document.addEventListener('click',event=>{
+    const btn=event.target.closest?.('#scheduleLeaveBtn');
+    if(!btn) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openLeaveModal();
+  },true);
+})();
