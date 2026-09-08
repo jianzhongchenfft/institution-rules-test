@@ -44,14 +44,14 @@
     .schedule-status.completed{background:#eff8ff;color:#175cd3}
     .schedule-status.cancelled{background:#fef3f2;color:#b42318}
     .schedule-service-editor{display:grid;gap:7px}
-    .schedule-service-head{display:grid;grid-template-columns:minmax(0,1fr) 20px 48px 72px 48px 34px;gap:6px;padding:0 2px;font-size:10.5px;font-weight:900;color:#667085;align-items:center}
-    .schedule-service-row{display:grid;grid-template-columns:minmax(0,1fr) 20px 48px 72px 48px 34px;gap:6px;align-items:center}
+    .schedule-service-head{display:grid;grid-template-columns:minmax(0,1fr) 20px 78px 34px;gap:6px;padding:0 2px;font-size:10.5px;font-weight:900;color:#667085;align-items:center}
+    .schedule-service-row{display:grid;grid-template-columns:minmax(0,1fr) 20px 78px 34px;gap:6px;align-items:center}
     .schedule-service-times{text-align:center;font-weight:900;color:#667085}
-    .schedule-qty-step{height:34px;padding:0!important;display:grid;place-items:center;font-size:10.5px!important;font-weight:900!important}
     .schedule-service-code,.schedule-service-qty{width:100%;min-width:0}
+    .schedule-auto-time{background:#f8fafc!important;color:#475467!important;font-weight:900}
     .schedule-remove-item{width:34px;height:34px;padding:0!important;display:grid;place-items:center}
     .schedule-form-note{padding:9px 10px;border:1px solid #f0ded7;background:#fff8f5;border-radius:9px;font-size:11px;line-height:1.5;color:#7d4b3b}
-    @media(max-width:700px){.schedule-service-head,.schedule-service-row{grid-template-columns:minmax(0,1fr) 18px 44px 64px 44px 34px;gap:4px}}
+    @media(max-width:700px){.schedule-service-head,.schedule-service-row{grid-template-columns:minmax(0,1fr) 18px 68px 34px;gap:4px}}
     @media(max-width:1180px){.schedule-board{min-width:1120px;grid-template-columns:repeat(7,minmax(160px,1fr))}}
     @media(max-width:820px){.schedule-stats{grid-template-columns:repeat(2,1fr)}.schedule-toolbar .spacer{display:none}.schedule-week-title{order:-1;width:100%;text-align:left}.schedule-toolbar select{flex:1}}
   `;
@@ -156,42 +156,71 @@
     return match?.[0] || 'OTHER';
   }
 
-  const scheduleBACodes = [
-    ['BA01','基本身體清潔'],
-    ['BA02','基本日常照顧'],
-    ['BA03','測量生命徵象'],
-    ['BA04','協助進食或管灌餵食'],
-    ['BA05','餐食照顧'],
-    ['BA07','協助沐浴及洗頭'],
-    ['BA08','足部照護'],
-    ['BA09','到宅沐浴車服務－第1型'],
-    ['BA09a','到宅沐浴車服務－第2型'],
-    ['BA10','翻身拍背'],
-    ['BA11','肢體關節活動'],
-    ['BA12','協助上（下）樓梯'],
-    ['BA13','陪同外出'],
-    ['BA14','陪同就醫'],
-    ['BA15-1','家務協助－自用'],
-    ['BA15-2','家務協助－共用'],
-    ['BA16-1','代購／代領／代送－自用'],
-    ['BA16-2','代購／代領／代送－共用'],
-    ['BA17a','人工氣道管內分泌物抽吸'],
-    ['BA17b','口腔內分泌物抽吸'],
-    ['BA17c','尿管及鼻胃管清潔與固定'],
-    ['BA17d1','血糖機驗血糖'],
-    ['BA17d2','甘油球通便'],
-    ['BA17e','依指示置入藥盒'],
-    ['BA18','安全看視'],
-    ['BA20','陪伴服務'],
-    ['BA22','巡視服務'],
-    ['BA23','協助洗頭'],
-    ['BA24','協助排泄']
+  const scheduleServiceCodes = [
+    {code:'BA01',name:'基本身體清潔',minutes:30},
+    {code:'BA02',name:'基本日常照顧',minutes:30},
+    {code:'BA03',name:'測量生命徵象',minutes:10},
+    {code:'BA04',name:'協助進食或管灌餵食',minutes:30},
+    {code:'BA05',name:'餐食照顧',minutes:40},
+    {code:'BA07',name:'協助沐浴及洗頭',minutes:30},
+    {code:'BA08',name:'足部照護',minutes:40},
+    {code:'BA10',name:'翻身拍背',minutes:20},
+    {code:'BA11',name:'肢體關節活動',minutes:20},
+    {code:'BA12',name:'協助上/下樓梯',minutes:20},
+    {code:'BA13',name:'陪同外出',minutes:30},
+    {code:'BA14',name:'陪同就醫',minutes:90},
+    {code:'BA15',name:'家務協助',minutes:30},
+    {code:'BA16',name:'代購/代領/代送服務',minutes:20},
+    {code:'BA17',name:'協助執行輔助性醫療',minutes:0},
+    {code:'BA18',name:'安全看視',minutes:30},
+    {code:'BA20',name:'陪伴服務',minutes:30},
+    {code:'BA22',name:'巡視服務',minutes:20},
+    {code:'BA23',name:'協助洗頭',minutes:30},
+    {code:'BA24',name:'協助排泄',minutes:30},
+    {code:'GA09',name:'居家喘息服務',minutes:120},
+    {code:'SC09',name:'居家短照服務',minutes:120}
   ];
 
-  function scheduleBAOptions(selected=''){
-    return '<option value="">請選擇 BA碼</option>' + scheduleBACodes.map(([code,name]) =>
-      `<option value="${code}" ${selected===code?'selected':''}>${code}｜${escapeHTML(name)}</option>`
-    ).join('');
+  function scheduleServiceInfo(code){
+    return scheduleServiceCodes.find(x=>x.code===code) || null;
+  }
+
+  function scheduleServiceOptions(selected=''){
+    return '<option value="">請選擇服務碼別</option>' + scheduleServiceCodes.map(item => {
+      const timeText = item.minutes>0 ? `（${item.minutes}分）` : '';
+      return `<option value="${item.code}" ${selected===item.code?'selected':''}>${item.code}｜${escapeHTML(item.name)}${timeText}</option>`;
+    }).join('');
+  }
+
+  function updateScheduleEndTime(){
+    const startInput = $('scheduleAddStart');
+    const endInput = $('scheduleAddEnd');
+    if(!startInput || !endInput) return;
+
+    const start = startInput.value;
+    if(!start){
+      endInput.value = '';
+      return;
+    }
+
+    let totalMinutes = 0;
+    document.querySelectorAll('#scheduleServiceRows .schedule-service-row').forEach(row=>{
+      const code = row.querySelector('.schedule-service-code')?.value || '';
+      const qty = Number(row.querySelector('.schedule-service-qty')?.value || 0);
+      const info = scheduleServiceInfo(code);
+      if(info && info.minutes>0 && qty>0) totalMinutes += info.minutes * qty;
+    });
+
+    if(totalMinutes<=0){
+      endInput.value = '';
+      return;
+    }
+
+    const [h,m] = start.split(':').map(Number);
+    const total = h*60 + m + totalMinutes;
+    const endH = Math.floor((total % (24*60))/60);
+    const endM = total % 60;
+    endInput.value = `${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`;
   }
 
   function addScheduleServiceRow(code='', quantity=1){
@@ -201,30 +230,26 @@
     row.className = 'schedule-service-row';
     const safeQty = Math.min(8,Math.max(1,Number(quantity)||1));
     row.innerHTML = `
-      <select class="schedule-service-code">${scheduleBAOptions(code)}</select>
+      <select class="schedule-service-code">${scheduleServiceOptions(code)}</select>
       <span class="schedule-service-times">×</span>
-      <button type="button" class="btn schedule-qty-step schedule-qty-minus" title="減 1">−1</button>
       <select class="schedule-service-qty">${Array.from({length:8},(_,i)=>i+1).map(n=>`<option value="${n}" ${n===safeQty?'selected':''}>${n}</option>`).join('')}</select>
-      <button type="button" class="btn schedule-qty-step schedule-qty-plus" title="加 1">＋1</button>
       <button type="button" class="btn schedule-remove-item" title="移除">×</button>
     `;
 
-    const qtySelect = row.querySelector('.schedule-service-qty');
-    row.querySelector('.schedule-qty-minus').addEventListener('click',()=>{
-      qtySelect.value = String(Math.max(1,Number(qtySelect.value)-1));
-    });
-    row.querySelector('.schedule-qty-plus').addEventListener('click',()=>{
-      qtySelect.value = String(Math.min(8,Number(qtySelect.value)+1));
-    });
+    row.querySelector('.schedule-service-code').addEventListener('change',updateScheduleEndTime);
+    row.querySelector('.schedule-service-qty').addEventListener('change',updateScheduleEndTime);
     row.querySelector('.schedule-remove-item').addEventListener('click',()=>{
       if(wrap.querySelectorAll('.schedule-service-row').length<=1){
         row.querySelector('.schedule-service-code').value='';
         row.querySelector('.schedule-service-qty').value='1';
+        updateScheduleEndTime();
         return;
       }
       row.remove();
+      updateScheduleEndTime();
     });
     wrap.appendChild(row);
+    updateScheduleEndTime();
   }
 
   async function openAddScheduleModal(){
@@ -266,7 +291,7 @@
             <div class="field"><label>班表狀態 *</label><select id="scheduleAddStatus"><option value="confirmed">已確認</option><option value="unnotified">尚未照會</option><option value="planned">已排定</option></select></div>
 
             <div class="field"><label>開始時間 *</label><input id="scheduleAddStart" type="time" value="09:00"></div>
-            <div class="field"><label>結束時間 *</label><input id="scheduleAddEnd" type="time" value="10:00"></div>
+            <div class="field"><label>結束時間（自動計算） *</label><input id="scheduleAddEnd" class="schedule-auto-time" type="time" readonly></div>
 
             <div class="field"><label>個案 *</label><select id="scheduleAddCase"><option value="">請選擇個案</option>${cases.map(c=>`<option value="${c.id}">${escapeHTML(c.case_name)}</option>`).join('')}</select></div>
             <div class="field"><label>居服員 *</label><select id="scheduleAddWorker"><option value="">請選擇居服員</option>${workers.map(w=>`<option value="${w.id}">${escapeHTML(w.worker_name)}</option>`).join('')}</select></div>
@@ -274,7 +299,7 @@
             <div class="field full">
               <label>服務項目 *</label>
               <div class="schedule-service-editor">
-                <div class="schedule-service-head"><span>BA碼</span><span class="schedule-service-times">×</span><span></span><span>支數</span><span></span><span></span></div>
+                <div class="schedule-service-head"><span>服務碼別</span><span class="schedule-service-times">×</span><span>支數</span><span></span></div>
                 <div id="scheduleServiceRows"></div>
                 <div><button id="scheduleAddServiceItem" type="button" class="btn sm">＋ 新增服務項目</button></div>
               </div>
@@ -288,7 +313,10 @@
       });
 
       addScheduleServiceRow();
+      $('scheduleAddStart').addEventListener('change',updateScheduleEndTime);
+      $('scheduleAddStart').addEventListener('input',updateScheduleEndTime);
       $('scheduleAddServiceItem').addEventListener('click',()=>addScheduleServiceRow());
+      updateScheduleEndTime();
     }catch(err){
       console.error(err);
       toast('載入新增班表資料失敗：'+(err?.message||err),'error');
@@ -313,20 +341,24 @@
       }))
       .filter(x=>x.code);
 
-    if(!date || !start || !end || !caseId || !workerId){
-      toast('請完整填寫日期、時間、個案與居服員。','error');
+    if(!date || !start || !caseId || !workerId){
+      toast('請完整填寫日期、開始時間、個案與居服員。','error');
+      return;
+    }
+    if(!end){
+      toast('目前選擇的服務項目沒有可計算的服務時間，請確認服務碼別與支數。','error');
       return;
     }
     if(end<=start){
-      toast('結束時間必須晚於開始時間。','error');
+      toast('自動計算的結束時間異常，請確認服務項目。','error');
       return;
     }
     if(!items.length){
       toast('請至少填寫 1 項服務碼。','error');
       return;
     }
-    if(items.some(x=>!Number.isFinite(x.quantity) || x.quantity<=0)){
-      toast('服務項目的支數必須大於 0。','error');
+    if(items.some(x=>!Number.isInteger(x.quantity) || x.quantity<1 || x.quantity>8)){
+      toast('服務項目的支數必須介於 1～8。','error');
       return;
     }
 
@@ -367,12 +399,16 @@
 
       if(scheduleRes.error) throw scheduleRes.error;
 
-      const itemRows = items.map(x=>({
-        schedule_id:scheduleRes.data.id,
-        service_group:scheduleGroupFromCode(x.code),
-        service_code:x.code,
-        quantity:x.quantity
-      }));
+      const itemRows = items.map(x=>{
+        const info = scheduleServiceInfo(x.code);
+        return {
+          schedule_id:scheduleRes.data.id,
+          service_group:scheduleGroupFromCode(x.code),
+          service_code:x.code,
+          service_name:info?.name || null,
+          quantity:x.quantity
+        };
+      });
 
       const itemsRes = await db.from('schedule_service_items').insert(itemRows);
       if(itemsRes.error) throw itemsRes.error;
