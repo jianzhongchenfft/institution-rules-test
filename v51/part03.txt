@@ -96,4 +96,4 @@
     care_worker:'居家服務員', supervisor:'居家督導員', business_manager:'業務負責人',
     organization_manager:'機構負責人', admin:'系統管理員'
   };
-  const manageRo
+  const manageRoles = new Set(['business_manager','organization_manager','admin']);
