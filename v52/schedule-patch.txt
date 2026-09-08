@@ -988,7 +988,7 @@
           <h1>📅 排班管理</h1>
           <p>查看每週服務班表，並建立單次服務班次。</p>
         </div>
-        <div class="actions"><button id="schedulePendingBtn" class="btn schedule-pending-btn ${state.pendingSubstituteCount?'':'zero'}">⚠ 待代班 ${state.pendingSubstituteCount} 筆</button><button id="scheduleLeaveBtn" class="btn">請假／代班</button><button id="scheduleAddBtn" class="btn primary">＋ 新增班表</button></div>
+        <div class="actions"><button id="scheduleMobilePreviewBtn" class="btn">📱 手機版預覽</button><button id="schedulePendingBtn" class="btn schedule-pending-btn ${state.pendingSubstituteCount?'':'zero'}">⚠ 待代班 ${state.pendingSubstituteCount} 筆</button><button id="scheduleLeaveBtn" class="btn">請假／代班</button><button id="scheduleAddBtn" class="btn primary">＋ 新增班表</button></div>
       </div>
 
       <section class="schedule-stats">
