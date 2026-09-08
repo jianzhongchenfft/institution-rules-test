@@ -24,8 +24,15 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!importRes.ok) throw new Error(`v51/case-pdf-import-patch.txt 載入失敗（${importRes.status}）`);
       eval(await importRes.text());
 
+      const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
+      if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
+      eval(await scheduleRes.text());
+
+      if(state.profile) renderNav();
+
       if(state.profile && state.page==='dashboard') renderDashboard();
       else if(state.profile && state.page==='cases') navigate('cases');
+      else if(state.profile && state.page==='schedule') navigate('schedule');
     }catch(err){
       console.error('個案家訪／電訪模組載入失敗',err);
       if(state.profile) toast('個案家訪／電訪模組載入失敗，請重新整理頁面。','error');
