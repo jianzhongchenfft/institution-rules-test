@@ -328,6 +328,32 @@
     }
   }
 
+  function scheduleScopeLabel(scope){
+    return ({single:'只處理這一班',future:'這一班及之後',all:'整組固定班表'})[scope] || '只處理這一班';
+  }
+
+  async function scheduleScopeRows(row,scope){
+    if(!row?.recurrence_group_id || scope==='single') return [row];
+    let query=db.from('service_schedules')
+      .select('id,service_date,start_time,end_time,case_id,care_worker_id,schedule_status,recurrence_group_id,notes')
+      .eq('recurrence_group_id',row.recurrence_group_id)
+      .order('service_date')
+      .order('start_time');
+    if(scope==='future') query=query.gte('service_date',row.service_date);
+    const res=await query;
+    if(res.error) throw res.error;
+    return res.data || [];
+  }
+
+  function updateScheduleEditScopeUI(){
+    const scope=$('scheduleEditScope')?.value || 'single';
+    const dateInput=$('scheduleAddDate');
+    if(!dateInput) return;
+    const grouped=scope!=='single';
+    dateInput.disabled=grouped;
+    dateInput.title=grouped?'整組或後續修改會保留每一班原本的服務日期。':'';
+  }
+
   async function openEditScheduleModal(scheduleId){
     if(!canUseScheduleAdmin()) return;
     const row = state.scheduleRows.find(x=>x.id===scheduleId);
@@ -359,6 +385,17 @@
         large:true,
         html:`
           <div class="form-grid">
+            ${row.recurrence_group_id?`
+              <div class="field full">
+                <label>修改／刪除範圍 *</label>
+                <select id="scheduleEditScope">
+                  <option value="single">只處理這一班</option>
+                  <option value="future">這一班及之後</option>
+                  <option value="all">整組固定班表</option>
+                </select>
+                <div class="schedule-recurrence-preview">選擇「這一班及之後」或「整組」時，各班原本的服務日期會保留，只同步修改時間、個案、居服員、服務項目、狀態與備註。</div>
+              </div>`:''
+            }
             <div class="field"><label>服務日期 *</label><input id="scheduleAddDate" type="date" value="${row.service_date}"></div>
             <div class="field"><label>班表狀態 *</label><select id="scheduleAddStatus">
               <option value="confirmed" ${row.schedule_status==='confirmed'?'selected':''}>已確認</option>
@@ -408,6 +445,8 @@
       $('scheduleAddStart').addEventListener('input',updateScheduleEndTime);
       $('scheduleAddServiceItem').addEventListener('click',()=>addScheduleServiceRow());
       $('scheduleDeleteBtn').addEventListener('click',()=>deleteSchedule(scheduleId));
+      $('scheduleEditScope')?.addEventListener('change',updateScheduleEditScopeUI);
+      updateScheduleEditScopeUI();
       updateScheduleEndTime();
     }catch(err){
       console.error(err);
@@ -418,64 +457,78 @@
   }
 
   async function deleteSchedule(scheduleId){
-    const row = state.scheduleRows.find(x=>x.id===scheduleId);
+    const row=state.scheduleRows.find(x=>x.id===scheduleId);
     if(!row){
       toast('找不到這筆班表，請重新整理後再試。','error');
       return;
     }
 
-    const ok = confirm(
-      '確定要刪除這筆班表嗎？\n\n' +
-      scheduleDateLabel(new Date(row.service_date+'T00:00:00')) + ' ' +
-      scheduleTimeLabel(row.start_time) + '–' + scheduleTimeLabel(row.end_time) + '\n' +
-      scheduleCaseName(row.case_id) + '／' + scheduleWorkerName(row.care_worker_id) +
-      '\n\n刪除後無法復原。'
-    );
-    if(!ok) return;
-
-    const deleteBtn = $('scheduleDeleteBtn');
-    if(deleteBtn) deleteBtn.disabled = true;
+    const scope=row.recurrence_group_id ? ($('scheduleEditScope')?.value||'single') : 'single';
+    const deleteBtn=$('scheduleDeleteBtn');
+    if(deleteBtn) deleteBtn.disabled=true;
     showLoading(true);
 
     try{
-      const res = await db.from('service_schedules')
+      const targets=await scheduleScopeRows(row,scope);
+      if(!targets.length) throw new Error('找不到要刪除的班表。');
+
+      const rangeText=scheduleScopeLabel(scope);
+      const ok=confirm(
+        '確定要刪除班表嗎？\n\n' +
+        '範圍：'+rangeText+'\n' +
+        '共 '+targets.length+' 筆班表\n\n' +
+        '刪除後無法復原。'
+      );
+      if(!ok) return;
+
+      const ids=targets.map(x=>x.id);
+      const res=await db.from('service_schedules')
         .delete()
-        .eq('id',scheduleId)
+        .in('id',ids)
         .select('id');
 
       if(res.error) throw res.error;
-      if(!(res.data || []).length) throw new Error('班表未刪除，可能沒有權限或資料已不存在。');
+      if((res.data||[]).length!==ids.length){
+        throw new Error('部分班表未能刪除，請重新整理後確認。');
+      }
 
       closeModal();
       await loadScheduleWeek();
       renderSchedulePage();
-      toast('班表已刪除。','success');
+      toast(scope==='single'?'班表已刪除。':`已刪除 ${ids.length} 筆班表。`,'success');
     }catch(err){
       console.error(err);
       toast('刪除班表失敗：'+(err?.message||err),'error');
     }finally{
       showLoading(false);
-      if(deleteBtn && document.body.contains(deleteBtn)) deleteBtn.disabled = false;
+      if(deleteBtn && document.body.contains(deleteBtn)) deleteBtn.disabled=false;
     }
   }
 
   async function saveScheduleEdit(scheduleId){
-    const date = $('scheduleAddDate')?.value;
-    const start = $('scheduleAddStart')?.value;
-    const end = $('scheduleAddEnd')?.value;
-    const caseId = $('scheduleAddCase')?.value;
-    const workerId = $('scheduleAddWorker')?.value;
-    const status = $('scheduleAddStatus')?.value || 'confirmed';
-    const notes = $('scheduleAddNotes')?.value?.trim() || null;
+    const row=state.scheduleRows.find(x=>x.id===scheduleId);
+    if(!row){
+      toast('找不到這筆班表，請重新整理後再試。','error');
+      return;
+    }
 
-    const items = [...document.querySelectorAll('#scheduleServiceRows .schedule-service-row')]
-      .map(row=>({
-        code: row.querySelector('.schedule-service-code')?.value?.trim().toUpperCase() || '',
-        quantity: Number(row.querySelector('.schedule-service-qty')?.value || 0)
+    const scope=row.recurrence_group_id ? ($('scheduleEditScope')?.value||'single') : 'single';
+    const date=$('scheduleAddDate')?.value;
+    const start=$('scheduleAddStart')?.value;
+    const end=$('scheduleAddEnd')?.value;
+    const caseId=$('scheduleAddCase')?.value;
+    const workerId=$('scheduleAddWorker')?.value;
+    const status=$('scheduleAddStatus')?.value||'confirmed';
+    const notes=$('scheduleAddNotes')?.value?.trim()||null;
+
+    const items=[...document.querySelectorAll('#scheduleServiceRows .schedule-service-row')]
+      .map(itemRow=>({
+        code:itemRow.querySelector('.schedule-service-code')?.value?.trim().toUpperCase()||'',
+        quantity:Number(itemRow.querySelector('.schedule-service-qty')?.value||0)
       }))
       .filter(x=>x.code);
 
-    if(!date || !start || !caseId || !workerId){
+    if(!date||!start||!caseId||!workerId){
       toast('請完整填寫日期、開始時間、個案與居服員。','error');
       return;
     }
@@ -491,80 +544,128 @@
       toast('請至少填寫 1 項服務碼。','error');
       return;
     }
-    if(items.some(x=>!Number.isInteger(x.quantity) || x.quantity<1 || x.quantity>8)){
+    if(items.some(x=>!Number.isInteger(x.quantity)||x.quantity<1||x.quantity>8)){
       toast('服務項目的支數必須介於 1～8。','error');
       return;
     }
 
-    const confirmBtn = $('modalConfirm');
-    if(confirmBtn) confirmBtn.disabled = true;
+    const confirmBtn=$('modalConfirm');
+    if(confirmBtn) confirmBtn.disabled=true;
     showLoading(true);
 
     try{
-      const conflictRes = await db.from('service_schedules')
-        .select('id,start_time,end_time,schedule_status')
-        .eq('service_date',date)
-        .eq('care_worker_id',workerId)
-        .neq('id',scheduleId)
-        .neq('schedule_status','cancelled')
-        .lt('start_time',end)
-        .gt('end_time',start)
-        .limit(1);
+      const targets=await scheduleScopeRows(row,scope);
+      if(!targets.length) throw new Error('找不到要修改的班表。');
 
-      if(conflictRes.error) throw conflictRes.error;
-      if((conflictRes.data || []).length){
-        const proceed = confirm('⚠️ 排班時間重疊\n\n修改後，此居服員在同一天的這個時段會與其他班表重疊。\n\n仍要儲存修改嗎？');
-        if(!proceed) return;
+      // 單班可修改日期；整組／後續則保留每一班原日期。
+      const proposed=targets.map(target=>({
+        id:target.id,
+        service_date:scope==='single'?date:target.service_date
+      }));
+
+      // 檢查修改後與其他班表是否重疊；被本次修改的班表彼此不算衝突。
+      if(status!=='cancelled'){
+        const targetIds=new Set(targets.map(x=>x.id));
+        const dates=proposed.map(x=>x.service_date).sort();
+        const existingRes=await db.from('service_schedules')
+          .select('id,service_date,start_time,end_time,schedule_status')
+          .eq('care_worker_id',workerId)
+          .neq('schedule_status','cancelled')
+          .gte('service_date',dates[0])
+          .lte('service_date',dates[dates.length-1]);
+        if(existingRes.error) throw existingRes.error;
+
+        const proposedDates=new Set(dates);
+        const conflicts=(existingRes.data||[]).filter(x=>
+          !targetIds.has(x.id) &&
+          proposedDates.has(x.service_date) &&
+          x.start_time<end &&
+          x.end_time>start
+        );
+        if(conflicts.length){
+          const conflictDays=new Set(conflicts.map(x=>x.service_date)).size;
+          const proceed=confirm(
+            '⚠️ 排班時間重疊\n\n' +
+            '修改範圍：'+scheduleScopeLabel(scope)+'\n' +
+            '其中 '+conflictDays+' 個服務日會與此居服員其他班表時間重疊。\n\n' +
+            '仍要儲存修改嗎？'
+          );
+          if(!proceed) return;
+        }
       }
 
-      const scheduleRes = await db.from('service_schedules')
-        .update({
-          service_date:date,
-          start_time:start,
-          end_time:end,
-          case_id:caseId,
-          care_worker_id:workerId,
-          schedule_status:status,
-          notes,
-          updated_by:state.user.id,
-          updated_at:new Date().toISOString()
-        })
-        .eq('id',scheduleId)
-        .select('id')
-        .single();
+      let recurrenceValue=row.recurrence_group_id;
+      if(row.recurrence_group_id && scope==='single'){
+        // 單獨修改固定班表後，脫離原固定群組，避免日後整組修改覆蓋這個例外。
+        recurrenceValue=null;
+      }else if(row.recurrence_group_id && scope==='future'){
+        // 從本班起切成新的固定群組，讓過去紀錄與新規則分開管理。
+        recurrenceValue=crypto.randomUUID();
+      }
+
+      const updatePayload={
+        start_time:start,
+        end_time:end,
+        case_id:caseId,
+        care_worker_id:workerId,
+        schedule_status:status,
+        notes,
+        updated_by:state.user.id,
+        updated_at:new Date().toISOString()
+      };
+
+      if(scope==='single'){
+        updatePayload.service_date=date;
+        updatePayload.recurrence_group_id=recurrenceValue;
+      }else if(scope==='future'){
+        updatePayload.recurrence_group_id=recurrenceValue;
+      }
+
+      const ids=targets.map(x=>x.id);
+      const scheduleRes=await db.from('service_schedules')
+        .update(updatePayload)
+        .in('id',ids)
+        .select('id');
 
       if(scheduleRes.error) throw scheduleRes.error;
+      if((scheduleRes.data||[]).length!==ids.length){
+        throw new Error('部分班表未能更新，請重新整理後確認。');
+      }
 
-      const deleteItemsRes = await db.from('schedule_service_items')
+      const deleteItemsRes=await db.from('schedule_service_items')
         .delete()
-        .eq('schedule_id',scheduleId);
+        .in('schedule_id',ids);
       if(deleteItemsRes.error) throw deleteItemsRes.error;
 
-      const itemRows = items.map(x=>{
-        const info = scheduleServiceInfo(x.code);
-        return {
-          schedule_id:scheduleId,
-          service_group:scheduleGroupFromCode(x.code),
-          service_code:x.code,
-          service_name:info?.name || null,
-          quantity:x.quantity
-        };
+      const itemRows=[];
+      ids.forEach(id=>{
+        items.forEach(x=>{
+          const info=scheduleServiceInfo(x.code);
+          itemRows.push({
+            schedule_id:id,
+            service_group:scheduleGroupFromCode(x.code),
+            service_code:x.code,
+            service_name:info?.name||null,
+            quantity:x.quantity
+          });
+        });
       });
 
-      const insertItemsRes = await db.from('schedule_service_items').insert(itemRows);
+      const insertItemsRes=await db.from('schedule_service_items').insert(itemRows);
       if(insertItemsRes.error) throw insertItemsRes.error;
 
-      state.scheduleWeekStart = scheduleDateISO(scheduleMonday(new Date(date+'T00:00:00')));
+      const focusDate=scope==='single'?date:row.service_date;
+      state.scheduleWeekStart=scheduleDateISO(scheduleMonday(new Date(focusDate+'T00:00:00')));
       closeModal();
       await loadScheduleWeek();
       renderSchedulePage();
-      toast('班表已更新。','success');
+      toast(scope==='single'?'班表已更新。':`已更新 ${ids.length} 筆班表。`,'success');
     }catch(err){
       console.error(err);
       toast('更新班表失敗：'+(err?.message||err),'error');
     }finally{
       showLoading(false);
-      if(confirmBtn && document.body.contains(confirmBtn)) confirmBtn.disabled = false;
+      if(confirmBtn && document.body.contains(confirmBtn)) confirmBtn.disabled=false;
     }
   }
 
@@ -686,7 +787,7 @@
           .order('worker_name'),
 
         db.from('service_schedules')
-          .select('id,service_date,start_time,end_time,case_id,care_worker_id,schedule_status,notes')
+          .select('id,service_date,start_time,end_time,case_id,care_worker_id,schedule_status,recurrence_group_id,notes')
           .gte('service_date', scheduleDateISO(start))
           .lte('service_date', scheduleDateISO(end))
           .order('service_date')
