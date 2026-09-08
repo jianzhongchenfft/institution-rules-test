@@ -59,6 +59,8 @@
     .schedule-delete-wrap{display:flex;justify-content:flex-start;margin-top:2px}
     .schedule-delete-btn{border-color:#fda29b!important;background:#fff!important;color:#b42318!important}
     .schedule-delete-btn:hover{background:#fef3f2!important}
+    .schedule-pending-btn{border-color:#fdb022!important;background:#fffaeb!important;color:#b54708!important;font-weight:900!important}
+    .schedule-pending-btn.zero{border-color:var(--line)!important;background:#fff!important;color:#667085!important}
     @media(max-width:700px){.schedule-service-head,.schedule-service-row{grid-template-columns:minmax(0,1fr) 18px 68px 34px;gap:4px}}
     @media(max-width:1180px){.schedule-board{min-width:1120px;grid-template-columns:repeat(7,minmax(160px,1fr))}}
     @media(max-width:820px){.schedule-stats{grid-template-columns:repeat(2,1fr)}.schedule-toolbar .spacer{display:none}.schedule-week-title{order:-1;width:100%;text-align:left}.schedule-toolbar select{flex:1}}
@@ -128,6 +130,7 @@
     scheduleWorkers: [],
     scheduleCases: [],
     scheduleItems: [],
+    pendingSubstituteCount: 0,
     scheduleLoading: false
   });
 
@@ -888,7 +891,7 @@
       const start = new Date(state.scheduleWeekStart + 'T00:00:00');
       const end = scheduleAddDays(start, 6);
 
-      const [workersRes, schedulesRes] = await Promise.all([
+      const [workersRes, schedulesRes, pendingRes] = await Promise.all([
         db.from('care_workers')
           .select('id,worker_name,employment_status')
           .eq('employment_status','active')
@@ -899,14 +902,21 @@
           .gte('service_date', scheduleDateISO(start))
           .lte('service_date', scheduleDateISO(end))
           .order('service_date')
-          .order('start_time')
+          .order('start_time'),
+
+        db.from('service_schedules')
+          .select('id')
+          .eq('staffing_status','pending_substitute')
+          .neq('schedule_status','cancelled')
       ]);
 
       if(workersRes.error) throw workersRes.error;
       if(schedulesRes.error) throw schedulesRes.error;
+      if(pendingRes.error) throw pendingRes.error;
 
       state.scheduleWorkers = workersRes.data || [];
       state.scheduleRows = schedulesRes.data || [];
+      state.pendingSubstituteCount = (pendingRes.data || []).length;
 
       const scheduleIds = [...new Set(state.scheduleRows.map(x=>x.id))];
       const caseIds = [...new Set(state.scheduleRows.map(x=>x.case_id).filter(Boolean))];
@@ -978,7 +988,7 @@
           <h1>📅 排班管理</h1>
           <p>查看每週服務班表，並建立單次服務班次。</p>
         </div>
-        <div class="actions"><button id="scheduleLeaveBtn" class="btn">請假／代班</button><button id="scheduleAddBtn" class="btn primary">＋ 新增班表</button></div>
+        <div class="actions"><button id="schedulePendingBtn" class="btn schedule-pending-btn ${state.pendingSubstituteCount?'':'zero'}">⚠ 待代班 ${state.pendingSubstituteCount} 筆</button><button id="scheduleLeaveBtn" class="btn">請假／代班</button><button id="scheduleAddBtn" class="btn primary">＋ 新增班表</button></div>
       </div>
 
       <section class="schedule-stats">
@@ -1142,6 +1152,11 @@
       toast('已重新整理班表','success');
     });
   }
+
+  window.v52ScheduleRefresh = async function(){
+    await loadScheduleWeek();
+    renderSchedulePage();
+  };
 
   const baseNavigateForSchedule = navigate;
 
