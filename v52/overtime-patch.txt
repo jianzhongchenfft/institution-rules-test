@@ -1,0 +1,426 @@
+// V5.2 加班／換休管理：申請、審核與規則
+(() => {
+  const overtimeStyle = document.createElement('style');
+  overtimeStyle.id = 'v52-overtime-style';
+  overtimeStyle.textContent = `
+    .ot-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .ot-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+    .ot-toolbar .spacer{flex:1}
+    .ot-tabs{display:flex;gap:7px;flex-wrap:wrap}
+    .ot-tab{border:1px solid var(--line);background:#fff;color:#667085;border-radius:999px;padding:7px 11px;font-size:11.5px;font-weight:900;cursor:pointer}
+    .ot-tab.active{background:var(--green-700);border-color:var(--green-700);color:#fff}
+    .ot-table-shell{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px}
+    .ot-table{width:100%;min-width:920px;border-collapse:collapse}
+    .ot-table th{padding:10px 12px;text-align:left;background:#faf8f7;color:#667085;font-size:11px;font-weight:900;border-bottom:1px solid var(--line);white-space:nowrap}
+    .ot-table td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:#344054;vertical-align:middle}
+    .ot-table tr:last-child td{border-bottom:0}
+    .ot-table tbody tr:hover{background:#fffaf8}
+    .ot-status{display:inline-flex;align-items:center;border-radius:999px;padding:5px 8px;font-size:10.5px;font-weight:900;white-space:nowrap}
+    .ot-status.draft{background:#f2f4f7;color:#667085}
+    .ot-status.pending{background:#fffaeb;color:#b54708}
+    .ot-status.approved{background:#eef7f1;color:#237a4b}
+    .ot-status.rejected{background:#fef3f2;color:#b42318}
+    .ot-type{font-weight:900;color:#475467}
+    .ot-detail{font-size:11px;color:#667085;line-height:1.5;margin-top:2px}
+    .ot-amount{font-weight:900;color:var(--green-800);white-space:nowrap}
+    .ot-reject{margin-top:5px;color:#b42318;font-size:11px;line-height:1.5}
+    .ot-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .ot-rule-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+    .ot-rule-card h3{margin:0 0 9px;font-size:15px}
+    .ot-rule-card p{margin:0;color:#667085;font-size:12px;line-height:1.7}
+    .ot-rule-list{margin:10px 0 0;padding-left:22px;color:#475467;font-size:12.5px;line-height:1.75}
+    .ot-rule-highlight{margin-top:12px;border:1px solid #f0ded7;background:#fff8f5;border-radius:10px;padding:10px 12px;color:#7d4b3b;font-size:12px;line-height:1.65}
+    .ot-calc{border:1px solid #f0ded7;background:#fff8f5;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:900;color:#7d4b3b;line-height:1.6}
+    .ot-readonly{background:#f8fafc!important;color:#475467!important;font-weight:900}
+    .ot-empty{padding:34px 18px;text-align:center;color:#667085}
+    .ot-empty .icon{font-size:28px;margin-bottom:7px}
+    .ot-empty h3{margin:0 0 6px;color:#344054;font-size:15px}
+    .ot-empty p{margin:0;font-size:12px;line-height:1.6}
+    .ot-review-name{font-weight:900;color:#1f2937}
+    .ot-note{white-space:pre-wrap}
+    @media(max-width:820px){.ot-summary{grid-template-columns:1fr 1fr}.ot-toolbar .spacer{display:none}}
+    @media(max-width:560px){.ot-summary{grid-template-columns:1fr}.ot-toolbar>*{width:100%}.ot-tabs{width:100%}.ot-tab{flex:1}.ot-actions{flex-direction:column}.ot-actions .btn{width:100%}}
+  `;
+  document.head.appendChild(overtimeStyle);
+
+  const regIndex = modules.findIndex(m=>m.id==='regulations');
+  if(!modules.some(m=>m.id==='overtime')){
+    const overtimeModule = {
+      section:'行政管理',
+      id:'overtime',
+      icon:'⏱',
+      label:'加班／換休管理',
+      crumb:'加班申請、換休與審核',
+      ready:true
+    };
+    if(regIndex >= 0) modules.splice(regIndex + 1, 0, overtimeModule);
+    else modules.push(overtimeModule);
+  }
+
+  Object.assign(state, {
+    overtimeRows: [],
+    overtimeLoaded: false,
+    overtimeView: 'mine',
+    overtimeMonth: isoDate(new Date()).slice(0,7)
+  });
+
+  function overtimeCanSubmit(){
+    return !!state.profile && ['supervisor','business_manager','admin'].includes(state.profile.role);
+  }
+
+  function overtimeCanReview(){
+    return !!state.profile && ['organization_manager','admin'].includes(state.profile.role);
+  }
+
+  function overtimeTypeLabel(type){
+    return type === 'holiday_visit_comp' ? '假日家訪換休' : '平日加班';
+  }
+
+  function overtimeStatusLabel(status){
+    return ({draft:'草稿',pending:'待審核',approved:'已核准',rejected:'已退回'})[status] || status || '—';
+  }
+
+  function overtimeRoleLabel(role){
+    return roleLabels[role] || role || '—';
+  }
+
+  function overtimeMonthRange(month){
+    const safe = /^\d{4}-\d{2}$/.test(month || '') ? month : isoDate(new Date()).slice(0,7);
+    const [year,mon] = safe.split('-').map(Number);
+    const start = `${year}-${String(mon).padStart(2,'0')}-01`;
+    const next = new Date(year, mon, 1);
+    const end = isoDate(new Date(next.getFullYear(), next.getMonth(), 0));
+    return {start,end};
+  }
+
+  function overtimeMinutesBetween(start,end){
+    if(!start || !end) return 0;
+    const toMin = value => {
+      const [h,m] = String(value).slice(0,5).split(':').map(Number);
+      return h*60 + m;
+    };
+    return Math.max(0, toMin(end)-toMin(start));
+  }
+
+  function overtimeDurationLabel(minutes){
+    const n = Number(minutes) || 0;
+    const h = Math.floor(n/60);
+    const m = n%60;
+    if(h && m) return `${h}小時${m}分`;
+    if(h) return `${h}小時`;
+    return `${m}分鐘`;
+  }
+
+  function overtimeOwnRows(){
+    return state.overtimeRows.filter(r=>r.applicant_staff_id===state.profile?.id);
+  }
+
+  async function loadOvertimeRows(){
+    if(!state.profile) return;
+    showLoading(true);
+    try{
+      const {data,error} = await db.from('overtime_requests')
+        .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
+        .order('work_date',{ascending:false})
+        .order('created_at',{ascending:false});
+      if(error) throw error;
+      state.overtimeRows = data || [];
+      state.overtimeLoaded = true;
+    }catch(err){
+      console.error(err);
+      state.overtimeRows = [];
+      toast('讀取加班／換休資料失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  function overtimeSummary(){
+    const {start,end}=overtimeMonthRange(state.overtimeMonth);
+    const own=overtimeOwnRows().filter(r=>r.work_date>=start && r.work_date<=end && r.status==='approved');
+    const overtimeMinutes=own.filter(r=>r.request_type==='overtime').reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
+    const compMinutes=own.filter(r=>r.request_type==='holiday_visit_comp').reduce((sum,r)=>sum+(Number(r.comp_minutes)||0),0);
+    const pending=state.overtimeRows.filter(r=>r.status==='pending').length;
+    return {overtimeMinutes,compMinutes,pending};
+  }
+
+  function renderOvertimeRules(){
+    return `
+      <section class="ot-rule-card">
+        <h3>加班申請原則</h3>
+        <p>加班以實際執行機構交辦工作為認列基礎，並依機構規定提出申請及完成審核。</p>
+        <ol class="ot-rule-list">
+          <li>如有加班需要，應向「機構負責人」提出申請，並由機構負責人審核。</li>
+          <li>申請時應填寫日期、開始時間、結束時間及加班事由；系統依開始與結束時間自動計算加班分鐘數。</li>
+          <li>提早到班或延後離開，不因打卡時間本身當然認列為加班，仍以該時段是否實際執行機構交辦工作為準。</li>
+          <li>例如機構正常上班時間為上午9時，如因9時需直接至案家家訪而於8時40分先到機構，應視8時40分至9時之間是否有實際執行機構交辦工作，再判斷是否申請加班。</li>
+          <li>加班申請經核准後，始納入機構加班紀錄；如資料不足或不符規定，機構負責人得退回並註明原因。</li>
+        </ol>
+      </section>
+      <section class="ot-rule-card">
+        <h3>假日家訪換休</h3>
+        <p>因個案情形確有需要於假日進行家訪時，依當日完成之家訪案數計算換休：</p>
+        <div class="ot-rule-highlight">1個個案換休2小時；2個個案換休4小時；以此類推，由系統依「家訪案數 × 2小時」自動計算。</div>
+      </section>`;
+  }
+
+  function overtimeRowDetail(r){
+    if(r.request_type==='holiday_visit_comp'){
+      return `<div class="ot-detail">${Number(r.holiday_case_count)||0} 案・換休 ${overtimeDurationLabel(r.comp_minutes)}</div>`;
+    }
+    return `<div class="ot-detail">${String(r.start_time||'').slice(0,5)}–${String(r.end_time||'').slice(0,5)}・${overtimeDurationLabel(r.overtime_minutes)}</div>`;
+  }
+
+  function overtimeAmount(r){
+    return r.request_type==='holiday_visit_comp' ? overtimeDurationLabel(r.comp_minutes) : overtimeDurationLabel(r.overtime_minutes);
+  }
+
+  function overtimeRenderTable(rows,{review=false}={}){
+    if(!rows.length){
+      return `<div class="ot-empty"><div class="icon">✓</div><h3>目前沒有資料</h3><p>${review?'沒有待審核的加班／換休申請。':'尚無符合條件的申請紀錄。'}</p></div>`;
+    }
+    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr>
+      ${review?'<th>申請人</th>':''}<th>日期</th><th>類型</th><th>認列</th><th>事由</th><th>狀態</th><th>操作</th>
+      </tr></thead><tbody>${rows.map(r=>`<tr>
+        ${review?`<td><div class="ot-review-name">${escapeHTML(r.applicant_name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.applicant_role))}</div></td>`:''}
+        <td>${rocDate(r.work_date+'T00:00:00')}</td>
+        <td><div class="ot-type">${overtimeTypeLabel(r.request_type)}</div>${overtimeRowDetail(r)}</td>
+        <td><span class="ot-amount">${overtimeAmount(r)}</span></td>
+        <td><div>${escapeHTML(r.reason||'—')}</div>${r.notes?`<div class="ot-detail ot-note">備註：${escapeHTML(r.notes)}</div>`:''}${r.review_note?`<div class="ot-reject">審核說明：${escapeHTML(r.review_note)}</div>`:''}</td>
+        <td><span class="ot-status ${r.status}">${overtimeStatusLabel(r.status)}</span></td>
+        <td><div class="ot-actions">
+          ${!review && ['draft','rejected'].includes(r.status) && overtimeCanSubmit()?`<button class="btn sm" data-ot-edit="${r.id}">編輯</button>`:''}
+          ${review && r.status==='pending'?`<button class="btn sm primary" data-ot-approve="${r.id}">核准</button><button class="btn sm" data-ot-reject="${r.id}">退回</button>`:''}
+        </div></td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function wireOvertimeTableActions(){
+    document.querySelectorAll('[data-ot-edit]').forEach(btn=>btn.addEventListener('click',()=>openOvertimeModal(state.overtimeRows.find(r=>r.id===btn.dataset.otEdit)||null)));
+    document.querySelectorAll('[data-ot-approve]').forEach(btn=>btn.addEventListener('click',()=>reviewOvertime(btn.dataset.otApprove,'approved')));
+    document.querySelectorAll('[data-ot-reject]').forEach(btn=>btn.addEventListener('click',()=>openOvertimeRejectModal(btn.dataset.otReject)));
+  }
+
+  function renderOvertimePage(){
+    if(state.page!=='overtime') return;
+    const summary=overtimeSummary();
+    const own=overtimeOwnRows();
+    const pending=state.overtimeRows.filter(r=>r.status==='pending');
+    const canSubmit=overtimeCanSubmit();
+    const canReview=overtimeCanReview();
+    const validViews=canReview?['mine','review','rules']:['mine','rules'];
+    if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview?'review':'mine';
+
+    $('content').innerHTML=`
+      <div class="page-head">
+        <div><h1>⏱ 加班／換休管理</h1><p>填寫加班申請、假日家訪換休，並集中管理審核紀錄。</p></div>
+        <div class="actions">${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 新增申請</button>':''}</div>
+      </div>
+      <section class="ot-summary">
+        <article class="stat-card"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">僅計已核准申請</div></article>
+        <article class="stat-card"><div class="stat-head"><span>本月假日家訪換休</span><span class="stat-icon">🏠</span></div><div class="stat-value">${overtimeDurationLabel(summary.compMinutes)}</div><div class="stat-foot">僅計已核准申請</div></article>
+        <article class="stat-card"><div class="stat-head"><span>${canReview?'待審核':'我的待審核'}</span><span class="stat-icon">📄</span></div><div class="stat-value">${canReview?summary.pending:own.filter(r=>r.status==='pending').length}</div><div class="stat-foot">${canReview?'等待機構負責人處理':'已送出等待審核'}</div></article>
+      </section>
+      <div class="ot-toolbar">
+        <div class="ot-tabs">
+          <button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">我的申請</button>
+          ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${pending.length}</button>`:''}
+          <button class="ot-tab ${state.overtimeView==='rules'?'active':''}" data-ot-view="rules">加班規則</button>
+        </div>
+        <span class="spacer"></span>
+        <label class="schedule-filter-label" for="otMonth">月份</label>
+        <input id="otMonth" type="month" value="${escapeHTML(state.overtimeMonth)}">
+        <button id="otReload" class="btn">↻ 重新整理</button>
+      </div>
+      <div id="otMain">
+        ${state.overtimeView==='rules' ? renderOvertimeRules() : state.overtimeView==='review' ? overtimeRenderTable(pending,{review:true}) : overtimeRenderTable(own)}
+      </div>`;
+
+    $('otAddBtn')?.addEventListener('click',()=>openOvertimeModal());
+    document.querySelectorAll('[data-ot-view]').forEach(btn=>btn.addEventListener('click',()=>{state.overtimeView=btn.dataset.otView;renderOvertimePage();}));
+    $('otMonth').addEventListener('change',e=>{state.overtimeMonth=e.target.value||isoDate(new Date()).slice(0,7);renderOvertimePage();});
+    $('otReload').addEventListener('click',async()=>{await loadOvertimeRows();renderOvertimePage();toast('已重新整理加班／換休資料','success');});
+    wireOvertimeTableActions();
+  }
+
+  function overtimeFormHTML(existing){
+    const type=existing?.request_type || 'overtime';
+    const today=existing?.work_date || isoDate(new Date());
+    return `
+      <div class="form-grid">
+        <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
+        <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
+        <div class="field"><label>日期 *</label><input id="otWorkDate" type="date" value="${escapeHTML(today)}"></div>
+        <div class="field"><label>申請類型 *</label><select id="otType"><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
+        <div id="otTimeFields" class="field full">
+          <div class="form-grid">
+            <div class="field"><label>開始時間 *</label><input id="otStart" type="time" value="${escapeHTML(String(existing?.start_time||'').slice(0,5))}"></div>
+            <div class="field"><label>結束時間 *</label><input id="otEnd" type="time" value="${escapeHTML(String(existing?.end_time||'').slice(0,5))}"></div>
+            <div class="field full"><label>加班分鐘數</label><div id="otMinuteCalc" class="ot-calc">系統將依開始與結束時間自動計算</div></div>
+          </div>
+        </div>
+        <div id="otHolidayFields" class="field full hidden">
+          <div class="form-grid">
+            <div class="field"><label>假日家訪案數 *</label><input id="otCaseCount" type="number" min="1" max="20" step="1" value="${existing?.holiday_case_count||1}"></div>
+            <div class="field"><label>可換休時數</label><div id="otCompCalc" class="ot-calc">2小時</div></div>
+          </div>
+        </div>
+        <div class="field full"><label>加班事由 *</label><textarea id="otReason" placeholder="請簡要說明本次加班或假日家訪原因">${escapeHTML(existing?.reason||'')}</textarea></div>
+        <div class="field full"><label>備註</label><textarea id="otNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
+      </div>`;
+  }
+
+  function openOvertimeModal(existing=null){
+    if(!overtimeCanSubmit()){ toast('目前帳號沒有加班申請權限','warn'); return; }
+    openModal({
+      title:existing?'編輯加班／換休申請':'新增加班／換休申請',
+      html:overtimeFormHTML(existing),
+      confirmText:'送出審核',
+      onConfirm:()=>saveOvertime(existing,'pending'),
+      large:true
+    });
+    const foot=$('modalRoot').querySelector('.modal-foot');
+    if(foot && !existing){
+      const draft=el('button',{class:'btn',text:'儲存草稿',onClick:()=>saveOvertime(null,'draft')});
+      foot.insertBefore(draft,$('modalConfirm'));
+    }
+    const typeEl=$('otType');
+    const updateFields=()=>{
+      const holiday=typeEl.value==='holiday_visit_comp';
+      $('otTimeFields').classList.toggle('hidden',holiday);
+      $('otHolidayFields').classList.toggle('hidden',!holiday);
+      updateOvertimeCalc();
+    };
+    typeEl.addEventListener('change',updateFields);
+    $('otStart')?.addEventListener('input',updateOvertimeCalc);
+    $('otEnd')?.addEventListener('input',updateOvertimeCalc);
+    $('otCaseCount')?.addEventListener('input',updateOvertimeCalc);
+    updateFields();
+  }
+
+  function updateOvertimeCalc(){
+    const type=$('otType')?.value;
+    if(type==='holiday_visit_comp'){
+      const count=Math.max(0,Number($('otCaseCount')?.value)||0);
+      if($('otCompCalc')) $('otCompCalc').textContent=count?`${count*2}小時`:'請輸入家訪案數';
+    }else{
+      const minutes=overtimeMinutesBetween($('otStart')?.value,$('otEnd')?.value);
+      if($('otMinuteCalc')) $('otMinuteCalc').textContent=minutes?`${minutes}分鐘（${overtimeDurationLabel(minutes)}）`:'請輸入有效的開始與結束時間';
+    }
+  }
+
+  async function saveOvertime(existing,status){
+    const type=$('otType').value;
+    const workDate=$('otWorkDate').value;
+    const reason=$('otReason').value.trim();
+    const notes=$('otNotes').value.trim();
+    const start=$('otStart')?.value || null;
+    const end=$('otEnd')?.value || null;
+    const overtimeMinutes=type==='overtime'?overtimeMinutesBetween(start,end):0;
+    const caseCount=type==='holiday_visit_comp'?Math.max(0,Number($('otCaseCount')?.value)||0):null;
+    const compMinutes=type==='holiday_visit_comp'?caseCount*120:0;
+
+    if(!workDate){toast('請選擇日期','warn');return false;}
+    if(!reason){toast('請填寫加班事由','warn');return false;}
+    if(type==='overtime' && (!start || !end || overtimeMinutes<=0)){toast('請填寫有效的開始與結束時間','warn');return false;}
+    if(type==='holiday_visit_comp' && caseCount<1){toast('請填寫假日家訪案數','warn');return false;}
+
+    const payload={
+      applicant_staff_id:state.profile.id,
+      applicant_name:state.profile.display_name,
+      applicant_role:state.profile.role,
+      work_date:workDate,
+      request_type:type,
+      start_time:type==='overtime'?start:null,
+      end_time:type==='overtime'?end:null,
+      overtime_minutes:overtimeMinutes,
+      reason,
+      holiday_case_count:type==='holiday_visit_comp'?caseCount:null,
+      comp_minutes:compMinutes,
+      notes:notes||null,
+      status,
+      submitted_at:status==='pending'?new Date().toISOString():null,
+      review_note:null,
+      reviewed_at:null,
+      reviewed_by:null,
+      updated_at:new Date().toISOString()
+    };
+
+    showLoading(true);
+    try{
+      let error;
+      if(existing){
+        ({error}=await db.from('overtime_requests').update(payload).eq('id',existing.id));
+      }else{
+        payload.created_by=state.user.id;
+        ({error}=await db.from('overtime_requests').insert(payload));
+      }
+      if(error) throw error;
+      closeModal();
+      await loadOvertimeRows();
+      renderOvertimePage();
+      toast(status==='pending'?'申請已送出審核':'草稿已儲存','success');
+      return true;
+    }catch(err){
+      console.error(err);
+      toast('儲存失敗：'+(err?.message||err),'error');
+      return false;
+    }finally{showLoading(false);}
+  }
+
+  async function reviewOvertime(id,status,note=null){
+    if(!overtimeCanReview()){toast('目前帳號沒有審核權限','warn');return;}
+    const row=state.overtimeRows.find(r=>r.id===id);
+    if(!row || row.status!=='pending'){toast('此申請目前不是待審核狀態','warn');return;}
+    if(status==='approved' && !confirm(`確定核准「${row.applicant_name}」${overtimeTypeLabel(row.request_type)}申請嗎？`)) return;
+    showLoading(true);
+    try{
+      const {error}=await db.from('overtime_requests').update({
+        status,
+        review_note:note||null,
+        reviewed_by:state.user.id,
+        reviewed_at:new Date().toISOString(),
+        updated_at:new Date().toISOString()
+      }).eq('id',id).eq('status','pending');
+      if(error) throw error;
+      closeModal();
+      await loadOvertimeRows();
+      renderOvertimePage();
+      toast(status==='approved'?'申請已核准':'申請已退回','success');
+    }catch(err){
+      console.error(err);
+      toast('審核失敗：'+(err?.message||err),'error');
+    }finally{showLoading(false);}
+  }
+
+  function openOvertimeRejectModal(id){
+    const row=state.overtimeRows.find(r=>r.id===id);
+    if(!row) return;
+    openModal({
+      title:'退回加班／換休申請',
+      html:`<div class="field"><label>退回原因 *</label><textarea id="otRejectReason" placeholder="請說明需要申請人補充或修正的內容"></textarea></div>`,
+      confirmText:'確認退回',
+      onConfirm:async()=>{
+        const note=$('otRejectReason').value.trim();
+        if(!note){toast('請填寫退回原因','warn');return false;}
+        await reviewOvertime(id,'rejected',note);
+        return true;
+      }
+    });
+  }
+
+  const baseNavigateForOvertime=navigate;
+  navigate=function(id){
+    if(id!=='overtime') return baseNavigateForOvertime(id);
+    const m=modules.find(x=>x.id==='overtime')||modules[0];
+    state.page='overtime';
+    if(overtimeCanReview() && !overtimeCanSubmit()) state.overtimeView='review';
+    renderNav();
+    $('topTitle').textContent=m.label;
+    $('crumb').textContent=m.crumb;
+    $('sidebar').classList.remove('open');
+    window.scrollTo({top:0,behavior:'auto'});
+    $('content').innerHTML='<div class="empty compact"><div class="icon">⏱</div><h3>正在載入加班／換休資料</h3><p>請稍候。</p></div>';
+    loadOvertimeRows().then(renderOvertimePage);
+  };
+})();
