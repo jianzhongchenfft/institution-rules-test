@@ -292,17 +292,17 @@
   }
 
   function overtimeFormHTML(existing){
-    const type=existing?.request_type || 'overtime';
+    const type=existing?.request_type || '';
     const today=existing?.work_date || isoDate(new Date());
     const startParts=overtimeTimeParts(existing?.start_time);
     const endParts=overtimeTimeParts(existing?.end_time);
-    const compensation=existing?.compensation_method || (type==='holiday_visit_comp'?'comp_leave':'overtime_pay');
+    const compensation=existing?.compensation_method || (type==='holiday_visit_comp'?'comp_leave':'');
     return `
       <div class="form-grid">
         <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
         <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
         <div class="field"><label>日期 *</label><input id="otWorkDate" type="date" value="${escapeHTML(today)}"></div>
-        <div class="field"><label>申請類型 *</label><select id="otType"><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="holiday_overtime" ${type==='holiday_overtime'?'selected':''}>假日加班</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
+        <div class="field"><label>申請類型 *</label><select id="otType"><option value="" ${!type?'selected':''} disabled>請選擇</option><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="holiday_overtime" ${type==='holiday_overtime'?'selected':''}>假日加班</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
         <div id="otTimeFields" class="field full">
           <div class="form-grid">
             <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="otStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="otStartMinute">${overtimeTimeOptions(59,startParts.minute,'分')}</select></div><div class="help">24小時制（00–23時／00–59分）</div></div>
@@ -317,7 +317,7 @@
           </div>
         </div>
         <div class="field full"><label>加班事由 *</label><textarea id="otReason" placeholder="請簡要說明本次加班或假日家訪原因">${escapeHTML(existing?.reason||'')}</textarea></div>
-        <div class="field full"><label>加班處理方式 *</label><select id="otCompensation"><option value="overtime_pay" ${compensation==='overtime_pay'?'selected':''}>領加班費</option><option value="comp_leave" ${compensation==='comp_leave'?'selected':''}>換休</option></select><div id="otCompensationHelp" class="help"></div></div>
+        <div class="field full"><label>加班處理方式 *</label><select id="otCompensation"><option value="" ${!compensation?'selected':''} disabled>請選擇</option><option value="overtime_pay" ${compensation==='overtime_pay'?'selected':''}>領加班費</option><option value="comp_leave" ${compensation==='comp_leave'?'selected':''}>換休</option></select><div id="otCompensationHelp" class="help"></div></div>
         <div class="field full"><label>備註</label><textarea id="otNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
       </div>`;
   }
@@ -339,10 +339,15 @@
     const typeEl=$('otType');
     const compensationEl=$('otCompensation');
     const updateFields=()=>{
+      const selected=!!typeEl.value;
       const holiday=typeEl.value==='holiday_visit_comp';
-      $('otTimeFields').classList.toggle('hidden',holiday);
+      $('otTimeFields').classList.toggle('hidden',!selected || holiday);
       $('otHolidayFields').classList.toggle('hidden',!holiday);
-      if(holiday){
+      if(!selected){
+        compensationEl.value='';
+        compensationEl.disabled=true;
+        $('otCompensationHelp').textContent='請先選擇申請類型。';
+      }else if(holiday){
         compensationEl.value='comp_leave';
         compensationEl.disabled=true;
         $('otCompensationHelp').textContent='假日家訪換休固定為換休。';
@@ -352,7 +357,10 @@
       }
       updateOvertimeCalc();
     };
-    typeEl.addEventListener('change',updateFields);
+    typeEl.addEventListener('change',()=>{
+      if(typeEl.value!=='holiday_visit_comp') compensationEl.value='';
+      updateFields();
+    });
     ['otStartHour','otStartMinute','otEndHour','otEndMinute'].forEach(id=>$(id)?.addEventListener('change',updateOvertimeCalc));
     $('otCaseCount')?.addEventListener('input',updateOvertimeCalc);
     updateFields();
@@ -385,8 +393,10 @@
     const caseCount=type==='holiday_visit_comp'?Math.max(0,Number($('otCaseCount')?.value)||0):null;
     const compMinutes=type==='holiday_visit_comp'?caseCount*120:0;
 
+    if(!type){toast('請選擇申請類型','warn');return false;}
     if(!workDate){toast('請選擇日期','warn');return false;}
     if(!reason){toast('請填寫加班事由','warn');return false;}
+    if(type!=='holiday_visit_comp' && !compensationMethod){toast('請選擇加班處理方式','warn');return false;}
     if(timeBased && (!overtimeValid24h(start)||!overtimeValid24h(end))){toast('請選擇完整的開始及結束時間','warn');return false;}
     if(timeBased && overtimeMinutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
     if(type==='holiday_visit_comp' && caseCount<1){toast('請填寫假日家訪案數','warn');return false;}
