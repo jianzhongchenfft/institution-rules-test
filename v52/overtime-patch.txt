@@ -62,6 +62,8 @@
   Object.assign(state, {
     overtimeRows: [],
     overtimeLoaded: false,
+    compLeaveRows: [],
+    compLeaveLoaded: false,
     overtimeView: 'mine',
     overtimeMonth: isoDate(new Date()).slice(0,7)
   });
@@ -161,20 +163,76 @@
     return state.overtimeRows.filter(r=>r.applicant_staff_id===state.profile?.id);
   }
 
+  function compLeaveOwnRows(){
+    return state.compLeaveRows.filter(r=>r.applicant_staff_id===state.profile?.id);
+  }
+
+  function compLeaveEarnedMinutes(staffId){
+    return state.overtimeRows
+      .filter(r=>r.applicant_staff_id===staffId && r.status==='approved' && r.compensation_method==='comp_leave')
+      .reduce((sum,r)=>sum+(r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0)),0);
+  }
+
+  function compLeaveApprovedUsedMinutes(staffId){
+    return state.compLeaveRows
+      .filter(r=>r.applicant_staff_id===staffId && r.status==='approved')
+      .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+  }
+
+  function compLeavePendingMinutes(staffId){
+    return state.compLeaveRows
+      .filter(r=>r.applicant_staff_id===staffId && r.status==='pending')
+      .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+  }
+
+  function compLeaveBalance(staffId){
+    const earned=compLeaveEarnedMinutes(staffId);
+    const used=compLeaveApprovedUsedMinutes(staffId);
+    const pending=compLeavePendingMinutes(staffId);
+    return {
+      earned,
+      used,
+      pending,
+      remaining:Math.max(0,earned-used),
+      requestable:Math.max(0,earned-used-pending)
+    };
+  }
+
+  function compLeaveDurationParts(minutes){
+    const n=Math.max(0,Number(minutes)||0);
+    return {hour:String(Math.floor(n/60)),minute:String(n%60).padStart(2,'0')};
+  }
+
+  function compLeaveSelectedMinutes(){
+    const h=Number($('clHours')?.value||0);
+    const m=Number($('clMinutes')?.value||0);
+    return h*60+m;
+  }
+
   async function loadOvertimeRows(){
     if(!state.profile) return;
     showLoading(true);
     try{
-      const {data,error} = await db.from('overtime_requests')
-        .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
-        .order('work_date',{ascending:false})
-        .order('created_at',{ascending:false});
-      if(error) throw error;
-      state.overtimeRows = data || [];
+      const [overtimeResult,leaveResult] = await Promise.all([
+        db.from('overtime_requests')
+          .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
+          .order('work_date',{ascending:false})
+          .order('created_at',{ascending:false}),
+        db.from('comp_leave_usages')
+          .select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,minutes,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
+          .order('leave_date',{ascending:false})
+          .order('created_at',{ascending:false})
+      ]);
+      if(overtimeResult.error) throw overtimeResult.error;
+      if(leaveResult.error) throw leaveResult.error;
+      state.overtimeRows = overtimeResult.data || [];
+      state.compLeaveRows = leaveResult.data || [];
       state.overtimeLoaded = true;
+      state.compLeaveLoaded = true;
     }catch(err){
       console.error(err);
       state.overtimeRows = [];
+      state.compLeaveRows = [];
       toast('讀取加班／換休資料失敗：'+(err?.message||err),'error');
     }finally{
       showLoading(false);
@@ -186,8 +244,11 @@
     const own=overtimeOwnRows().filter(r=>r.work_date>=start && r.work_date<=end && r.status==='approved');
     const overtimeMinutes=own.filter(r=>['overtime','holiday_overtime'].includes(r.request_type)).reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
     const compMinutes=own.filter(r=>r.request_type==='holiday_visit_comp').reduce((sum,r)=>sum+(Number(r.comp_minutes)||0),0);
-    const pending=state.overtimeRows.filter(r=>r.status==='pending').length;
-    return {overtimeMinutes,compMinutes,pending};
+    const pendingOvertime=state.overtimeRows.filter(r=>r.status==='pending').length;
+    const pendingLeave=state.compLeaveRows.filter(r=>r.status==='pending').length;
+    const ownPending=overtimeOwnRows().filter(r=>r.status==='pending').length+compLeaveOwnRows().filter(r=>r.status==='pending').length;
+    const balance=compLeaveBalance(state.profile?.id);
+    return {overtimeMinutes,compMinutes,pending:pendingOvertime+pendingLeave,pendingOvertime,pendingLeave,ownPending,balance};
   }
 
   function renderOvertimeRules(){
