@@ -3,7 +3,7 @@
   const overtimeStyle = document.createElement('style');
   overtimeStyle.id = 'v52-overtime-style';
   overtimeStyle.textContent = `
-    .ot-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .ot-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
     .ot-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
     .ot-toolbar .spacer{flex:1}
     .ot-tabs{display:flex;gap:7px;flex-wrap:wrap}
@@ -304,36 +304,110 @@
       </tr>`).join('')}</tbody></table></div>`;
   }
 
+
+  function compLeaveSourceMinutes(r){
+    return r.request_type==='holiday_visit_comp' ? (Number(r.comp_minutes)||0) : (Number(r.overtime_minutes)||0);
+  }
+
+  function renderCompLeaveOverview(){
+    const balance=compLeaveBalance(state.profile?.id);
+    const sources=overtimeOwnRows().filter(r=>r.status==='approved' && r.compensation_method==='comp_leave');
+    return `
+      <section class="ot-summary">
+        <article class="stat-card"><div class="stat-head"><span>已取得換休</span><span class="stat-icon">➕</span></div><div class="stat-value">${overtimeDurationLabel(balance.earned)}</div><div class="stat-foot">已核准且選擇換休</div></article>
+        <article class="stat-card"><div class="stat-head"><span>已使用換休</span><span class="stat-icon">➖</span></div><div class="stat-value">${overtimeDurationLabel(balance.used)}</div><div class="stat-foot">僅計已核准使用</div></article>
+        <article class="stat-card"><div class="stat-head"><span>待審核使用</span><span class="stat-icon">⏳</span></div><div class="stat-value">${overtimeDurationLabel(balance.pending)}</div><div class="stat-foot">送審中，暫時保留</div></article>
+        <article class="stat-card"><div class="stat-head"><span>可再申請換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(balance.requestable)}</div><div class="stat-foot">已扣除待審核與已使用</div></article>
+      </section>
+      <section class="ot-rule-card">
+        <h3>換休取得明細</h3>
+        ${sources.length ? `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>來源</th><th>取得時數</th><th>事由</th></tr></thead><tbody>${sources.map(r=>`<tr><td>${rocDate(r.work_date+'T00:00:00')}</td><td><div class="ot-type">${overtimeTypeLabel(r.request_type)}</div></td><td><span class="ot-amount">${overtimeDurationLabel(compLeaveSourceMinutes(r))}</span></td><td>${escapeHTML(r.reason||'—')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="ot-empty"><div class="icon">🕒</div><h3>尚無換休取得紀錄</h3><p>已核准且選擇「換休」的加班或假日家訪換休，會自動列在這裡。</p></div>`}
+      </section>`;
+  }
+
+  function compLeaveUsageRenderTable(rows,{review=false}={}){
+    if(!rows.length){
+      return `<div class="ot-empty"><div class="icon">🕒</div><h3>目前沒有資料</h3><p>${review?'沒有待審核的換休使用申請。':'尚無換休使用紀錄。'}</p></div>`;
+    }
+    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr>
+      ${review?'<th>申請人</th>':''}<th>換休日期</th><th>使用時數</th><th>事由</th><th>狀態</th><th>操作</th>
+      </tr></thead><tbody>${rows.map(r=>`<tr>
+        ${review?`<td><div class="ot-review-name">${escapeHTML(r.applicant_name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.applicant_role))}</div></td>`:''}
+        <td>${rocDate(r.leave_date+'T00:00:00')}</td>
+        <td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td>
+        <td><div>${escapeHTML(r.reason||'—')}</div>${r.notes?`<div class="ot-detail ot-note">備註：${escapeHTML(r.notes)}</div>`:''}${r.review_note?`<div class="ot-reject">審核說明：${escapeHTML(r.review_note)}</div>`:''}</td>
+        <td><span class="ot-status ${r.status}">${overtimeStatusLabel(r.status)}</span></td>
+        <td><div class="ot-actions">
+          ${!review && ['draft','rejected'].includes(r.status) && overtimeCanSubmit()?`<button class="btn sm" data-cl-edit="${r.id}">編輯</button>`:''}
+          ${review && r.status==='pending'?`<button class="btn sm primary" data-cl-approve="${r.id}">核准</button><button class="btn sm" data-cl-reject="${r.id}">退回</button>`:''}
+        </div></td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function renderOvertimeReview(){
+    const overtimePending=state.overtimeRows.filter(r=>r.status==='pending');
+    const leavePending=state.compLeaveRows.filter(r=>r.status==='pending');
+    return `
+      <section class="ot-rule-card">
+        <h3>加班／換休取得申請</h3>
+        ${overtimeRenderTable(overtimePending,{review:true})}
+      </section>
+      <section class="ot-rule-card">
+        <h3>換休使用申請</h3>
+        ${compLeaveUsageRenderTable(leavePending,{review:true})}
+      </section>`;
+  }
+
+  function wireCompLeaveActions(){
+    document.querySelectorAll('[data-cl-edit]').forEach(btn=>btn.addEventListener('click',()=>openCompLeaveUsageModal(state.compLeaveRows.find(r=>r.id===btn.dataset.clEdit)||null)));
+    document.querySelectorAll('[data-cl-approve]').forEach(btn=>btn.addEventListener('click',()=>reviewCompLeaveUsage(btn.dataset.clApprove,'approved')));
+    document.querySelectorAll('[data-cl-reject]').forEach(btn=>btn.addEventListener('click',()=>openCompLeaveRejectModal(btn.dataset.clReject)));
+  }
+
   function wireOvertimeTableActions(){
     document.querySelectorAll('[data-ot-edit]').forEach(btn=>btn.addEventListener('click',()=>openOvertimeModal(state.overtimeRows.find(r=>r.id===btn.dataset.otEdit)||null)));
     document.querySelectorAll('[data-ot-approve]').forEach(btn=>btn.addEventListener('click',()=>reviewOvertime(btn.dataset.otApprove,'approved')));
     document.querySelectorAll('[data-ot-reject]').forEach(btn=>btn.addEventListener('click',()=>openOvertimeRejectModal(btn.dataset.otReject)));
   }
 
+
   function renderOvertimePage(){
     if(state.page!=='overtime') return;
     const summary=overtimeSummary();
     const own=overtimeOwnRows();
-    const pending=state.overtimeRows.filter(r=>r.status==='pending');
+    const ownLeave=compLeaveOwnRows();
     const canSubmit=overtimeCanSubmit();
     const canReview=overtimeCanReview();
-    const validViews=canReview?['mine','review','rules']:['mine','rules'];
-    if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview?'review':'mine';
+    const reviewCount=summary.pending;
+    const validViews=canSubmit
+      ? (canReview?['mine','balance','usage','review','rules']:['mine','balance','usage','rules'])
+      : (canReview?['review','rules']:['rules']);
+    if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview&&!canSubmit?'review':'mine';
 
     $('content').innerHTML=`
       <div class="page-head">
-        <div><h1>⏱ 加班／換休管理</h1><p>填寫加班申請、假日家訪換休，並集中管理審核紀錄。</p></div>
-        <div class="actions">${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 新增申請</button>':''}</div>
+        <div><h1>⏱ 加班／換休管理</h1><p>填寫加班申請、管理換休取得與使用，並集中處理審核紀錄。</p></div>
+        <div class="actions">
+          ${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 新增申請</button><button id="clAddBtn" class="btn">＋ 使用換休</button>':''}
+        </div>
       </div>
+      ${canSubmit?`
       <section class="ot-summary">
         <article class="stat-card"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">僅計已核准申請</div></article>
-        <article class="stat-card"><div class="stat-head"><span>本月假日家訪換休</span><span class="stat-icon">🏠</span></div><div class="stat-value">${overtimeDurationLabel(summary.compMinutes)}</div><div class="stat-foot">僅計已核准申請</div></article>
-        <article class="stat-card"><div class="stat-head"><span>${canReview?'待審核':'我的待審核'}</span><span class="stat-icon">📄</span></div><div class="stat-value">${canReview?summary.pending:own.filter(r=>r.status==='pending').length}</div><div class="stat-foot">${canReview?'等待機構負責人處理':'已送出等待審核'}</div></article>
-      </section>
+        <article class="stat-card"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.remaining)}</div><div class="stat-foot">已取得－已核准使用</div></article>
+        <article class="stat-card"><div class="stat-head"><span>可再申請換休</span><span class="stat-icon">✅</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div><div class="stat-foot">已再扣除待審核使用</div></article>
+        <article class="stat-card"><div class="stat-head"><span>${canReview?'全部待審核':'我的待審核'}</span><span class="stat-icon">📄</span></div><div class="stat-value">${canReview?reviewCount:summary.ownPending}</div><div class="stat-foot">${canReview?'含加班與換休使用':'已送出等待審核'}</div></article>
+      </section>`:`
+      <section class="ot-summary">
+        <article class="stat-card"><div class="stat-head"><span>待審核加班／換休</span><span class="stat-icon">⏱</span></div><div class="stat-value">${summary.pendingOvertime}</div><div class="stat-foot">等待處理</div></article>
+        <article class="stat-card"><div class="stat-head"><span>待審核換休使用</span><span class="stat-icon">🕒</span></div><div class="stat-value">${summary.pendingLeave}</div><div class="stat-foot">等待處理</div></article>
+      </section>`}
       <div class="ot-toolbar">
         <div class="ot-tabs">
-          <button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">我的申請</button>
-          ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${pending.length}</button>`:''}
+          ${canSubmit?`<button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">我的申請</button>
+          <button class="ot-tab ${state.overtimeView==='balance'?'active':''}" data-ot-view="balance">我的換休</button>
+          <button class="ot-tab ${state.overtimeView==='usage'?'active':''}" data-ot-view="usage">換休使用紀錄</button>`:''}
+          ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${reviewCount}</button>`:''}
           <button class="ot-tab ${state.overtimeView==='rules'?'active':''}" data-ot-view="rules">加班規則</button>
         </div>
         <span class="spacer"></span>
@@ -342,14 +416,20 @@
         <button id="otReload" class="btn">↻ 重新整理</button>
       </div>
       <div id="otMain">
-        ${state.overtimeView==='rules' ? renderOvertimeRules() : state.overtimeView==='review' ? overtimeRenderTable(pending,{review:true}) : overtimeRenderTable(own)}
+        ${state.overtimeView==='rules' ? renderOvertimeRules()
+          : state.overtimeView==='review' ? renderOvertimeReview()
+          : state.overtimeView==='balance' ? renderCompLeaveOverview()
+          : state.overtimeView==='usage' ? compLeaveUsageRenderTable(ownLeave)
+          : overtimeRenderTable(own)}
       </div>`;
 
     $('otAddBtn')?.addEventListener('click',()=>openOvertimeModal());
+    $('clAddBtn')?.addEventListener('click',()=>openCompLeaveUsageModal());
     document.querySelectorAll('[data-ot-view]').forEach(btn=>btn.addEventListener('click',()=>{state.overtimeView=btn.dataset.otView;renderOvertimePage();}));
     $('otMonth').addEventListener('change',e=>{state.overtimeMonth=e.target.value||isoDate(new Date()).slice(0,7);renderOvertimePage();});
     $('otReload').addEventListener('click',async()=>{await loadOvertimeRows();renderOvertimePage();toast('已重新整理加班／換休資料','success');});
     wireOvertimeTableActions();
+    wireCompLeaveActions();
   }
 
   function overtimeFormHTML(existing){
