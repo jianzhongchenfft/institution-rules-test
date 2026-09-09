@@ -303,7 +303,6 @@
         <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
         <div class="field"><label>日期 *</label><input id="otWorkDate" type="date" value="${escapeHTML(today)}"></div>
         <div class="field"><label>申請類型 *</label><select id="otType"><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="holiday_overtime" ${type==='holiday_overtime'?'selected':''}>假日加班</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
-        <div class="field full"><label>加班處理方式 *</label><select id="otCompensation"><option value="overtime_pay" ${compensation==='overtime_pay'?'selected':''}>領加班費</option><option value="comp_leave" ${compensation==='comp_leave'?'selected':''}>換休</option></select><div id="otCompensationHelp" class="help"></div></div>
         <div id="otTimeFields" class="field full">
           <div class="form-grid">
             <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="otStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="otStartMinute">${overtimeTimeOptions(59,startParts.minute,'分')}</select></div><div class="help">24小時制（00–23時／00–59分）</div></div>
@@ -318,6 +317,7 @@
           </div>
         </div>
         <div class="field full"><label>加班事由 *</label><textarea id="otReason" placeholder="請簡要說明本次加班或假日家訪原因">${escapeHTML(existing?.reason||'')}</textarea></div>
+        <div class="field full"><label>加班處理方式 *</label><select id="otCompensation"><option value="overtime_pay" ${compensation==='overtime_pay'?'selected':''}>領加班費</option><option value="comp_leave" ${compensation==='comp_leave'?'selected':''}>換休</option></select><div id="otCompensationHelp" class="help"></div></div>
         <div class="field full"><label>備註</label><textarea id="otNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
       </div>`;
   }
