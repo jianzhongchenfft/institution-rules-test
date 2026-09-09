@@ -40,14 +40,19 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!mobileScheduleRes.ok) throw new Error(`v52/schedule-mobile-patch.txt 載入失敗（${mobileScheduleRes.status}）`);
       eval(await mobileScheduleRes.text());
 
+      const overtimeRes = await fetch('v52/overtime-patch.txt',{cache:'no-store'});
+      if(!overtimeRes.ok) throw new Error(`v52/overtime-patch.txt 載入失敗（${overtimeRes.status}）`);
+      eval(await overtimeRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
       else if(state.profile && state.page==='cases') navigate('cases');
       else if(state.profile && state.page==='schedule') navigate('schedule');
+      else if(state.profile && state.page==='overtime') navigate('overtime');
     }catch(err){
-      console.error('個案家訪／電訪模組載入失敗',err);
-      if(state.profile) toast('個案家訪／電訪模組載入失敗，請重新整理頁面。','error');
+      console.error('系統功能模組載入失敗',err);
+      if(state.profile) toast('系統功能模組載入失敗，請重新整理頁面。','error');
     }
   }
 
