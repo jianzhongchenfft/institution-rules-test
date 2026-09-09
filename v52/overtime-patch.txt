@@ -73,7 +73,11 @@
   }
 
   function overtimeTypeLabel(type){
-    return type === 'holiday_visit_comp' ? '假日家訪換休' : '平日加班';
+    return ({
+      overtime:'平日加班',
+      holiday_overtime:'假日加班',
+      holiday_visit_comp:'假日家訪換休'
+    })[type] || type || '—';
   }
 
   function overtimeStatusLabel(status){
@@ -93,13 +97,27 @@
     return {start,end};
   }
 
+  function overtimeNormalizeTime(value){
+    const raw=String(value||'').trim().replace(/：/g,':');
+    const match=raw.match(/^(\d{1,2}):(\d{1,2})$/);
+    if(!match) return raw;
+    const h=Number(match[1]),m=Number(match[2]);
+    if(h>23 || m>59) return raw;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  }
+
+  function overtimeValid24h(value){
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value||''));
+  }
+
   function overtimeMinutesBetween(start,end){
-    if(!start || !end) return 0;
+    const s=overtimeNormalizeTime(start),e=overtimeNormalizeTime(end);
+    if(!overtimeValid24h(s) || !overtimeValid24h(e)) return 0;
     const toMin = value => {
-      const [h,m] = String(value).slice(0,5).split(':').map(Number);
+      const [h,m] = String(value).split(':').map(Number);
       return h*60 + m;
     };
-    return Math.max(0, toMin(end)-toMin(start));
+    return Math.max(0, toMin(e)-toMin(s));
   }
 
   function overtimeDurationLabel(minutes){
@@ -138,7 +156,7 @@
   function overtimeSummary(){
     const {start,end}=overtimeMonthRange(state.overtimeMonth);
     const own=overtimeOwnRows().filter(r=>r.work_date>=start && r.work_date<=end && r.status==='approved');
-    const overtimeMinutes=own.filter(r=>r.request_type==='overtime').reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
+    const overtimeMinutes=own.filter(r=>['overtime','holiday_overtime'].includes(r.request_type)).reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
     const compMinutes=own.filter(r=>r.request_type==='holiday_visit_comp').reduce((sum,r)=>sum+(Number(r.comp_minutes)||0),0);
     const pending=state.overtimeRows.filter(r=>r.status==='pending').length;
     return {overtimeMinutes,compMinutes,pending};
@@ -151,7 +169,8 @@
         <p>加班以實際執行機構交辦工作為認列基礎，並依機構規定提出申請及完成審核。</p>
         <ol class="ot-rule-list">
           <li>如有加班需要，應向「機構負責人」提出申請，並由機構負責人審核。</li>
-          <li>申請時應填寫日期、開始時間、結束時間及加班事由；系統依開始與結束時間自動計算加班分鐘數。</li>
+          <li>申請時應填寫日期、開始時間、結束時間及加班事由；開始與結束時間採24小時制（HH:MM），系統依時間自動計算加班分鐘數。</li>
+          <li>申請類型分為「平日加班」、「假日加班」及「假日家訪換休」。</li>
           <li>提早到班或延後離開，不因打卡時間本身當然認列為加班，仍以該時段是否實際執行機構交辦工作為準。</li>
           <li>例如機構正常上班時間為上午9時，如因9時需直接至案家家訪而於8時40分先到機構，應視8時40分至9時之間是否有實際執行機構交辦工作，再判斷是否申請加班。</li>
           <li>加班申請經核准後，始納入機構加班紀錄；如資料不足或不符規定，機構負責人得退回並註明原因。</li>
@@ -251,11 +270,11 @@
         <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
         <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
         <div class="field"><label>日期 *</label><input id="otWorkDate" type="date" value="${escapeHTML(today)}"></div>
-        <div class="field"><label>申請類型 *</label><select id="otType"><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
+        <div class="field"><label>申請類型 *</label><select id="otType"><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="holiday_overtime" ${type==='holiday_overtime'?'selected':''}>假日加班</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
         <div id="otTimeFields" class="field full">
           <div class="form-grid">
-            <div class="field"><label>開始時間 *</label><input id="otStart" type="time" value="${escapeHTML(String(existing?.start_time||'').slice(0,5))}"></div>
-            <div class="field"><label>結束時間 *</label><input id="otEnd" type="time" value="${escapeHTML(String(existing?.end_time||'').slice(0,5))}"></div>
+            <div class="field"><label>開始時間 *</label><input id="otStart" type="text" inputmode="numeric" maxlength="5" placeholder="例如 08:40" value="${escapeHTML(String(existing?.start_time||'').slice(0,5))}"><div class="help">24小時制 HH:MM</div></div>
+            <div class="field"><label>結束時間 *</label><input id="otEnd" type="text" inputmode="numeric" maxlength="5" placeholder="例如 17:30" value="${escapeHTML(String(existing?.end_time||'').slice(0,5))}"><div class="help">24小時制 HH:MM</div></div>
             <div class="field full"><label>加班分鐘數</label><div id="otMinuteCalc" class="ot-calc">系統將依開始與結束時間自動計算</div></div>
           </div>
         </div>
@@ -292,8 +311,17 @@
       updateOvertimeCalc();
     };
     typeEl.addEventListener('change',updateFields);
-    $('otStart')?.addEventListener('input',updateOvertimeCalc);
-    $('otEnd')?.addEventListener('input',updateOvertimeCalc);
+    const normalizeTimeInput=(id)=>{
+      const input=$(id);
+      if(!input) return;
+      input.addEventListener('input',updateOvertimeCalc);
+      input.addEventListener('blur',()=>{
+        input.value=overtimeNormalizeTime(input.value);
+        updateOvertimeCalc();
+      });
+    };
+    normalizeTimeInput('otStart');
+    normalizeTimeInput('otEnd');
     $('otCaseCount')?.addEventListener('input',updateOvertimeCalc);
     updateFields();
   }
@@ -304,8 +332,11 @@
       const count=Math.max(0,Number($('otCaseCount')?.value)||0);
       if($('otCompCalc')) $('otCompCalc').textContent=count?`${count*2}小時`:'請輸入家訪案數';
     }else{
-      const minutes=overtimeMinutesBetween($('otStart')?.value,$('otEnd')?.value);
-      if($('otMinuteCalc')) $('otMinuteCalc').textContent=minutes?`${minutes}分鐘（${overtimeDurationLabel(minutes)}）`:'請輸入有效的開始與結束時間';
+      const start=overtimeNormalizeTime($('otStart')?.value);
+      const end=overtimeNormalizeTime($('otEnd')?.value);
+      const minutes=overtimeMinutesBetween(start,end);
+      const valid=overtimeValid24h(start)&&overtimeValid24h(end);
+      if($('otMinuteCalc')) $('otMinuteCalc').textContent=!valid?'請使用24小時制 HH:MM，例如 08:40、17:30':minutes?`${minutes}分鐘（${overtimeDurationLabel(minutes)}）`:'結束時間須晚於開始時間';
     }
   }
 
@@ -314,15 +345,17 @@
     const workDate=$('otWorkDate').value;
     const reason=$('otReason').value.trim();
     const notes=$('otNotes').value.trim();
-    const start=$('otStart')?.value || null;
-    const end=$('otEnd')?.value || null;
-    const overtimeMinutes=type==='overtime'?overtimeMinutesBetween(start,end):0;
+    const start=overtimeNormalizeTime($('otStart')?.value) || null;
+    const end=overtimeNormalizeTime($('otEnd')?.value) || null;
+    const timeBased=['overtime','holiday_overtime'].includes(type);
+    const overtimeMinutes=timeBased?overtimeMinutesBetween(start,end):0;
     const caseCount=type==='holiday_visit_comp'?Math.max(0,Number($('otCaseCount')?.value)||0):null;
     const compMinutes=type==='holiday_visit_comp'?caseCount*120:0;
 
     if(!workDate){toast('請選擇日期','warn');return false;}
     if(!reason){toast('請填寫加班事由','warn');return false;}
-    if(type==='overtime' && (!start || !end || overtimeMinutes<=0)){toast('請填寫有效的開始與結束時間','warn');return false;}
+    if(timeBased && (!overtimeValid24h(start)||!overtimeValid24h(end))){toast('開始及結束時間請使用24小時制 HH:MM，例如 08:40、17:30','warn');return false;}
+    if(timeBased && overtimeMinutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
     if(type==='holiday_visit_comp' && caseCount<1){toast('請填寫假日家訪案數','warn');return false;}
 
     const payload={
@@ -331,8 +364,8 @@
       applicant_role:state.profile.role,
       work_date:workDate,
       request_type:type,
-      start_time:type==='overtime'?start:null,
-      end_time:type==='overtime'?end:null,
+      start_time:timeBased?start:null,
+      end_time:timeBased?end:null,
       overtime_minutes:overtimeMinutes,
       reason,
       holiday_case_count:type==='holiday_visit_comp'?caseCount:null,
