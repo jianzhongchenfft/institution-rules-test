@@ -275,7 +275,7 @@
         <h3>換休使用</h3>
         <ol class="ot-rule-list">
           <li>只有已核准且處理方式為「換休」的加班，以及已核准的假日家訪換休，才會列入可用換休時數。</li>
-          <li>使用換休應另提出申請，填寫換休日期、開始時間、結束時間及換休事由；系統依起訖時間自動計算使用換休時數。</li>
+          <li>使用換休應另提出申請，填寫換休日期、開始時間、結束時間及換休事由；開始與結束時間以30分鐘為間隔（分鐘僅00或30），系統依起訖時間自動計算使用換休時數。</li>
           <li>換休使用申請送出後會先列為待審核，該時數暫時保留；機構負責人核准後才正式列入已使用時數。</li>
           <li>已退回的換休使用申請不扣除換休時數，申請人可修改後重新送審。</li>
           <li>申請使用的換休時數不得超過目前可再申請的換休餘額。</li>
@@ -619,8 +619,8 @@
         <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
         <div class="field"><label>換休日期 *</label><input id="clDate" type="date" value="${escapeHTML(today)}"></div>
         <div class="field"><label>目前可再申請</label><input class="ot-readonly" value="${escapeHTML(overtimeDurationLabel(balance.requestable))}" disabled></div>
-        <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="clStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="clStartMinute">${overtimeTimeOptions(59,startParts.minute,'分')}</select></div><div class="help">24小時制（00–23時／00–59分）</div></div>
-        <div class="field"><label>結束時間 *</label><div class="ot-time-pair"><select id="clEndHour">${overtimeTimeOptions(23,endParts.hour,'時')}</select><select id="clEndMinute">${overtimeTimeOptions(59,endParts.minute,'分')}</select></div><div class="help">24小時制（00–23時／00–59分）</div></div>
+        <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="clStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="clStartMinute"><option value="00" ${startParts.minute==='00'?'selected':''}>00</option><option value="30" ${startParts.minute==='30'?'selected':''}>30</option></select></div><div class="help">24小時制，分鐘以30分鐘為間隔（00／30）</div></div>
+        <div class="field"><label>結束時間 *</label><div class="ot-time-pair"><select id="clEndHour">${overtimeTimeOptions(23,endParts.hour,'時')}</select><select id="clEndMinute"><option value="00" ${endParts.minute==='00'?'selected':''}>00</option><option value="30" ${endParts.minute==='30'?'selected':''}>30</option></select></div><div class="help">24小時制，分鐘以30分鐘為間隔（00／30）</div></div>
         <div class="field full"><label>使用換休時數</label><div id="clDurationHelp" class="ot-calc">系統將依開始與結束時間自動計算</div></div>
         <div class="field full"><label>換休事由 *</label><textarea id="clReason" placeholder="請簡要說明本次換休原因">${escapeHTML(existing?.reason||'')}</textarea></div>
         <div class="field full"><label>備註</label><textarea id="clNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
@@ -677,6 +677,7 @@
 
     if(!leaveDate){toast('請選擇換休日期','warn');return false;}
     if(!overtimeValid24h(start)||!overtimeValid24h(end)){toast('請選擇完整的開始及結束時間','warn');return false;}
+    if(!['00','30'].includes(String(start).slice(3,5)) || !['00','30'].includes(String(end).slice(3,5))){toast('換休時間請以30分鐘為間隔','warn');return false;}
     if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
     if(!reason){toast('請填寫換休事由','warn');return false;}
     if(status==='pending' && minutes>balance.requestable){
