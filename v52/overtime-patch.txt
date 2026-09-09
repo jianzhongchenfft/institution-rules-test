@@ -219,7 +219,7 @@
           .order('work_date',{ascending:false})
           .order('created_at',{ascending:false}),
         db.from('comp_leave_usages')
-          .select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,minutes,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
+          .select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,start_time,end_time,minutes,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
           .order('leave_date',{ascending:false})
           .order('created_at',{ascending:false})
       ]);
@@ -275,7 +275,7 @@
         <h3>換休使用</h3>
         <ol class="ot-rule-list">
           <li>只有已核准且處理方式為「換休」的加班，以及已核准的假日家訪換休，才會列入可用換休時數。</li>
-          <li>使用換休應另提出申請，填寫換休日期、使用時數及換休事由。</li>
+          <li>使用換休應另提出申請，填寫換休日期、開始時間、結束時間及換休事由；系統依起訖時間自動計算使用換休時數。</li>
           <li>換休使用申請送出後會先列為待審核，該時數暫時保留；機構負責人核准後才正式列入已使用時數。</li>
           <li>已退回的換休使用申請不扣除換休時數，申請人可修改後重新送審。</li>
           <li>申請使用的換休時數不得超過目前可再申請的換休餘額。</li>
@@ -335,15 +335,17 @@
       </section>`;
   }
 
+
   function compLeaveUsageRenderTable(rows,{review=false}={}){
     if(!rows.length){
       return `<div class="ot-empty"><div class="icon">🕒</div><h3>目前沒有資料</h3><p>${review?'沒有待審核的換休使用申請。':'尚無換休使用紀錄。'}</p></div>`;
     }
     return `<div class="ot-table-shell"><table class="ot-table"><thead><tr>
-      ${review?'<th>申請人</th>':''}<th>換休日期</th><th>使用時數</th><th>事由</th><th>狀態</th><th>操作</th>
+      ${review?'<th>申請人</th>':''}<th>換休日期</th><th>換休時間</th><th>使用時數</th><th>事由</th><th>狀態</th><th>操作</th>
       </tr></thead><tbody>${rows.map(r=>`<tr>
         ${review?`<td><div class="ot-review-name">${escapeHTML(r.applicant_name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.applicant_role))}</div></td>`:''}
         <td>${rocDate(r.leave_date+'T00:00:00')}</td>
+        <td><div class="ot-type">${String(r.start_time||'').slice(0,5)}–${String(r.end_time||'').slice(0,5)}</div></td>
         <td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td>
         <td><div>${escapeHTML(r.reason||'—')}</div>${r.notes?`<div class="ot-detail ot-note">備註：${escapeHTML(r.notes)}</div>`:''}${r.review_note?`<div class="ot-reject">審核說明：${escapeHTML(r.review_note)}</div>`:''}</td>
         <td><span class="ot-status ${r.status}">${overtimeStatusLabel(r.status)}</span></td>
@@ -601,12 +603,14 @@
   }
 
 
+
   function compLeaveUsageFormHTML(existing){
     const today=existing?.leave_date || isoDate(new Date());
-    const parts=compLeaveDurationParts(existing?.minutes||0);
+    const startParts=overtimeTimeParts(existing?.start_time);
+    const endParts=overtimeTimeParts(existing?.end_time);
     if(!existing){
-      parts.hour='';
-      parts.minute='00';
+      startParts.minute='00';
+      endParts.minute='00';
     }
     const balance=compLeaveBalance(state.profile?.id);
     return `
@@ -615,18 +619,14 @@
         <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
         <div class="field"><label>換休日期 *</label><input id="clDate" type="date" value="${escapeHTML(today)}"></div>
         <div class="field"><label>目前可再申請</label><input class="ot-readonly" value="${escapeHTML(overtimeDurationLabel(balance.requestable))}" disabled></div>
-        <div class="field full">
-          <label>使用換休時數 *</label>
-          <div class="ot-time-pair">
-            <select id="clHours">${overtimeTimeOptions(24,parts.hour,'時')}</select>
-            <select id="clMinutes">${overtimeTimeOptions(59,parts.minute,'分')}</select>
-          </div>
-          <div id="clDurationHelp" class="help">請選擇本次要使用的換休時數。</div>
-        </div>
+        <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="clStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="clStartMinute">${overtimeTimeOptions(59,startParts.minute,'分')}</select></div><div class="help">24小時制（00–23時／00–59分）</div></div>
+        <div class="field"><label>結束時間 *</label><div class="ot-time-pair"><select id="clEndHour">${overtimeTimeOptions(23,endParts.hour,'時')}</select><select id="clEndMinute">${overtimeTimeOptions(59,endParts.minute,'分')}</select></div><div class="help">24小時制（00–23時／00–59分）</div></div>
+        <div class="field full"><label>使用換休時數</label><div id="clDurationHelp" class="ot-calc">系統將依開始與結束時間自動計算</div></div>
         <div class="field full"><label>換休事由 *</label><textarea id="clReason" placeholder="請簡要說明本次換休原因">${escapeHTML(existing?.reason||'')}</textarea></div>
         <div class="field full"><label>備註</label><textarea id="clNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
       </div>`;
   }
+
 
   function openCompLeaveUsageModal(existing=null){
     if(!overtimeCanSubmit()){toast('目前帳號沒有換休使用申請權限','warn');return;}
@@ -648,31 +648,39 @@
       foot.insertBefore(draft,$('modalConfirm'));
     }
     const updateDuration=()=>{
-      const minutes=compLeaveSelectedMinutes();
+      const start=overtimeSelectedTime('clStart');
+      const end=overtimeSelectedTime('clEnd');
+      const minutes=overtimeMinutesBetween(start,end);
+      const valid=overtimeValid24h(start)&&overtimeValid24h(end);
       const balanceNow=compLeaveBalance(state.profile?.id);
       if($('clDurationHelp')){
-        $('clDurationHelp').textContent=minutes
-          ? `本次使用 ${overtimeDurationLabel(minutes)}；目前可再申請 ${overtimeDurationLabel(balanceNow.requestable)}。`
-          : '請選擇本次要使用的換休時數。';
+        $('clDurationHelp').textContent=!valid
+          ? '請選擇完整的開始與結束時間'
+          : minutes
+            ? `${minutes}分鐘（${overtimeDurationLabel(minutes)}）；目前可再申請 ${overtimeDurationLabel(balanceNow.requestable)}`
+            : '結束時間須晚於開始時間';
       }
     };
-    $('clHours')?.addEventListener('change',updateDuration);
-    $('clMinutes')?.addEventListener('change',updateDuration);
+    ['clStartHour','clStartMinute','clEndHour','clEndMinute'].forEach(id=>$(id)?.addEventListener('change',updateDuration));
     updateDuration();
   }
 
+
   async function saveCompLeaveUsage(existing,status){
     const leaveDate=$('clDate').value;
-    const minutes=compLeaveSelectedMinutes();
+    const start=overtimeSelectedTime('clStart');
+    const end=overtimeSelectedTime('clEnd');
+    const minutes=overtimeMinutesBetween(start,end);
     const reason=$('clReason').value.trim();
     const notes=$('clNotes').value.trim();
     const balance=compLeaveBalance(state.profile?.id);
 
     if(!leaveDate){toast('請選擇換休日期','warn');return false;}
-    if(minutes<=0){toast('請選擇使用換休時數','warn');return false;}
+    if(!overtimeValid24h(start)||!overtimeValid24h(end)){toast('請選擇完整的開始及結束時間','warn');return false;}
+    if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
     if(!reason){toast('請填寫換休事由','warn');return false;}
     if(status==='pending' && minutes>balance.requestable){
-      toast(`可再申請換休僅剩 ${overtimeDurationLabel(balance.requestable)}，請調整使用時數`,'warn');
+      toast(`可再申請換休僅剩 ${overtimeDurationLabel(balance.requestable)}，請調整換休起訖時間`,'warn');
       return false;
     }
 
@@ -681,6 +689,8 @@
       applicant_name:state.profile.display_name,
       applicant_role:state.profile.role,
       leave_date:leaveDate,
+      start_time:start,
+      end_time:end,
       minutes,
       reason,
       notes:notes||null,
