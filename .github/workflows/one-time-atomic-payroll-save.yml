@@ -1,0 +1,76 @@
+name: One-time atomic payroll save
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-atomic-payroll-save.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.event.head_commit.message == 'Add one-time atomic payroll save workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Route payroll settings save through atomic RPC
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('v52/overtime-personal-hours-patch.txt')
+          text = path.read_text(encoding='utf-8')
+
+          pattern = re.compile(r"  async function saveRateFromModal\(\)\{.*?\n  \}\n\n  function currentStaffHours", re.S)
+          replacement = """  async function saveRateFromModal(){
+    if(!canReview()){toast('目前帳號沒有薪資計算設定權限','warn');return;}
+    const staffId=document.getElementById('prRateStaff')?.value;
+    const date=document.getElementById('prRateDate')?.value;
+    const amount=Number(document.getElementById('prRateAmount')?.value||0);
+    const hours=Number(document.getElementById('phDailyHours')?.value||0);
+    const note=String(document.getElementById('prRateNote')?.value||'').trim();
+    if(!staffId||!date||!Number.isFinite(amount)||amount<=0||!Number.isFinite(hours)||hours<=0||hours>8){toast('請完整填寫員工、生效日期、月薪工資總額與約定每日工時','warn');return;}
+    showLoading(true);
+    try{
+      const {error}=await db.rpc('save_staff_payroll_rate',{
+        p_staff_id:staffId,
+        p_effective_from:date,
+        p_monthly_wage_base:amount,
+        p_agreed_daily_hours:hours,
+        p_note:note||null
+      });
+      if(error)throw error;
+      closeModal();
+      state.payrollRatesLoaded=false;
+      state.personalHoursLoaded=false;
+      await load(true);
+      navigate('overtime');
+      toast('薪資基數與約定每日工時已同步儲存並保留版本紀錄','success');
+    }catch(err){
+      console.error(err);
+      toast('新增薪資計算設定失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  function currentStaffHours"""
+
+          new_text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'expected one saveRateFromModal block, found {count}')
+          path.write_text(new_text, encoding='utf-8')
+
+      - name: Commit change
+        run: |
+          git config user.name "openai-maintenance-bot"
+          git config user.email "openai-maintenance-bot@users.noreply.github.com"
+          git add v52/overtime-personal-hours-patch.txt
+          git commit -m "Use atomic RPC for payroll setting save"
+          git push origin main
