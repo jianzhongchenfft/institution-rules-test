@@ -1,0 +1,120 @@
+// V5.2 加班／換休：統一「目前剩餘換休」定義，移除「可再申請換休」易混淆顯示
+(() => {
+  const style=document.createElement('style');
+  style.id='v52-overtime-balance-clarity-style';
+  style.textContent=`
+    .ot-summary.ot-summary-three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    @media(max-width:820px){.ot-summary.ot-summary-three{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.ot-summary.ot-summary-three{grid-template-columns:1fr}}
+  `;
+  document.head.appendChild(style);
+
+  function durationLabel(minutes){
+    const n=Math.max(0,Number(minutes)||0);
+    const h=Math.floor(n/60),m=n%60;
+    if(h&&m)return `${h}小時${m}分`;
+    if(h)return `${h}小時`;
+    return `${m}分鐘`;
+  }
+
+  function balance(){
+    const staffId=String(state.profile?.id||'');
+    const earned=(state.overtimeRows||[])
+      .filter(r=>String(r.applicant_staff_id)===staffId&&r.status==='approved'&&r.compensation_method==='comp_leave')
+      .reduce((sum,r)=>sum+(r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0)),0);
+    const used=(state.compLeaveRows||[])
+      .filter(r=>String(r.applicant_staff_id)===staffId&&r.status==='approved')
+      .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    const pending=(state.compLeaveRows||[])
+      .filter(r=>String(r.applicant_staff_id)===staffId&&r.status==='pending')
+      .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    return {earned,used,pending,remaining:Math.max(0,earned-used-pending)};
+  }
+
+  function cardTitle(card){
+    return card?.querySelector('.stat-head span')?.textContent?.trim()||'';
+  }
+
+  function updateSummaryCards(){
+    if(state.page!=='overtime')return;
+    const current=balance();
+    document.querySelectorAll('#otMain .ot-summary').forEach(summary=>{
+      const cards=[...summary.querySelectorAll(':scope > .stat-card')];
+      const remainingCard=cards.find(c=>cardTitle(c)==='目前剩餘換休');
+      const requestableCard=cards.find(c=>cardTitle(c)==='可再申請換休');
+
+      if(remainingCard&&requestableCard){
+        requestableCard.remove();
+        const value=remainingCard.querySelector('.stat-value');
+        const foot=remainingCard.querySelector('.stat-foot');
+        if(value)value.textContent=durationLabel(current.remaining);
+        if(foot)foot.textContent='已扣除已使用與待審核';
+      }else if(requestableCard&&!remainingCard){
+        const title=requestableCard.querySelector('.stat-head span');
+        const value=requestableCard.querySelector('.stat-value');
+        const foot=requestableCard.querySelector('.stat-foot');
+        if(title)title.textContent='目前剩餘換休';
+        if(value)value.textContent=durationLabel(current.remaining);
+        if(foot)foot.textContent='已扣除已使用與待審核';
+      }else if(remainingCard){
+        const value=remainingCard.querySelector('.stat-value');
+        const foot=remainingCard.querySelector('.stat-foot');
+        if(value)value.textContent=durationLabel(current.remaining);
+        if(foot)foot.textContent='已扣除已使用與待審核';
+      }
+
+      const count=summary.querySelectorAll(':scope > .stat-card').length;
+      summary.classList.toggle('ot-summary-three',count===3);
+    });
+  }
+
+  function updateCompLeaveModal(){
+    const modal=document.getElementById('clDate')?.closest('.modal');
+    if(!modal)return;
+    const current=balance();
+    modal.querySelectorAll('.field').forEach(field=>{
+      const label=field.querySelector('label');
+      if(label?.textContent?.trim()==='目前可再申請'){
+        label.textContent='目前剩餘換休';
+        const input=field.querySelector('input');
+        if(input)input.value=durationLabel(current.remaining);
+      }
+    });
+    const help=document.getElementById('clDurationHelp');
+    if(help&&help.textContent.includes('目前可再申請')){
+      help.textContent=help.textContent.replace('目前可再申請','目前剩餘換休');
+    }
+  }
+
+  function updateRuleCopy(){
+    document.querySelectorAll('#otMain .ot-rule-list li').forEach(li=>{
+      if(li.textContent.includes('目前可再申請的換休餘額')){
+        li.textContent=li.textContent.replace('目前可再申請的換休餘額','目前剩餘換休時數');
+      }
+    });
+  }
+
+  function enhance(){
+    updateSummaryCards();
+    updateCompLeaveModal();
+    updateRuleCopy();
+  }
+
+  let queued=false;
+  function scheduleEnhance(){
+    if(queued)return;
+    queued=true;
+    setTimeout(()=>{queued=false;enhance();},20);
+  }
+
+  const observer=new MutationObserver(()=>scheduleEnhance());
+  observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-ot-view],#otReload,#clAddBtn'))scheduleEnhance();
+  });
+  document.addEventListener('change',e=>{
+    if(['clStartHour','clStartMinute','clEndHour','clEndMinute'].includes(e.target?.id))scheduleEnhance();
+  });
+
+  scheduleEnhance();
+})();
