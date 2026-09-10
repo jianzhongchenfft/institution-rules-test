@@ -12,6 +12,70 @@
     });
   }
 
+  let balanceRefreshSeq=0;
+  let balanceRefreshTimer1=null;
+  let balanceRefreshTimer2=null;
+
+  async function refreshOvertimeDataSilently(token){
+    if(!state.profile || state.page!=='overtime' || token!==balanceRefreshSeq) return;
+    try{
+      const [overtimeResult,leaveResult]=await Promise.all([
+        db.from('overtime_requests')
+          .select('*')
+          .order('work_date',{ascending:false})
+          .order('created_at',{ascending:false}),
+        db.from('comp_leave_usages')
+          .select('*')
+          .order('leave_date',{ascending:false})
+          .order('created_at',{ascending:false})
+      ]);
+      if(overtimeResult.error) throw overtimeResult.error;
+      if(leaveResult.error) throw leaveResult.error;
+      if(token!==balanceRefreshSeq || state.page!=='overtime') return;
+
+      state.overtimeRows=overtimeResult.data||[];
+      state.compLeaveRows=leaveResult.data||[];
+      state.overtimeLoaded=true;
+      state.compLeaveLoaded=true;
+
+      // 透過目前作用中的頁籤重新渲染既有加班頁，不顯示「重新整理完成」提示。
+      const activeTab=document.querySelector('#otMain [data-ot-view].active');
+      if(activeTab) activeTab.click();
+    }catch(err){
+      console.error('自動更新加班／換休資料失敗',err);
+    }
+  }
+
+  function scheduleAutomaticBalanceRefresh(){
+    const token=++balanceRefreshSeq;
+    clearTimeout(balanceRefreshTimer1);
+    clearTimeout(balanceRefreshTimer2);
+
+    // 第一次於頁面建立後立即抓取；第二次作為初次登入／權限狀態尚未完全穩定時的補抓。
+    balanceRefreshTimer1=setTimeout(()=>refreshOvertimeDataSilently(token),180);
+    balanceRefreshTimer2=setTimeout(()=>{
+      if(token!==balanceRefreshSeq || state.page!=='overtime') return;
+      if(!(state.overtimeRows||[]).length && !(state.compLeaveRows||[]).length){
+        refreshOvertimeDataSilently(token);
+      }
+    },900);
+  }
+
+  const baseNavigateForAutoBalance=navigate;
+  navigate=function(id){
+    const result=baseNavigateForAutoBalance(id);
+    if(id==='overtime') scheduleAutomaticBalanceRefresh();
+    else{
+      balanceRefreshSeq++;
+      clearTimeout(balanceRefreshTimer1);
+      clearTimeout(balanceRefreshTimer2);
+    }
+    return result;
+  };
+
+  // 若本補丁載入時已位於加班／換休頁，也主動取得一次最新資料。
+  if(state.page==='overtime') scheduleAutomaticBalanceRefresh();
+
   function ownRow(kind,id){
     const rows=kind==='leave'?(state.compLeaveRows||[]):(state.overtimeRows||[]);
     return rows.find(r=>String(r.id)===String(id)&&String(r.applicant_staff_id)===String(state.profile?.id))||null;
