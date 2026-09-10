@@ -1,0 +1,78 @@
+// V5.2 加班／換休：補齊休息日、國定假日的重複／時段重疊防呆
+(() => {
+  const guardedTypes=new Set(['rest_day_overtime','national_holiday_overtime']);
+  const activeStatuses=new Set(['draft','pending','approved']);
+
+  const norm=v=>{
+    const x=String(v||'').slice(0,5);
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(x)?x:null;
+  };
+  const selected=p=>{
+    const h=document.getElementById(p+'Hour')?.value||'';
+    const m=document.getElementById(p+'Minute')?.value||'';
+    return h&&m?`${h}:${m}`:null;
+  };
+  const minutes=v=>{
+    const x=norm(v);if(!x)return null;
+    const [h,m]=x.split(':').map(Number);return h*60+m;
+  };
+  const overlaps=(a,b,c,d)=>{
+    const x=[minutes(a),minutes(b),minutes(c),minutes(d)];
+    return x.every(Number.isFinite)&&x[0]<x[3]&&x[1]>x[2];
+  };
+
+  function currentEditId(){
+    if(state.workflowEditingOvertimeId)return String(state.workflowEditingOvertimeId);
+    const d=document.getElementById('otWorkDate')?.value;
+    const t=document.getElementById('otType')?.value;
+    const a=selected('otStart'),b=selected('otEnd');
+    const matches=(state.overtimeRows||[]).filter(r=>
+      String(r.applicant_staff_id)===String(state.profile?.id)&&
+      ['draft','rejected'].includes(r.status)&&
+      r.work_date===d&&r.request_type===t&&
+      norm(r.start_time)===a&&norm(r.end_time)===b
+    );
+    return matches.length===1?String(matches[0].id):null;
+  }
+
+  function validateCurrentDayType(){
+    const date=document.getElementById('otWorkDate')?.value;
+    const type=document.getElementById('otType')?.value;
+    if(!date||!guardedTypes.has(type))return true;
+
+    const start=selected('otStart'),end=selected('otEnd');
+    if(!start||!end)return true;
+    const editingId=currentEditId();
+    const timedTypes=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+    const rows=(state.overtimeRows||[]).filter(r=>
+      String(r.applicant_staff_id)===String(state.profile?.id)&&
+      r.work_date===date&&
+      activeStatuses.has(r.status)&&
+      String(r.id)!==String(editingId||'')&&
+      timedTypes.has(r.request_type)
+    );
+
+    const exact=rows.find(r=>norm(r.start_time)===start&&norm(r.end_time)===end);
+    if(exact){
+      toast('同一天相同起訖時間已存在加班申請，請勿重複送出','warn');
+      return false;
+    }
+
+    const hit=rows.find(r=>overlaps(start,end,r.start_time,r.end_time));
+    if(!hit)return true;
+    return confirm(`⚠️ 這段加班時間與既有申請（${String(hit.start_time||'').slice(0,5)}–${String(hit.end_time||'').slice(0,5)}）有重疊。\n\n系統允許繼續，但請確認這不是重複申請。確定要繼續嗎？`);
+  }
+
+  document.addEventListener('click',e=>{
+    const btn=e.target.closest?.('button');
+    if(!btn)return;
+    const modal=btn.closest?.('.modal');
+    if(!modal||!modal.querySelector('#otWorkDate'))return;
+    const submit=btn.id==='modalConfirm'||btn.textContent.trim()==='儲存草稿';
+    if(!submit)return;
+    if(!validateCurrentDayType()){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  },true);
+})();
