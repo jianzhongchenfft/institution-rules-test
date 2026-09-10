@@ -1,0 +1,58 @@
+name: One-time enable midnight split fixed
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-enable-midnight-split-fixed.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch overtime loader and select
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          overtime=Path('v52/overtime-patch.txt')
+          s=overtime.read_text(encoding='utf-8')
+          old=".select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')"
+          new=".select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at,split_group_id,split_part,split_day_type_confirmed')"
+          if old not in s:
+              raise SystemExit('overtime select anchor not found')
+          overtime.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          part=Path('v51/part07.txt')
+          s=part.read_text(encoding='utf-8')
+          anchor="      const overtimeRes = await fetch('v52/overtime-patch.txt',{cache:'no-store'});\n      if(!overtimeRes.ok) throw new Error(`v52/overtime-patch.txt 載入失敗（${overtimeRes.status}）`);\n      eval(await overtimeRes.text());\n\n"
+          extra="      const midnightSplitRes = await fetch('v52/overtime-midnight-split-patch.txt',{cache:'no-store'});\n      if(!midnightSplitRes.ok) throw new Error(`v52/overtime-midnight-split-patch.txt 載入失敗（${midnightSplitRes.status}）`);\n      eval(await midnightSplitRes.text());\n\n"
+          if 'overtime-midnight-split-patch.txt' in s:
+              raise SystemExit('midnight split loader already present')
+          if anchor not in s:
+              raise SystemExit('overtime loader anchor not found')
+          part.write_text(s.replace(anchor,anchor+extra,1),encoding='utf-8')
+          PY
+
+      - name: Static checks
+        run: |
+          node --check < v52/overtime-midnight-split-patch.txt
+          grep -q "split_group_id,split_part,split_day_type_confirmed" v52/overtime-patch.txt
+          grep -q "overtime-midnight-split-patch.txt" v51/part07.txt
+          git diff --check
+
+      - name: Commit changes
+        run: |
+          git config user.name "openai-maintenance-bot"
+          git config user.email "openai-maintenance-bot@users.noreply.github.com"
+          git add v52/overtime-patch.txt v51/part07.txt
+          git commit -m "Enable split-pair cross-midnight overtime"
+          git push origin main
