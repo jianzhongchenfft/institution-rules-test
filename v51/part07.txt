@@ -56,6 +56,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!payrollCorrectionRes.ok) throw new Error(`v52/payroll-correction-patch.txt 載入失敗（${payrollCorrectionRes.status}）`);
       eval(await payrollCorrectionRes.text());
 
+      const compLeaveExpiryRes = await fetch('v52/comp-leave-expiry-patch.txt',{cache:'no-store'});
+      if(!compLeaveExpiryRes.ok) throw new Error(`v52/comp-leave-expiry-patch.txt 載入失敗（${compLeaveExpiryRes.status}）`);
+      eval(await compLeaveExpiryRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
