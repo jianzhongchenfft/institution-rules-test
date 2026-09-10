@@ -8,7 +8,7 @@
   function normalizeButtons(){
     document.querySelectorAll('[data-wf-withdraw]').forEach(btn=>{
       btn.textContent='撤回申請';
-      btn.title='僅待審核中的申請可由本人撤回；撤回後資料會直接刪除';
+      btn.title='撤回待審核申請';
     });
   }
 
@@ -28,11 +28,9 @@
     const date=kind==='leave'?row.leave_date:row.work_date;
     const time=row.start_time&&row.end_time?`${String(row.start_time).slice(0,5)}–${String(row.end_time).slice(0,5)}`:'—';
     openModal({
-      title:'撤回待審核申請',
+      title:'撤回申請',
       html:`
-        <div class="ot-rule-highlight" style="margin-top:0">
-          確定要撤回這筆待審核申請嗎？撤回後這筆申請會直接刪除，系統不保留撤回原因或撤回紀錄。
-        </div>
+        <div style="font-size:14px;font-weight:800;color:#344054">確定撤回此筆申請？</div>
         <div class="ot-detail" style="margin-top:10px">日期：${escapeHTML(date||'—')}　｜　時間：${escapeHTML(time)}</div>`,
       confirmText:'確認撤回',
       onConfirm:()=>submitWithdraw(kind,id)
@@ -61,7 +59,7 @@
 
       closeModal();
       await navigate('overtime');
-      toast('申請已撤回並刪除','success');
+      toast('申請已撤回','success');
       return true;
     }catch(err){
       console.error('撤回申請失敗',err);
