@@ -456,13 +456,6 @@
     prEnsureSettingsButton();prEnhanceTypeSelect();prEnhancePayroll();prEnhanceCorrectionModal();prNormalizeLabels();
   }
 
-  const baseNavigate=navigate;
-  navigate=function(id){
-    const r=baseNavigate(id);
-    if(id==='overtime')setTimeout(()=>prLoad(true),170);
-    return r;
-  };
-
   let queued=false;
   const obs=new MutationObserver(ms=>{
     const relevant=ms.some(m=>Array.from(m.addedNodes||[]).some(n=>n.nodeType===1&&(n.id==='otMain'||n.id==='otType'||n.id==='pcType'||n.matches?.('.modal,.ot-table,.ot-summary')||n.querySelector?.('#otMain,#otType,#pcType,.modal,.ot-table,.ot-summary'))));

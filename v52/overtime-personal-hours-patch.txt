@@ -253,8 +253,6 @@
     enhanceRateModal();enhanceOvertimeModal();enhancePayroll();enhanceRules();
   }
 
-  const baseNavigate=navigate;
-  navigate=function(id){const r=baseNavigate(id);if(id==='overtime')setTimeout(()=>load(true),260);return r;};
-  let queued=false;const observer=new MutationObserver(ms=>{if(queued||!ms.some(m=>m.addedNodes?.length))return;queued=true;setTimeout(()=>{queued=false;enhance();},40);});observer.observe(document.body,{childList:true,subtree:true});
+  let queued=false;const observer=new MutationObserver(ms=>{if(queued||!ms.some(m=>m.addedNodes?.length))return;queued=true;setTimeout(()=>{queued=false;if(state.page==='overtime'){if(!state.personalHoursLoaded)load();else enhance();}},40);});observer.observe(document.body,{childList:true,subtree:true});
   if(state.profile)setTimeout(()=>load(true),320);
 })();
