@@ -9,13 +9,22 @@
     if(b.dataset.clEdit)state.workflowEditingLeaveId=b.dataset.clEdit;
 
     const modal=b.closest?.('.modal');
-    if(!modal||!modal.querySelector('#otWorkDate'))return;
-    const type=document.getElementById('otType')?.value;
-    const isSave=b.id==='modalConfirm'||b.textContent.trim()==='儲存草稿';
-    if(type==='regular_day_off_overtime'&&isSave){
+    if(!modal)return;
+    if(modal.querySelector('#otWorkDate')){
+      const type=document.getElementById('otType')?.value;
+      const isSave=b.id==='modalConfirm'||b.textContent.trim()==='儲存草稿';
+      if(type==='regular_day_off_overtime'&&isSave){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        toast('今天是例假，不能提出加班申請；建議改為週六休息日加班。','warn');
+        return;
+      }
+    }
+    const corr=modal.querySelector('#prCorrDayType');
+    if(corr?.value==='regular_day_off_overtime'&&(b.id==='modalConfirm'||b.textContent.trim()==='建立更正單')){
       e.preventDefault();
       e.stopImmediatePropagation();
-      toast('今天是例假，不能提出加班申請；建議改為週六休息日加班。','warn');
+      toast('例假日不開放加班計薪更正，請確認實際出勤日別。','warn');
     }
   },true);
 
@@ -94,6 +103,14 @@
     note.textContent=`系統依固定週一至週五班別${manual?'目前選擇':'自動判斷'}：${typeLabel(type)||'請確認日別'}。如當日屬國定假日或有休息日／例假調移，請手動改選。`;
   }
 
+  function cleanCorrectionType(){
+    const sel=document.getElementById('prCorrDayType');
+    if(!sel)return;
+    const opt=[...sel.options].find(o=>o.value==='regular_day_off_overtime');
+    if(opt)opt.remove();
+    if(sel.value==='regular_day_off_overtime')sel.value='rest_day_overtime';
+  }
+
   function bindOvertimeModal(){
     const date=document.getElementById('otWorkDate');
     const sel=document.getElementById('otType');
@@ -139,9 +156,10 @@
   let queued=false;
   const observer=new MutationObserver(ms=>{
     if(queued)return;
-    if(!ms.some(m=>Array.from(m.addedNodes||[]).some(n=>n.nodeType===1&&(n.id==='otWorkDate'||n.querySelector?.('#otWorkDate')))))return;
+    const relevant=ms.some(m=>Array.from(m.addedNodes||[]).some(n=>n.nodeType===1&&(n.id==='otWorkDate'||n.id==='prCorrDayType'||n.querySelector?.('#otWorkDate,#prCorrDayType'))));
+    if(!relevant)return;
     queued=true;
-    setTimeout(()=>{queued=false;bindOvertimeModal();},80);
+    setTimeout(()=>{queued=false;bindOvertimeModal();cleanCorrectionType();},80);
   });
   observer.observe(document.body,{childList:true,subtree:true});
 })();
