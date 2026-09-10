@@ -192,7 +192,15 @@
       box.textContent=hours?`本次選擇換休；約定每日工時 ${hours} 小時。超過約定工時後即按機構規定認列加班，換休到期未休再依當時工資基準結清。`:'本次選擇換休；尚未設定約定每日工時。';
       return;
     }
-    const rate=rateFor(state.profile?.id,date),minutes=minutesBetween(selectedTime('otStart'),selectedTime('otEnd')),c=calc(type,minutes,rate);
+    const start=selectedTime('otStart'),end=selectedTime('otEnd');
+    const rate=rateFor(state.profile?.id,date),minutes=minutesBetween(start,end);
+    let c;
+    if(typeof globalThis.v52OvertimePayrollPreviewPosition==='function'&&typeof globalThis.v52OvertimePayrollCalcSegment==='function'){
+      const position=globalThis.v52OvertimePayrollPreviewPosition(state.profile?.id,date,start,state.workflowEditingOvertimeId||null);
+      c=globalThis.v52OvertimePayrollCalcSegment(type,minutes,rate,position.offset,position.includeDayBase);
+    }else{
+      c=calc(type,minutes,rate);
+    }
     if(!c.ok){box.textContent=c.text;return;}
     box.innerHTML=`預估加班費：<strong>${money(c.amount)}</strong><br>約定每日工時 ${escapeHTML(String(c.hours))} 小時；平日時薪基數約 ${money(c.hourly)}/小時。<br><span class="ot-detail">${escapeHTML(c.formula)}</span>`;
   }

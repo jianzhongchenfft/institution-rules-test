@@ -119,6 +119,25 @@
     return {ok:true,amount,hourly:h,monthly,hours,formula,dayOffset:offset,dayEnd};
   }
 
+  function prPreviewPosition(staffId,date,start,existingId=null){
+    const candidateStart=prNormTime(start);
+    if(!staffId||!date||!candidateStart)return {offset:0,includeDayBase:true};
+    const active=new Set(['draft','pending','approved']);
+    const earlier=(state.overtimeRows||[])
+      .filter(r=>String(r.applicant_staff_id)===String(staffId)&&r.work_date===date&&active.has(r.status)&&String(r.id)!==String(existingId||'')&&timedTypes.has(r.request_type))
+      .filter(r=>r.request_type!=='holiday_visit_comp'&&prNormTime(r.start_time)&&prNormTime(r.end_time))
+      .filter(r=>prNormTime(r.start_time)<candidateStart)
+      .sort((a,b)=>String(a.start_time||'').localeCompare(String(b.start_time||''))||String(a.end_time||'').localeCompare(String(b.end_time||''))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
+    let offset=0,dayBasePaid=false;
+    earlier.forEach(r=>{
+      offset+=Number(r.overtime_minutes)||prMinutes(r.start_time,r.end_time);
+      if(r.compensation_method==='overtime_pay'&&['national_holiday_overtime','regular_day_off_overtime'].includes(r.request_type))dayBasePaid=true;
+    });
+    return {offset,includeDayBase:!dayBasePaid};
+  }
+  globalThis.v52OvertimePayrollPreviewPosition=prPreviewPosition;
+  globalThis.v52OvertimePayrollCalcSegment=prCalc;
+
   async function prLoad(force=false){
     if(!state.profile||state.payrollRatesLoading)return;
     if(state.payrollRatesLoaded&&!force){prEnhance();return;}
@@ -243,9 +262,11 @@
       return;
     }
     if(comp==='comp_leave'){box.textContent='本次選擇換休，因此不列入直接加班費；換休到期與未休結清另依換休規則處理。';return;}
-    const minutes=prMinutes(prSelected('otStart'),prSelected('otEnd'));
+    const start=prSelected('otStart'),end=prSelected('otEnd');
+    const minutes=prMinutes(start,end);
     const rate=prRateFor(state.profile?.id,date);
-    const calc=prCalc(type,minutes,rate);
+    const position=prPreviewPosition(state.profile?.id,date,start,state.workflowEditingOvertimeId||null);
+    const calc=prCalc(type,minutes,rate,position.offset,position.includeDayBase);
     box.textContent=calc.ok?`預估加班費：${prMoney(calc.amount)}｜平日時薪基數約 ${prMoney(calc.hourly)}/小時`:`加班費試算：${calc.text}`;
   }
 
