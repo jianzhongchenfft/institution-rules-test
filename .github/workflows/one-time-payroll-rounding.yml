@@ -24,84 +24,50 @@ jobs:
 
           calc_path = Path('v52/overtime-payroll-calc-patch.txt')
           calc = calc_path.read_text(encoding='utf-8')
-
-          old = """  function prMoney(n){
-    const v=Number(n);
-    return Number.isFinite(v)?`NT$ ${v.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—';
-  }
-"""
-          new = """  function prMoney(n){
-    const v=Number(n);
-    return Number.isFinite(v)?`NT$ ${v.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—';
-  }
-  function prFinalMoney(n){
-    const v=Number(n);
-    return Number.isFinite(v)?`NT$ ${Math.round(v).toLocaleString('zh-TW')}`:'—';
-  }
-"""
-          if old not in calc:
-              raise SystemExit('prMoney block not found')
+          old = "  function prMoney(n){\n    const v=Number(n);\n    return Number.isFinite(v)?`NT$ ${v.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—';\n  }\n"
+          new = "  function prMoney(n){\n    const v=Number(n);\n    return Number.isFinite(v)?`NT$ ${v.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—';\n  }\n  function prFinalMoney(n){\n    const v=Number(n);\n    return Number.isFinite(v)?`NT$ ${Math.round(v).toLocaleString('zh-TW')}`:'—';\n  }\n"
+          if old not in calc: raise SystemExit('prMoney block not found')
           calc = calc.replace(old, new, 1)
-
           old = "    return {ok:true,amount:Math.round(amount*100)/100,hourly:Math.round(h*10000)/10000,monthly,hours,formula};\n"
           new = "    return {ok:true,amount,hourly:h,monthly,hours,formula};\n"
-          if old not in calc:
-              raise SystemExit('prCalc rounded return not found')
+          if old not in calc: raise SystemExit('prCalc rounded return not found')
           calc = calc.replace(old, new, 1)
-
           old = "    return {details,ok,total:Math.round(total*100)/100,missing:details.filter(d=>!d.calc.ok)};\n"
           new = "    return {details,ok,total,missing:details.filter(d=>!d.calc.ok)};\n"
-          if old not in calc:
-              raise SystemExit('prStaffCalc rounded total not found')
+          if old not in calc: raise SystemExit('prStaffCalc rounded total not found')
           calc = calc.replace(old, new, 1)
-
           old = "      else if(calc.ok)td.innerHTML=`<span class=\"pr-money\">${prMoney(calc.total+corr)}</span>${corr?`<div class=\"ot-detail\">含月結更正 ${corr>=0?'+':''}${prMoney(corr)}</div>`:''}`;\n"
           new = "      else if(calc.ok)td.innerHTML=`<span class=\"pr-money\">${prFinalMoney(calc.total+corr)}</span><div class=\"ot-detail\">月底實際應發金額；明細試算顯示至小數點後2位</div>${corr?`<div class=\"ot-detail\">含月結更正 ${corr>=0?'+':''}${prMoney(corr)}</div>`:''}`;\n"
-          if old not in calc:
-              raise SystemExit('payroll staff money cell not found')
+          if old not in calc: raise SystemExit('payroll staff money cell not found')
           calc = calc.replace(old, new, 1)
-
           old = "      const total=all.reduce((s,x)=>s+(x.c.ok?x.c.total:0)+x.corr,0);\n      const foot=first.querySelector('.stat-foot');if(foot)foot.textContent=complete?`系統試算加班費 ${prMoney(total)}`:'部分員工尚未完成薪資基數、約定每日工時或假日類型設定';\n"
           new = "      const total=all.reduce((s,x)=>s+Math.round((x.c.ok?x.c.total:0)+x.corr),0);\n      const foot=first.querySelector('.stat-foot');if(foot)foot.textContent=complete?`系統試算加班費 ${prFinalMoney(total)}（各員工月總額最後四捨五入至整元）`:'部分員工尚未完成薪資基數、約定每日工時或假日類型設定';\n"
-          if old not in calc:
-              raise SystemExit('payroll summary total block not found')
+          if old not in calc: raise SystemExit('payroll summary total block not found')
           calc = calc.replace(old, new, 1)
-
           old = "      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 30 ÷ 約定每日工時」為平日每小時工資額。找不到當日有效的薪資基數或約定每日工時時顯示待設定，不以目前最新設定回推。';\n"
           new = "      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 30 ÷ 約定每日工時」為平日每小時工資額。計算過程保留完整精度，明細僅顯示至小數點後2位；各員工整月加總完成後，實際應發加班費才四捨五入至整元。找不到當日有效的薪資基數或約定每日工時時顯示待設定，不以目前最新設定回推。';\n"
-          if old not in calc:
-              raise SystemExit('payroll calculation note not found')
+          if old not in calc: raise SystemExit('payroll calculation note not found')
           calc = calc.replace(old, new, 1)
-
           calc_path.write_text(calc, encoding='utf-8')
 
           ph_path = Path('v52/overtime-personal-hours-patch.txt')
           ph = ph_path.read_text(encoding='utf-8')
-
           old = "  const money=n=>`NT$ ${(Number(n)||0).toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`;\n"
           new = "  const money=n=>`NT$ ${(Number(n)||0).toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`;\n  const moneyFinal=n=>`NT$ ${Math.round(Number(n)||0).toLocaleString('zh-TW')}`;\n"
-          if old not in ph:
-              raise SystemExit('personal hours money helper not found')
+          if old not in ph: raise SystemExit('personal hours money helper not found')
           ph = ph.replace(old, new, 1)
-
           old = "    return {ok:true,amount:Math.round(amount*100)/100,hourly:Math.round(hourly*10000)/10000,monthly,hours,formula};\n"
           new = "    return {ok:true,amount,hourly,monthly,hours,formula};\n"
-          if old not in ph:
-              raise SystemExit('personal hours rounded calc return not found')
+          if old not in ph: raise SystemExit('personal hours rounded calc return not found')
           ph = ph.replace(old, new, 1)
-
           old = "      else if(c.ok)td.innerHTML=`<span class=\"pr-money\">${money(c.total)}</span><div class=\"ot-detail\">依個人約定每日工時換算</div>`;\n"
           new = "      else if(c.ok)td.innerHTML=`<span class=\"pr-money\">${moneyFinal(c.total)}</span><div class=\"ot-detail\">整月加總後四捨五入至整元；明細僅顯示2位小數</div>`;\n"
-          if old not in ph:
-              raise SystemExit('personal hours payroll money cell not found')
+          if old not in ph: raise SystemExit('personal hours payroll money cell not found')
           ph = ph.replace(old, new, 1)
-
           old = "    if(note)note.innerHTML='加班費依各員工於加班日有效的「<strong>月薪工資總額 ÷ 30 ÷ 約定每日工時</strong>」換算平日時薪；超過個人約定正常工時後，即依機構約定比照法定加班倍率。';\n"
           new = "    if(note)note.innerHTML='加班費依各員工於加班日有效的「<strong>月薪工資總額 ÷ 30 ÷ 約定每日工時</strong>」換算平日時薪；計算全程保留完整精度，明細僅顯示2位小數，各員工整月加總後的實際應發金額才四捨五入至整元。';\n"
-          if old not in ph:
-              raise SystemExit('personal hours payroll note not found')
+          if old not in ph: raise SystemExit('personal hours payroll note not found')
           ph = ph.replace(old, new, 1)
-
           ph_path.write_text(ph, encoding='utf-8')
 
       - name: Commit rounding update
