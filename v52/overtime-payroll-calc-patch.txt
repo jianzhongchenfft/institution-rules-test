@@ -158,26 +158,12 @@
           return `<div class="pr-rate-item"><div class="pr-rate-top"><div><div class="pr-rate-main">${escapeHTML(s?.display_name||'未命名')}｜${prMoney(r.monthly_wage_base)}</div><div class="pr-rate-sub">生效：${rocDate(String(r.effective_from)+'T00:00:00')}｜約定每日工時：${Number.isFinite(hours)&&hours>0?escapeHTML(String(hours))+'小時':'待設定'}｜平日時薪基數：約 ${hourly?prMoney(hourly)+'/小時':'待設定'}${r.note?`<br>備註：${escapeHTML(r.note)}`:''}</div></div><div class="pr-rate-sub">建立：${escapeHTML(r.created_by_name||'—')}・${rocDate(r.created_at)}</div></div></div>`;
         }).join(''):'<div class="ot-empty"><p>尚未設定任何薪資計算基數。</p></div>'}</div>`,
       confirmText:'新增薪資基數',
-      onConfirm:prSaveRate,
+      onConfirm:()=>{
+        if(typeof globalThis.v52SaveStaffPayrollRateAtomic!=='function'){toast('薪資設定儲存模組尚未載入，請重新整理頁面','error');return false;}
+        return globalThis.v52SaveStaffPayrollRateAtomic();
+      },
       large:true
     });
-  }
-  async function prSaveRate(){
-    const staffId=document.getElementById('prRateStaff')?.value;
-    const date=document.getElementById('prRateDate')?.value;
-    const amount=Number(document.getElementById('prRateAmount')?.value||0);
-    const note=String(document.getElementById('prRateNote')?.value||'').trim();
-    if(!staffId||!date||!Number.isFinite(amount)||amount<=0){toast('請完整填寫員工、生效日期與月薪工資總額','warn');return false;}
-    showLoading(true);
-    try{
-      const {error}=await db.from('staff_payroll_rates').insert({
-        staff_id:staffId,effective_from:date,monthly_wage_base:amount,note:note||null,
-        created_by:state.user.id,created_by_name:state.profile.display_name
-      });
-      if(error)throw error;
-      closeModal();state.payrollRatesLoaded=false;await prLoad(true);toast('薪資計算基數已新增並保留版本紀錄','success');return true;
-    }catch(err){console.error(err);toast('新增薪資計算基數失敗：'+(err?.message||err),'error');return false;}
-    finally{showLoading(false);}
   }
 
   function prEnsureSettingsButton(){

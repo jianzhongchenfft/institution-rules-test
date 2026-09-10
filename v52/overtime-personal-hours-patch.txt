@@ -162,6 +162,8 @@
     }
   }
 
+  globalThis.v52SaveStaffPayrollRateAtomic=saveRateFromModal;
+
   function currentStaffHours(){return Number(staffFor(state.profile?.id)?.agreed_daily_hours)||null;}
   function selectedTime(prefix){const h=document.getElementById(prefix+'Hour')?.value||'',m=document.getElementById(prefix+'Minute')?.value||'';return h&&m?`${h}:${m}`:null;}
   function minutesBetween(a,b){if(!a||!b)return 0;const [ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);return Math.max(0,bh*60+bm-ah*60-am);}
@@ -240,13 +242,6 @@
     list.appendChild(li);
   }
 
-  document.addEventListener('click',e=>{
-    const b=e.target.closest?.('button');if(!b)return;
-    const modal=b.closest('.modal');
-    if(canReview()&&modal?.querySelector('#prRateStaff')&&b.id==='modalConfirm'){
-      e.preventDefault();e.stopImmediatePropagation();saveRateFromModal();return;
-    }
-  },true);
 
   function enhance(){
     if(state.page!=='overtime')return;
