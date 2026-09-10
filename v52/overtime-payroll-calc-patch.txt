@@ -251,17 +251,6 @@
     box.textContent=calc.ok?`預估加班費：${prMoney(calc.amount)}｜平日時薪基數約 ${prMoney(calc.hourly)}/小時`:`加班費試算：${calc.text}`;
   }
 
-  function prCheckOverlap(type,date,start,end,existingId){
-    const active=new Set(['draft','pending','approved']);
-    const rows=(state.overtimeRows||[]).filter(r=>String(r.applicant_staff_id)===String(state.profile?.id)&&active.has(r.status)&&r.work_date===date&&String(r.id)!==String(existingId||'')&&timedTypes.has(r.request_type));
-    const toMin=v=>{v=prNormTime(v);if(!v)return null;const [h,m]=v.split(':').map(Number);return h*60+m;};
-    const a=toMin(start),b=toMin(end);if(!Number.isFinite(a)||!Number.isFinite(b))return true;
-    const exact=rows.find(r=>prNormTime(r.start_time)===start&&prNormTime(r.end_time)===end);
-    if(exact){toast('同一天相同起訖時間已存在加班申請，請勿重複送出','warn');return false;}
-    const hit=rows.find(r=>{const c=toMin(r.start_time),d=toMin(r.end_time);return Number.isFinite(c)&&Number.isFinite(d)&&a<d&&b>c;});
-    return !hit||confirm(`這段加班時間與既有申請（${String(hit.start_time||'').slice(0,5)}–${String(hit.end_time||'').slice(0,5)}）有重疊。\n\n系統允許繼續，但請確認不是重複申請。確定要繼續嗎？`);
-  }
-
   async function prSaveNewType(status){
     const type=document.getElementById('otType')?.value;
     const date=document.getElementById('otWorkDate')?.value;
@@ -278,7 +267,6 @@
       if(minutes>720){toast('例假日出勤超過12小時，請重新確認','warn');return false;}
       if(!document.getElementById('prEmergencyConfirm')?.checked){toast('例假日出勤須先確認屬於天災、事變或突發事件等法定例外情形','warn');return false;}
     }
-    if(!prCheckOverlap(type,date,start,end,existingId))return false;
     const payload={
       applicant_staff_id:state.profile.id,applicant_name:state.profile.display_name,applicant_role:state.profile.role,
       work_date:date,request_type:type,start_time:start,end_time:end,overtime_minutes:minutes,
