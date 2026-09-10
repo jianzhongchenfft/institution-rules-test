@@ -1,77 +1,10 @@
 // V5.2 加班／換休：待審核申請撤回（直接刪除，不追蹤原因）
+// 本檔只處理撤回，不再重載加班資料、不包裝 navigate、不覆寫換休餘額。
 (() => {
   const style=document.createElement('style');
   style.id='v52-overtime-withdraw-style';
   style.textContent='[data-wf-withdraw]{white-space:nowrap}';
   document.head.appendChild(style);
-
-  function normalizeButtons(){
-    document.querySelectorAll('[data-wf-withdraw]').forEach(btn=>{
-      btn.textContent='撤回申請';
-      btn.title='撤回待審核申請';
-    });
-  }
-
-  let balanceRefreshSeq=0;
-  let balanceRefreshTimer1=null;
-  let balanceRefreshTimer2=null;
-
-  async function refreshOvertimeDataSilently(token){
-    if(!state.profile || state.page!=='overtime' || token!==balanceRefreshSeq) return;
-    try{
-      const [overtimeResult,leaveResult]=await Promise.all([
-        db.from('overtime_requests')
-          .select('*')
-          .order('work_date',{ascending:false})
-          .order('created_at',{ascending:false}),
-        db.from('comp_leave_usages')
-          .select('*')
-          .order('leave_date',{ascending:false})
-          .order('created_at',{ascending:false})
-      ]);
-      if(overtimeResult.error) throw overtimeResult.error;
-      if(leaveResult.error) throw leaveResult.error;
-      if(token!==balanceRefreshSeq || state.page!=='overtime') return;
-
-      state.overtimeRows=overtimeResult.data||[];
-      state.compLeaveRows=leaveResult.data||[];
-      state.overtimeLoaded=true;
-      state.compLeaveLoaded=true;
-
-      const activeTab=document.querySelector('#otMain [data-ot-view].active');
-      if(activeTab) activeTab.click();
-    }catch(err){
-      console.error('自動更新加班／換休資料失敗',err);
-    }
-  }
-
-  function scheduleAutomaticBalanceRefresh(){
-    const token=++balanceRefreshSeq;
-    clearTimeout(balanceRefreshTimer1);
-    clearTimeout(balanceRefreshTimer2);
-
-    balanceRefreshTimer1=setTimeout(()=>refreshOvertimeDataSilently(token),180);
-    balanceRefreshTimer2=setTimeout(()=>{
-      if(token!==balanceRefreshSeq || state.page!=='overtime') return;
-      if(!(state.overtimeRows||[]).length && !(state.compLeaveRows||[]).length){
-        refreshOvertimeDataSilently(token);
-      }
-    },900);
-  }
-
-  const baseNavigateForAutoBalance=navigate;
-  navigate=function(id){
-    const result=baseNavigateForAutoBalance(id);
-    if(id==='overtime') scheduleAutomaticBalanceRefresh();
-    else{
-      balanceRefreshSeq++;
-      clearTimeout(balanceRefreshTimer1);
-      clearTimeout(balanceRefreshTimer2);
-    }
-    return result;
-  };
-
-  if(state.page==='overtime') scheduleAutomaticBalanceRefresh();
 
   function ownRow(kind,id){
     const rows=kind==='leave'?(state.compLeaveRows||[]):(state.overtimeRows||[]);
@@ -80,14 +13,20 @@
 
   function openWithdrawModal(kind,id){
     const row=ownRow(kind,id);
-    if(!row){toast('找不到這筆申請，請重新整理後再試','warn');return;}
+    if(!row){
+      toast('找不到這筆申請，請重新整理後再試','warn');
+      return;
+    }
     if(row.status!=='pending'){
       toast('只有待審核中的申請可以撤回','warn');
       return;
     }
 
     const date=kind==='leave'?row.leave_date:row.work_date;
-    const time=row.start_time&&row.end_time?`${String(row.start_time).slice(0,5)}–${String(row.end_time).slice(0,5)}`:'—';
+    const time=row.start_time&&row.end_time
+      ? `${String(row.start_time).slice(0,5)}–${String(row.end_time).slice(0,5)}`
+      : '—';
+
     openModal({
       title:'撤回申請',
       html:`
@@ -119,7 +58,7 @@
       if(!data)throw new Error('申請狀態已變更，請重新整理後再操作');
 
       closeModal();
-      await navigate('overtime');
+      navigate('overtime');
       toast('申請已撤回','success');
       return true;
     }catch(err){
@@ -137,148 +76,12 @@
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
+
     const [kind,id]=String(btn.dataset.wfWithdraw||'').split(':');
-    if(!['overtime','leave'].includes(kind)||!id){toast('撤回資料格式不正確，請重新整理頁面','warn');return;}
+    if(!['overtime','leave'].includes(kind)||!id){
+      toast('撤回資料格式不正確，請重新整理頁面','warn');
+      return;
+    }
     openWithdrawModal(kind,id);
   },true);
-
-  let queued=false;
-  const observer=new MutationObserver(ms=>{
-    if(queued||!ms.some(m=>m.addedNodes?.length))return;
-    queued=true;
-    setTimeout(()=>{queued=false;normalizeButtons();},20);
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-
-  normalizeButtons();
-})();
-
-// 顯示層只負責統一名稱與卡片數量；餘額來源與核心模組相同，皆讀取 comp_leave_credits 台帳。
-(() => {
-  const style=document.createElement('style');
-  style.id='v52-overtime-balance-inline-style';
-  style.textContent=`
-    .ot-summary.ot-summary-three{grid-template-columns:repeat(3,minmax(0,1fr))!important}
-    @media(max-width:820px){.ot-summary.ot-summary-three{grid-template-columns:1fr 1fr!important}}
-    @media(max-width:560px){.ot-summary.ot-summary-three{grid-template-columns:1fr!important}}
-  `;
-  document.head.appendChild(style);
-
-  function durationLabel(minutes){
-    const n=Math.max(0,Number(minutes)||0);
-    const h=Math.floor(n/60),m=n%60;
-    if(h&&m)return `${h}小時${m}分`;
-    if(h)return `${h}小時`;
-    return `${m}分鐘`;
-  }
-
-  function canonicalRemaining(asOfDate){
-    if(!Array.isArray(state.compLeaveCredits))return null;
-    const staffId=String(state.profile?.id||'');
-    const raw=String(asOfDate||'');
-    const asOf=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw:isoDate(new Date());
-
-    const ledgerRemaining=(state.compLeaveCredits||[])
-      .filter(c=>
-        String(c.staff_id)===staffId &&
-        String(c.earned_date||'')<=asOf &&
-        (!c.expires_on || String(c.expires_on)>=asOf)
-      )
-      .reduce((sum,c)=>sum+(Number(c.remaining_minutes)||0),0);
-
-    const pending=(state.compLeaveRows||[])
-      .filter(r=>String(r.applicant_staff_id)===staffId&&r.status==='pending')
-      .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
-
-    return Math.max(0,ledgerRemaining-pending);
-  }
-
-  function titleOf(card){
-    return card?.querySelector('.stat-head span')?.textContent?.trim()||'';
-  }
-
-  function fixSummaryCards(){
-    if(state.page!=='overtime')return;
-    const remaining=canonicalRemaining(isoDate(new Date()));
-    if(remaining===null)return;
-    document.querySelectorAll('#otMain .ot-summary').forEach(summary=>{
-      const cards=[...summary.children].filter(el=>el.classList?.contains('stat-card'));
-      const remainingCard=cards.find(card=>titleOf(card)==='目前剩餘換休');
-      const requestableCard=cards.find(card=>titleOf(card)==='可再申請換休');
-
-      if(remainingCard){
-        const value=remainingCard.querySelector('.stat-value');
-        const foot=remainingCard.querySelector('.stat-foot');
-        const next=durationLabel(remaining);
-        if(value&&value.textContent!==next)value.textContent=next;
-        if(foot&&foot.textContent!=='依換休台帳，已扣除待審核')foot.textContent='依換休台帳，已扣除待審核';
-      }
-
-      if(requestableCard)requestableCard.remove();
-
-      const count=[...summary.children].filter(el=>el.classList?.contains('stat-card')).length;
-      summary.classList.toggle('ot-summary-three',count===3);
-    });
-  }
-
-  function fixCompLeaveModal(){
-    const dateInput=document.getElementById('clDate');
-    const modal=dateInput?.closest('.modal');
-    if(!modal)return;
-    const remaining=canonicalRemaining(dateInput.value||isoDate(new Date()));
-    if(remaining===null)return;
-
-    const directInput=document.getElementById('clBalanceValue');
-    if(directInput)directInput.value=durationLabel(remaining);
-
-    modal.querySelectorAll('.field').forEach(field=>{
-      const label=field.querySelector('label');
-      const text=label?.textContent?.trim();
-      if(text==='目前可再申請'||text==='目前剩餘換休'){
-        if(label)label.textContent='目前剩餘換休';
-        const input=field.querySelector('input');
-        if(input)input.value=durationLabel(remaining);
-      }
-    });
-
-    const help=document.getElementById('clDurationHelp');
-    if(help&&help.textContent.includes('目前可再申請')){
-      help.textContent=help.textContent.replace('目前可再申請','目前剩餘換休');
-    }
-  }
-
-  function fixRuleCopy(){
-    document.querySelectorAll('#otMain .ot-rule-list li').forEach(li=>{
-      if(li.textContent.includes('目前可再申請的換休餘額')){
-        li.textContent=li.textContent.replace('目前可再申請的換休餘額','目前剩餘換休時數');
-      }
-    });
-  }
-
-  function apply(){
-    fixSummaryCards();
-    fixCompLeaveModal();
-    fixRuleCopy();
-  }
-
-  let queued=false;
-  function schedule(){
-    if(queued)return;
-    queued=true;
-    setTimeout(()=>{queued=false;apply();},15);
-  }
-
-  const observer=new MutationObserver(ms=>{
-    if(ms.some(m=>m.addedNodes?.length||m.removedNodes?.length))schedule();
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('[data-ot-view],#otReload,#otUseLeaveBtn,#clAddBtn'))schedule();
-  });
-  document.addEventListener('change',e=>{
-    if(e.target?.id==='clDate')schedule();
-  });
-
-  [0,80,250,700,1400].forEach(ms=>setTimeout(apply,ms));
 })();
