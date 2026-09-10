@@ -60,6 +60,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!compLeaveExpiryRes.ok) throw new Error(`v52/comp-leave-expiry-patch.txt 載入失敗（${compLeaveExpiryRes.status}）`);
       eval(await compLeaveExpiryRes.text());
 
+      const overtimeWorkflowRes = await fetch('v52/overtime-workflow-patch.txt',{cache:'no-store'});
+      if(!overtimeWorkflowRes.ok) throw new Error(`v52/overtime-workflow-patch.txt 載入失敗（${overtimeWorkflowRes.status}）`);
+      eval(await overtimeWorkflowRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
