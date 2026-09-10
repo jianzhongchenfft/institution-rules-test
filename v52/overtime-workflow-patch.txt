@@ -84,10 +84,13 @@
       if(same.some(r=>Number(r.holiday_case_count||0)===c)){toast('同一天相同家訪案數的假日家訪換休已存在，請勿重複申請','warn');return false;}
       return !same.length||confirm('同一天已經有另一筆假日家訪換休申請。\n\n若這不是重複申請，確定要繼續嗎？');
     }
-    const a=sel('otStart'),b=sel('otEnd');if(!a||!b)return true;const timed=rows.filter(r=>['overtime','holiday_overtime'].includes(r.request_type));
+    const a=sel('otStart'),b=sel('otEnd');if(!a||!b)return true;
+    const timedTypes=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+    const timed=rows.filter(r=>timedTypes.has(r.request_type));
     if(timed.some(r=>norm(r.start_time)===a&&norm(r.end_time)===b)){toast('同一天相同起訖時間已存在加班申請，請勿重複送出','warn');return false;}
     const hit=timed.find(r=>overlap(a,b,r.start_time,r.end_time));
-    return !hit||confirm(`這段加班時間與既有申請（${String(hit.start_time||'').slice(0,5)}–${String(hit.end_time||'').slice(0,5)}）有重疊。\n\n系統允許繼續，但請確認不是重複申請。確定要繼續嗎？`);
+    if(hit){toast(`這段加班時間與既有申請（${String(hit.start_time||'').slice(0,5)}–${String(hit.end_time||'').slice(0,5)}）重疊，請調整時間後再申請。`,'warn');return false;}
+    return true;
   }
   function validLeave(){
     const d=document.getElementById('clDate')?.value,a=sel('clStart'),b=sel('clEnd');if(!d||!a||!b)return true;const id=inferL();
