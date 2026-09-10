@@ -153,7 +153,9 @@
   normalizeButtons();
 })();
 
-// 統一換休餘額顯示：目前剩餘換休 = 已取得 - 已核准使用 - 待審核使用；移除「可再申請換休」卡片。
+// 統一換休餘額顯示：以 comp_leave_credits 台帳為唯一真實來源。
+// 目前剩餘換休 = 指定日期以前已取得、且當日尚未到期的台帳剩餘 - 待審核使用。
+// 已核准但取得日在未來的換休，不會提前列入可用餘額。
 (() => {
   const style=document.createElement('style');
   style.id='v52-overtime-balance-inline-style';
@@ -172,18 +174,26 @@
     return `${m}分鐘`;
   }
 
-  function currentRemaining(){
+  function canonicalRemaining(asOfDate){
+    if(state.compLeaveExpiryLoaded!==true)return null;
     const staffId=String(state.profile?.id||'');
-    const earned=(state.overtimeRows||[])
-      .filter(r=>String(r.applicant_staff_id)===staffId&&r.status==='approved'&&r.compensation_method==='comp_leave')
-      .reduce((sum,r)=>sum+(r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0)),0);
-    const used=(state.compLeaveRows||[])
-      .filter(r=>String(r.applicant_staff_id)===staffId&&r.status==='approved')
-      .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    const asOf=/^\d{4}-\d{2}-\d{2}$/.test(String(asOfDate||''))
+      ? String(asOfDate)
+      : isoDate(new Date());
+
+    const ledgerRemaining=(state.compLeaveCredits||[])
+      .filter(c=>
+        String(c.staff_id)===staffId &&
+        String(c.earned_date||'')<=asOf &&
+        (!c.expires_on || String(c.expires_on)>=asOf)
+      )
+      .reduce((sum,c)=>sum+(Number(c.remaining_minutes)||0),0);
+
     const pending=(state.compLeaveRows||[])
       .filter(r=>String(r.applicant_staff_id)===staffId&&r.status==='pending')
       .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
-    return Math.max(0,earned-used-pending);
+
+    return Math.max(0,ledgerRemaining-pending);
   }
 
   function titleOf(card){
@@ -192,7 +202,8 @@
 
   function fixSummaryCards(){
     if(state.page!=='overtime')return;
-    const remaining=currentRemaining();
+    const remaining=canonicalRemaining(isoDate(new Date()));
+    if(remaining===null)return;
     document.querySelectorAll('#otMain .ot-summary').forEach(summary=>{
       const cards=[...summary.children].filter(el=>el.classList?.contains('stat-card'));
       const remainingCard=cards.find(card=>titleOf(card)==='目前剩餘換休');
@@ -203,7 +214,7 @@
         const foot=remainingCard.querySelector('.stat-foot');
         const next=durationLabel(remaining);
         if(value&&value.textContent!==next)value.textContent=next;
-        if(foot&&foot.textContent!=='已扣除已使用與待審核')foot.textContent='已扣除已使用與待審核';
+        if(foot&&foot.textContent!=='依換休台帳，已扣除已使用與待審核')foot.textContent='依換休台帳，已扣除已使用與待審核';
       }
 
       if(requestableCard)requestableCard.remove();
@@ -216,7 +227,9 @@
   function fixCompLeaveModal(){
     const modal=document.getElementById('clDate')?.closest('.modal');
     if(!modal)return;
-    const remaining=currentRemaining();
+    const leaveDate=document.getElementById('clDate')?.value||isoDate(new Date());
+    const remaining=canonicalRemaining(leaveDate);
+    if(remaining===null)return;
     modal.querySelectorAll('.field').forEach(field=>{
       const label=field.querySelector('label');
       if(label?.textContent?.trim()==='目前可再申請'){
@@ -259,6 +272,9 @@
 
   document.addEventListener('click',e=>{
     if(e.target.closest?.('[data-ot-view],#otReload,#otUseLeaveBtn,#clAddBtn'))schedule();
+  });
+  document.addEventListener('change',e=>{
+    if(e.target?.id==='clDate')schedule();
   });
 
   [0,80,250,700,1400].forEach(ms=>setTimeout(apply,ms));
