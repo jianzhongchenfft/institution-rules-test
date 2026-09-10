@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   update:
-    if: github.event.head_commit.message == 'Add one-time atomic payroll save workflow'
+    if: github.event.head_commit.message == 'Fix one-time atomic payroll save workflow'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,46 +22,13 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import base64
           import re
 
           path = Path('v52/overtime-personal-hours-patch.txt')
           text = path.read_text(encoding='utf-8')
-
           pattern = re.compile(r"  async function saveRateFromModal\(\)\{.*?\n  \}\n\n  function currentStaffHours", re.S)
-          replacement = """  async function saveRateFromModal(){
-    if(!canReview()){toast('目前帳號沒有薪資計算設定權限','warn');return;}
-    const staffId=document.getElementById('prRateStaff')?.value;
-    const date=document.getElementById('prRateDate')?.value;
-    const amount=Number(document.getElementById('prRateAmount')?.value||0);
-    const hours=Number(document.getElementById('phDailyHours')?.value||0);
-    const note=String(document.getElementById('prRateNote')?.value||'').trim();
-    if(!staffId||!date||!Number.isFinite(amount)||amount<=0||!Number.isFinite(hours)||hours<=0||hours>8){toast('請完整填寫員工、生效日期、月薪工資總額與約定每日工時','warn');return;}
-    showLoading(true);
-    try{
-      const {error}=await db.rpc('save_staff_payroll_rate',{
-        p_staff_id:staffId,
-        p_effective_from:date,
-        p_monthly_wage_base:amount,
-        p_agreed_daily_hours:hours,
-        p_note:note||null
-      });
-      if(error)throw error;
-      closeModal();
-      state.payrollRatesLoaded=false;
-      state.personalHoursLoaded=false;
-      await load(true);
-      navigate('overtime');
-      toast('薪資基數與約定每日工時已同步儲存並保留版本紀錄','success');
-    }catch(err){
-      console.error(err);
-      toast('新增薪資計算設定失敗：'+(err?.message||err),'error');
-    }finally{
-      showLoading(false);
-    }
-  }
-
-  function currentStaffHours"""
-
+          replacement = base64.b64decode('ICBhc3luYyBmdW5jdGlvbiBzYXZlUmF0ZUZyb21Nb2RhbCgpewogICAgaWYoIWNhblJldmlldygpKXt0b2FzdCgn55uu5YmN5biz6Jmf5rKS5pyJ6Jaq6LOH6KiI566X6Kit5a6a5qyK6ZmQJywnd2FybicpO3JldHVybjt9CiAgICBjb25zdCBzdGFmZklkPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwclJhdGVTdGFmZicpPy52YWx1ZTsKICAgIGNvbnN0IGRhdGU9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3ByUmF0ZURhdGUnKT8udmFsdWU7CiAgICBjb25zdCBhbW91bnQ9TnVtYmVyKGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwclJhdGVBbW91bnQnKT8udmFsdWV8fDApOwogICAgY29uc3QgaG91cnM9TnVtYmVyKGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwaERhaWx5SG91cnMnKT8udmFsdWV8fDApOwogICAgY29uc3Qgbm90ZT1TdHJpbmcoZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3ByUmF0ZU5vdGUnKT8udmFsdWV8fCcnKS50cmltKCk7CiAgICBpZighc3RhZmZJZHx8IWRhdGV8fCFOdW1iZXIuaXNGaW5pdGUoYW1vdW50KXx8YW1vdW50PD0wfHwhTnVtYmVyLmlzRmluaXRlKGhvdXJzKXx8aG91cnM8PTB8fGhvdXJzPjgpe3RvYXN0KCfoq4vlrozmlbTloavlr6vlk6Hlt6XjgIHnlJ/mlYjml6XmnJ/jgIHmnIjolqrlt6Xos4fnuL3poY3oiIfntITlrprmr4/ml6Xlt6XmmYInLCd3YXJuJyk7cmV0dXJuO30KICAgIHNob3dMb2FkaW5nKHRydWUpOwogICAgdHJ5ewogICAgICBjb25zdCB7ZXJyb3J9PWF3YWl0IGRiLnJwYygnc2F2ZV9zdGFmZl9wYXlyb2xsX3JhdGUnLHsKICAgICAgICBwX3N0YWZmX2lkOnN0YWZmSWQsCiAgICAgICAgcF9lZmZlY3RpdmVfZnJvbTpkYXRlLAogICAgICAgIHBfbW9udGhseV93YWdlX2Jhc2U6YW1vdW50LAogICAgICAgIHBfYWdyZWVkX2RhaWx5X2hvdXJzOmhvdXJzLAogICAgICAgIHBfbm90ZTpub3RlfHxudWxsCiAgICAgIH0pOwogICAgICBpZihlcnJvcil0aHJvdyBlcnJvcjsKICAgICAgY2xvc2VNb2RhbCgpOwogICAgICBzdGF0ZS5wYXlyb2xsUmF0ZXNMb2FkZWQ9ZmFsc2U7CiAgICAgIHN0YXRlLnBlcnNvbmFsSG91cnNMb2FkZWQ9ZmFsc2U7CiAgICAgIGF3YWl0IGxvYWQodHJ1ZSk7CiAgICAgIG5hdmlnYXRlKCdvdmVydGltZScpOwogICAgICB0b2FzdCgn6Jaq6LOH5Z+65pW46IiH57SE5a6a5q+P5pel5bel5pmC5bey5ZCM5q2l5YSy5a2Y5Lim5L+d55WZ54mI5pys57SA6YyEJywnc3VjY2VzcycpOwogICAgfWNhdGNoKGVycil7CiAgICAgIGNvbnNvbGUuZXJyb3IoZXJyKTsKICAgICAgdG9hc3QoJ+aWsOWinuiWquizh+ioiOeul+ioreWumuWkseaVl++8micrKGVycj8ubWVzc2FnZXx8ZXJyKSwnZXJyb3InKTsKICAgIH1maW5hbGx5ewogICAgICBzaG93TG9hZGluZyhmYWxzZSk7CiAgICB9CiAgfQoKICBmdW5jdGlvbiBjdXJyZW50U3RhZmZIb3Vycw==').decode('utf-8')
           new_text, count = pattern.subn(replacement, text, count=1)
           if count != 1:
               raise SystemExit(f'expected one saveRateFromModal block, found {count}')
