@@ -59,8 +59,11 @@
     }
 
     const hit=rows.find(r=>overlaps(start,end,r.start_time,r.end_time));
-    if(!hit)return true;
-    return confirm(`⚠️ 這段加班時間與既有申請（${String(hit.start_time||'').slice(0,5)}–${String(hit.end_time||'').slice(0,5)}）有重疊。\n\n系統允許繼續，但請確認這不是重複申請。確定要繼續嗎？`);
+    if(hit){
+      toast(`這段加班時間與既有申請（${String(hit.start_time||'').slice(0,5)}–${String(hit.end_time||'').slice(0,5)}）重疊，請調整時間後再申請。`,'warn');
+      return false;
+    }
+    return true;
   }
 
   document.addEventListener('click',e=>{
