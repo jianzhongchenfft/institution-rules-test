@@ -1,0 +1,28 @@
+name: One-time cleanup legacy cross-midnight frontend
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-cleanup-legacy-cross-midnight.yml'
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - run: python scripts/cleanup_legacy_cross_midnight_frontend.py
+      - run: |
+          node --check < v52/overtime-patch.txt
+          node --check < v52/overtime-payroll-calc-patch.txt
+          node --check < v52/overtime-personal-hours-patch.txt
+          node --check < v52/overtime-workflow-patch.txt
+          git diff --check
+      - run: |
+          git config user.name openai-maintenance-bot
+          git config user.email openai-maintenance-bot@users.noreply.github.com
+          git add v52/overtime-patch.txt v52/overtime-payroll-calc-patch.txt v52/overtime-personal-hours-patch.txt v52/overtime-workflow-patch.txt
+          git commit -m 'Remove legacy cross-midnight frontend references'
+          git push origin main
