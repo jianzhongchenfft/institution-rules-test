@@ -84,6 +84,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimePersonalHoursRes.ok) throw new Error(`v52/overtime-personal-hours-patch.txt 載入失敗（${overtimePersonalHoursRes.status}）`);
       eval(await overtimePersonalHoursRes.text());
 
+      const overtimeMonthFilterRes = await fetch('v52/overtime-month-filter-patch.txt',{cache:'no-store'});
+      if(!overtimeMonthFilterRes.ok) throw new Error(`v52/overtime-month-filter-patch.txt 載入失敗（${overtimeMonthFilterRes.status}）`);
+      eval(await overtimeMonthFilterRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
