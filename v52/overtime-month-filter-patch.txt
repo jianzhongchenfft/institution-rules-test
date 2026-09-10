@@ -1,4 +1,5 @@
-// V5.2 加班／換休：月份篩選完整套用
+// V5.2 加班／換休：月份篩選與顯示輔助
+// 本檔只處理畫面篩選與固定提示，不載入其他模組、不包裝 navigate、不重寫資料。
 (() => {
   const style=document.createElement('style');
   style.id='v52-overtime-month-filter-style';
@@ -8,12 +9,13 @@
     .ot-month-filter-empty .icon{font-size:28px;margin-bottom:7px}
     .ot-month-filter-empty h3{margin:0 0 6px;color:#344054;font-size:15px}
     .ot-month-filter-empty p{margin:0;font-size:12px;line-height:1.6}
-
-    /* 加班申請視窗：將「約定每日工時」與「薪資基數」固定拆成兩列，避免共用提示區反覆切換 */
     #phApplicantHoursHint,#prAmountPreview{display:none!important}
     .ot-stable-status-stack{grid-column:1 / -1;width:100%;display:grid;gap:10px;margin-top:0}
     .ot-stable-status-row{width:100%;box-sizing:border-box;border:1px solid #eaded9;background:#fffaf8;color:#667085;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.55}
     .ot-stable-status-row strong{color:#344054}
+    .ot-summary.ot-summary-three{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    @media(max-width:820px){.ot-summary.ot-summary-three{grid-template-columns:1fr 1fr!important}}
+    @media(max-width:560px){.ot-summary.ot-summary-three{grid-template-columns:1fr!important}}
   `;
   document.head.appendChild(style);
 
@@ -36,12 +38,9 @@
   }
 
   function toggleMonthControl(){
-    const view=state.overtimeView;
-    const show=['mine','usage','payroll'].includes(view);
-    const input=document.getElementById('otMonth');
-    const label=document.querySelector('label[for="otMonth"]');
-    input?.classList.toggle('ot-month-filter-hidden',!show);
-    label?.classList.toggle('ot-month-filter-hidden',!show);
+    const show=['mine','usage','payroll'].includes(state.overtimeView);
+    document.getElementById('otMonth')?.classList.toggle('ot-month-filter-hidden',!show);
+    document.querySelector('label[for="otMonth"]')?.classList.toggle('ot-month-filter-hidden',!show);
   }
 
   function clearEmptyNotice(){
@@ -79,19 +78,19 @@
       clearEmptyNotice();
       return;
     }
+    if(domRows.length!==items.length)return;
 
-    if(domRows.length===items.length){
-      let visible=0;
-      domRows.forEach((tr,index)=>{
-        const match=isInSelectedMonth(items[index]?.[dateKey]);
-        tr.classList.toggle('ot-month-filter-hidden',!match);
-        if(match)visible++;
-      });
-      if(visible===0)showEmptyNotice(tableShell,view);
-      else{
-        tableShell.classList.remove('ot-month-filter-hidden');
-        clearEmptyNotice();
-      }
+    let visible=0;
+    domRows.forEach((tr,index)=>{
+      const match=isInSelectedMonth(items[index]?.[dateKey]);
+      tr.classList.toggle('ot-month-filter-hidden',!match);
+      if(match)visible++;
+    });
+
+    if(visible===0)showEmptyNotice(tableShell,view);
+    else{
+      tableShell.classList.remove('ot-month-filter-hidden');
+      clearEmptyNotice();
     }
   }
 
@@ -121,23 +120,6 @@
     return `NT$ ${n.toLocaleString('zh-TW',{maximumFractionDigits:0})}`;
   }
 
-  function stableStatusTexts(){
-    const h=currentDailyHours();
-    const hoursText=h
-      ? `約定每日工時：<strong>${escapeHTML(String(h))} 小時</strong>`
-      : '約定每日工時：<strong>尚未設定</strong>';
-
-    let wageText='薪資計算基數：<strong>由機構負責人於薪資作業中管理</strong>';
-    if(reviewerCanSeeWageBase()){
-      const rate=currentWageRate();
-      const amount=formatMoney(rate?.monthly_wage_base);
-      wageText=amount
-        ? `薪資計算基數：<strong>${escapeHTML(amount)}</strong>${rate?.effective_from?`（${escapeHTML(String(rate.effective_from))} 起生效）`:''}`
-        : '薪資計算基數：<strong>尚未設定有效薪資基數</strong>';
-    }
-    return {hoursText,wageText};
-  }
-
   function ensureStableStatusRows(){
     const modal=document.getElementById('otWorkDate')?.closest('.modal');
     if(!modal)return;
@@ -158,46 +140,40 @@
       anchor.insertAdjacentElement('afterend',stack);
     }
 
-    const {hoursText,wageText}=stableStatusTexts();
+    const h=currentDailyHours();
+    const hoursText=h
+      ? `約定每日工時：<strong>${escapeHTML(String(h))} 小時</strong>`
+      : '約定每日工時：<strong>尚未設定</strong>';
+
+    let wageText='薪資計算基數：<strong>由機構負責人於薪資作業中管理</strong>';
+    if(reviewerCanSeeWageBase()){
+      const rate=currentWageRate();
+      const amount=formatMoney(rate?.monthly_wage_base);
+      wageText=amount
+        ? `薪資計算基數：<strong>${escapeHTML(amount)}</strong>${rate?.effective_from?`（${escapeHTML(String(rate.effective_from))} 起生效）`:''}`
+        : '薪資計算基數：<strong>尚未設定有效薪資基數</strong>';
+    }
+
     const hoursRow=stack.querySelector('#otDailyHoursStable');
     const wageRow=stack.querySelector('#otWageBaseStable');
     if(hoursRow&&hoursRow.innerHTML!==hoursText)hoursRow.innerHTML=hoursText;
     if(wageRow&&wageRow.innerHTML!==wageText)wageRow.innerHTML=wageText;
   }
 
-  // 舊提示元件即使仍被其他補丁更新，也已隱藏；以下只避免無意義的相同內容重寫。
-  const innerHTMLDescriptor=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
-  const textContentDescriptor=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
-
-  function stabilizeProperty(el,prop,descriptor,flag){
-    if(!el||el.dataset?.[flag]==='1'||!descriptor?.get||!descriptor?.set)return;
-    try{
-      Object.defineProperty(el,prop,{
-        configurable:true,
-        enumerable:false,
-        get(){return descriptor.get.call(this);},
-        set(value){
-          const next=value==null?'':String(value);
-          if(descriptor.get.call(this)===next)return;
-          descriptor.set.call(this,value);
-        }
-      });
-      el.dataset[flag]='1';
-    }catch(err){
-      console.debug('略過提示文字穩定化',err);
-    }
-  }
-
-  function stabilizePreviewNodes(){
-    document.querySelectorAll('#phApplicantHoursHint,#prAmountPreview,#phHourlyPreview,#wfDayTypeAutoNote,#prLegalWarn,.pr-rate-history').forEach(el=>{
-      stabilizeProperty(el,'innerHTML',innerHTMLDescriptor,'stableInnerHTML');
-      stabilizeProperty(el,'textContent',textContentDescriptor,'stableTextContent');
+  function removeRequestableCard(){
+    if(state.page!=='overtime')return;
+    document.querySelectorAll('#content .ot-summary').forEach(summary=>{
+      const cards=[...summary.children].filter(el=>el.classList?.contains('stat-card'));
+      const redundant=cards.find(card=>card.querySelector('.stat-head span')?.textContent?.trim()==='可再申請換休');
+      redundant?.remove();
+      const count=[...summary.children].filter(el=>el.classList?.contains('stat-card')).length;
+      summary.classList.toggle('ot-summary-three',count===3);
     });
   }
 
   function enhance(){
     if(state.page!=='overtime')return;
-    stabilizePreviewNodes();
+    removeRequestableCard();
     ensureStableStatusRows();
     toggleMonthControl();
     applyTableMonthFilter();
@@ -207,14 +183,14 @@
   function scheduleEnhance(){
     if(queued)return;
     queued=true;
-    setTimeout(()=>{queued=false;enhance();},30);
+    queueMicrotask(()=>{
+      queued=false;
+      enhance();
+    });
   }
 
   const observer=new MutationObserver(mutations=>{
-    if(mutations.some(m=>m.addedNodes&&m.addedNodes.length)){
-      stabilizePreviewNodes();
-      scheduleEnhance();
-    }
+    if(mutations.some(m=>m.addedNodes?.length||m.removedNodes?.length))scheduleEnhance();
   });
   observer.observe(document.body,{childList:true,subtree:true});
 
@@ -224,13 +200,4 @@
   document.addEventListener('change',e=>{
     if(['otMonth','otWorkDate','otType','otStartHour','otStartMinute','otEndHour','otEndMinute','otCompensation'].includes(e.target?.id))scheduleEnhance();
   });
-
-  stabilizePreviewNodes();
-  scheduleEnhance();
 })();
-
-// 載入待審核申請撤回增強版（原因選填、撤回後保留紀錄）。
-fetch('v52/overtime-withdraw-patch.txt',{cache:'no-store'})
-  .then(res=>{if(!res.ok)throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${res.status}）`);return res.text();})
-  .then(code=>eval(code))
-  .catch(err=>console.error('撤回申請模組載入失敗',err));
