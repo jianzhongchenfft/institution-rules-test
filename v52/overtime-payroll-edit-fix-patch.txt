@@ -1,0 +1,17 @@
+// V5.2 新假別編輯補強：還原既有草稿／退回資料的類型選擇
+(() => {
+  const newTypes=new Set(['rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+  function restore(){
+    const sel=document.getElementById('otType');
+    const id=state.workflowEditingOvertimeId;
+    if(!sel||!id)return;
+    const row=(state.overtimeRows||[]).find(r=>String(r.id)===String(id));
+    if(!row||!newTypes.has(row.request_type)||sel.value===row.request_type)return;
+    if([...sel.options].some(o=>o.value===row.request_type)){
+      sel.value=row.request_type;
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  }
+  let q=false;const obs=new MutationObserver(ms=>{if(q||!ms.some(m=>m.addedNodes?.length))return;q=true;setTimeout(()=>{q=false;restore();},40);});obs.observe(document.body,{childList:true,subtree:true});
+  setTimeout(restore,250);
+})();
