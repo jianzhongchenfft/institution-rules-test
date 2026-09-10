@@ -1,0 +1,379 @@
+// V5.2 月結後更正單：附加式更正、報表重算與換休餘額同步
+(() => {
+  const correctionStyle=document.createElement('style');
+  correctionStyle.id='v52-payroll-correction-style';
+  correctionStyle.textContent=`
+    .pc-summary{display:grid;gap:10px}
+    .pc-adjust{font-weight:900;white-space:nowrap}
+    .pc-adjust.plus{color:#237a4b}.pc-adjust.minus{color:#b42318}.pc-adjust.zero{color:#667085}
+    .pc-flow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;white-space:nowrap}
+    .pc-flow .orig{color:#667085}.pc-flow .arrow{color:#98a2b3}.pc-flow .final{font-weight:900;color:#344054}
+    .pc-history{display:grid;gap:7px;margin-top:10px}
+    .pc-history-item{border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}
+    .pc-history-top{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+    .pc-history-main{font-size:12px;font-weight:900;color:#344054}.pc-history-sub{font-size:11px;color:#667085;line-height:1.55;margin-top:4px}
+    .pc-inline-note{font-size:11px;color:#7d4b3b;margin-top:5px}
+    @media(max-width:560px){.pc-flow{white-space:normal}}
+  `;
+  document.head.appendChild(correctionStyle);
+
+  Object.assign(state,{
+    payrollCorrections:state.payrollCorrections||[],
+    payrollCorrectionsLoaded:false,
+    overtimeStaffDirectory:state.overtimeStaffDirectory||[],
+    payrollCorrectionLoading:false
+  });
+
+  function pcCanReview(){return !!state.profile&&['organization_manager','admin'].includes(state.profile.role);}
+  function pcCanSubmitLeave(){return !!state.profile&&['supervisor','business_manager','admin'].includes(state.profile.role);}
+  function pcMonthStart(month){
+    const safe=/^\d{4}-\d{2}$/.test(month||'')?month:isoDate(new Date()).slice(0,7);
+    return safe+'-01';
+  }
+  function pcSettlement(){
+    const start=pcMonthStart(state.overtimeMonth);
+    return (state.payrollSettlements||[]).find(r=>r.settlement_month===start)||null;
+  }
+  function pcCorrectionsForSettlement(settlementId){return (state.payrollCorrections||[]).filter(c=>c.settlement_id===settlementId);}
+  function pcCorrectionsForStaff(staffId,type=null){
+    return (state.payrollCorrections||[]).filter(c=>c.staff_id===staffId&&(!type||c.adjustment_type===type));
+  }
+  function pcSum(list,type){return list.filter(c=>c.adjustment_type===type).reduce((s,c)=>s+(Number(c.adjustment_minutes)||0),0);}
+  function pcDuration(minutes){
+    const n=Math.max(0,Number(minutes)||0),h=Math.floor(n/60),m=n%60;
+    if(h&&m)return `${h}小時${m}分`;
+    if(h)return `${h}小時`;
+    return `${m}分鐘`;
+  }
+  function pcSigned(minutes){
+    const n=Number(minutes)||0;
+    if(!n)return '<span class="pc-adjust zero">0</span>';
+    return `<span class="pc-adjust ${n>0?'plus':'minus'}">${n>0?'+':'−'}${escapeHTML(pcDuration(Math.abs(n)))}</span>`;
+  }
+  function pcTypeLabel(type){return ({overtime_pay:'加班計薪',comp_leave_earned:'換休取得',comp_leave_used:'換休使用'})[type]||type;}
+  function pcRoleLabel(role){return roleLabels?.[role]||role||'—';}
+
+  function pcBaseBalance(staffId){
+    const earned=(state.overtimeRows||[])
+      .filter(r=>r.applicant_staff_id===staffId&&r.status==='approved'&&r.compensation_method==='comp_leave')
+      .reduce((s,r)=>s+(r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0)),0);
+    const used=(state.compLeaveRows||[])
+      .filter(r=>r.applicant_staff_id===staffId&&r.status==='approved')
+      .reduce((s,r)=>s+(Number(r.minutes)||0),0);
+    const pending=(state.compLeaveRows||[])
+      .filter(r=>r.applicant_staff_id===staffId&&r.status==='pending')
+      .reduce((s,r)=>s+(Number(r.minutes)||0),0);
+    const ownCorr=pcCorrectionsForStaff(staffId);
+    const corrEarned=pcSum(ownCorr,'comp_leave_earned');
+    const corrUsed=pcSum(ownCorr,'comp_leave_used');
+    const correctedEarned=Math.max(0,earned+corrEarned);
+    const correctedUsed=Math.max(0,used+corrUsed);
+    const remaining=Math.max(0,correctedEarned-correctedUsed);
+    return {earned:correctedEarned,used:correctedUsed,pending,remaining,requestable:Math.max(0,remaining-pending),corrEarned,corrUsed};
+  }
+
+  async function pcLoadData(force=false){
+    if(!state.profile||state.payrollCorrectionLoading) return;
+    if(state.payrollCorrectionsLoaded&&!force){pcEnhance();return;}
+    state.payrollCorrectionLoading=true;
+    try{
+      const correctionPromise=db.from('payroll_settlement_corrections')
+        .select('id,settlement_id,staff_id,staff_name,staff_role,adjustment_type,adjustment_minutes,reason,created_by,created_by_name,created_at')
+        .order('created_at',{ascending:false});
+      const staffPromise=pcCanReview()
+        ? db.from('staff_users').select('id,display_name,role,is_active').eq('is_active',true).order('display_name')
+        : Promise.resolve({data:[{id:state.profile.id,display_name:state.profile.display_name,role:state.profile.role,is_active:true}],error:null});
+      const [corrRes,staffRes]=await Promise.all([correctionPromise,staffPromise]);
+      if(corrRes.error) throw corrRes.error;
+      if(staffRes.error) throw staffRes.error;
+      state.payrollCorrections=corrRes.data||[];
+      state.overtimeStaffDirectory=staffRes.data||[];
+      state.payrollCorrectionsLoaded=true;
+      pcEnhance();
+    }catch(err){
+      console.error('讀取月結更正資料失敗',err);
+      toast('讀取月結更正資料失敗：'+(err?.message||err),'error');
+    }finally{state.payrollCorrectionLoading=false;}
+  }
+
+  function pcUpdateCard(label,value,foot=null){
+    document.querySelectorAll('#content .stat-card').forEach(card=>{
+      const head=card.querySelector('.stat-head span:first-child');
+      if(head?.textContent.trim()!==label)return;
+      const val=card.querySelector('.stat-value');
+      if(val&&val.textContent!==value) val.textContent=value;
+      if(foot){const f=card.querySelector('.stat-foot');if(f&&f.textContent!==foot)f.textContent=foot;}
+    });
+  }
+
+  function pcUpdateBalanceCards(){
+    if(state.page!=='overtime'||!state.profile||!state.payrollCorrectionsLoaded)return;
+    const b=pcBaseBalance(state.profile.id);
+    const hasCorr=b.corrEarned!==0||b.corrUsed!==0;
+    pcUpdateCard('目前剩餘換休',pcDuration(b.remaining),hasCorr?'已取得＋月結更正－已核准使用':'已取得－已核准使用');
+    pcUpdateCard('可再申請換休',pcDuration(b.requestable),hasCorr?'已納入月結更正並扣除待審核使用':'已扣除待審核與已使用');
+    pcUpdateCard('已取得換休',pcDuration(b.earned),hasCorr?'含已核准來源與月結更正':'已核准且選擇換休');
+    pcUpdateCard('已使用換休',pcDuration(b.used),hasCorr?'含已核准使用與月結更正':'僅計已核准使用');
+  }
+
+  function pcCorrectedRows(settlement){
+    const base=Array.isArray(settlement?.summary?.staff)?settlement.summary.staff:[];
+    const map=new Map();
+    base.forEach(r=>map.set(String(r.staffId),{
+      staffId:String(r.staffId),name:r.name||'未命名',role:r.role||'',
+      originalPay:Number(r.overtimePayMinutes)||0,originalEarned:Number(r.compLeaveEarnedMinutes)||0,
+      originalUsed:Number(r.compLeaveUsedMinutes)||0,originalBalance:Number(r.compLeaveBalanceMinutes)||0,
+      corrPay:0,corrEarned:0,corrUsed:0
+    }));
+    pcCorrectionsForSettlement(settlement.id).forEach(c=>{
+      const key=String(c.staff_id);
+      if(!map.has(key))map.set(key,{staffId:key,name:c.staff_name||'未命名',role:c.staff_role||'',originalPay:0,originalEarned:0,originalUsed:0,originalBalance:0,corrPay:0,corrEarned:0,corrUsed:0});
+      const r=map.get(key);
+      if(c.adjustment_type==='overtime_pay')r.corrPay+=Number(c.adjustment_minutes)||0;
+      if(c.adjustment_type==='comp_leave_earned')r.corrEarned+=Number(c.adjustment_minutes)||0;
+      if(c.adjustment_type==='comp_leave_used')r.corrUsed+=Number(c.adjustment_minutes)||0;
+    });
+    return [...map.values()].map(r=>({...r,
+      finalPay:Math.max(0,r.originalPay+r.corrPay),
+      finalEarned:Math.max(0,r.originalEarned+r.corrEarned),
+      finalUsed:Math.max(0,r.originalUsed+r.corrUsed),
+      finalBalance:Math.max(0,r.originalBalance+r.corrEarned-r.corrUsed)
+    })).sort((a,b)=>String(a.name).localeCompare(String(b.name),'zh-Hant'));
+  }
+
+  function pcFlow(original,adjusted,finalValue){
+    return `<div class="pc-flow"><span class="orig">${escapeHTML(pcDuration(original))}</span>${adjusted?`<span>${pcSigned(adjusted)}</span>`:''}<span class="arrow">→</span><span class="final">${escapeHTML(pcDuration(finalValue))}</span></div>`;
+  }
+
+  function pcCorrectionPanelHTML(settlement){
+    const corrections=pcCorrectionsForSettlement(settlement.id);
+    const rows=pcCorrectedRows(settlement);
+    return `
+      <section id="payrollCorrectionPanel" class="ot-rule-card">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+          <div><h3>月結後更正</h3><p>原月結資料保持鎖定；後續調整以獨立更正單追加，不覆蓋原始結算。</p></div>
+          ${pcCanReview()?'<button id="pcAddBtn" class="btn primary">＋ 新增月結更正</button>':''}
+        </div>
+        <div class="ot-rule-highlight">更正單建立後不可修改或刪除；若更正單本身填錯，請再新增一筆反向更正，保留完整稽核軌跡。</div>
+        <div style="margin-top:14px"><h3>更正後月結摘要</h3>
+          ${rows.length?`<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>員工</th><th>加班計薪</th><th>換休取得</th><th>換休使用</th><th>更正後月底換休餘額</th></tr></thead><tbody>${rows.map(r=>`<tr><td><div class="ot-review-name">${escapeHTML(r.name)}</div><div class="ot-detail">${escapeHTML(pcRoleLabel(r.role))}</div></td><td>${pcFlow(r.originalPay,r.corrPay,r.finalPay)}</td><td>${pcFlow(r.originalEarned,r.corrEarned,r.finalEarned)}</td><td>${pcFlow(r.originalUsed,r.corrUsed,r.finalUsed)}</td><td><strong>${escapeHTML(pcDuration(r.finalBalance))}</strong></td></tr>`).join('')}</tbody></table></div>`:'<div class="ot-empty"><p>目前沒有可顯示的結算資料。</p></div>'}
+        </div>
+        <div style="margin-top:14px"><h3>更正紀錄</h3>
+          ${corrections.length?`<div class="pc-history">${corrections.map(c=>`<div class="pc-history-item"><div class="pc-history-top"><div><div class="pc-history-main">${escapeHTML(c.staff_name)}｜${escapeHTML(pcTypeLabel(c.adjustment_type))}　${pcSigned(c.adjustment_minutes)}</div><div class="pc-history-sub">原因：${escapeHTML(c.reason)}<br>更正人：${escapeHTML(c.created_by_name||'—')}・${rocDate(c.created_at)}</div></div></div></div>`).join('')}</div>`:'<div class="ot-empty"><div class="icon">🧾</div><h3>尚無月結更正</h3><p>若結算後才發現漏算或誤算，可由機構負責人建立更正單。</p></div>'}
+        </div>
+      </section>`;
+  }
+
+  function pcUpdatePayrollUI(){
+    if(state.page!=='overtime'||state.overtimeView!=='payroll'||!state.payrollCorrectionsLoaded)return;
+    const settlement=pcSettlement();
+    if(!settlement)return;
+    const corr=pcCorrectionsForSettlement(settlement.id);
+    const payAdj=pcSum(corr,'overtime_pay'),earnedAdj=pcSum(corr,'comp_leave_earned'),usedAdj=pcSum(corr,'comp_leave_used');
+    pcUpdateCard('本月待計薪加班',pcDuration((Number(settlement.total_overtime_pay_minutes)||0)+payAdj),payAdj?'原月結＋月結更正':'僅計已核准且選擇領加班費');
+    pcUpdateCard('本月新增換休',pcDuration((Number(settlement.total_comp_leave_earned_minutes)||0)+earnedAdj),earnedAdj?'原月結＋月結更正':'已核准且選擇換休');
+    pcUpdateCard('本月使用換休',pcDuration((Number(settlement.total_comp_leave_used_minutes)||0)+usedAdj),usedAdj?'原月結＋月結更正':'僅計已核准使用');
+    const main=document.getElementById('otMain');
+    if(!main)return;
+    const old=document.getElementById('payrollCorrectionPanel');
+    if(old)old.remove();
+    main.insertAdjacentHTML('beforeend',pcCorrectionPanelHTML(settlement));
+    document.getElementById('pcAddBtn')?.addEventListener('click',pcOpenCorrectionModal);
+  }
+
+  function pcMinuteOptions(type,selected='00'){
+    const vals=type==='comp_leave_used'?['00','30']:['00','10','20','30','40','50'];
+    return vals.map(v=>`<option value="${v}" ${v===selected?'selected':''}>${v}</option>`).join('');
+  }
+
+  function pcOpenCorrectionModal(){
+    if(!pcCanReview()){toast('目前帳號沒有建立月結更正的權限','warn');return;}
+    const settlement=pcSettlement();
+    if(!settlement){toast('只有已完成月結的月份才能建立更正單','warn');return;}
+    const staff=(state.overtimeStaffDirectory||[]).filter(s=>s.is_active!==false);
+    if(!staff.length){toast('目前沒有可選擇的人員','warn');return;}
+    openModal({
+      title:'新增月結更正單',
+      html:`
+        <div class="ot-rule-highlight" style="margin-top:0">更正月份：<strong>${escapeHTML(state.overtimeMonth)}</strong>。原月結不會被修改，本次只新增一筆調整紀錄。</div>
+        <div class="form-grid" style="margin-top:12px">
+          <div class="field"><label>員工 *</label><select id="pcStaff">${staff.map(s=>`<option value="${escapeHTML(s.id)}">${escapeHTML(s.display_name)}｜${escapeHTML(pcRoleLabel(s.role))}</option>`).join('')}</select></div>
+          <div class="field"><label>更正項目 *</label><select id="pcType"><option value="overtime_pay">加班計薪</option><option value="comp_leave_earned">換休取得</option><option value="comp_leave_used">換休使用</option></select></div>
+          <div class="field"><label>調整方向 *</label><select id="pcDirection"><option value="1">增加認列</option><option value="-1">減少認列</option></select></div>
+          <div class="field"><label>更正時數 *</label><div class="ot-time-pair"><input id="pcHours" type="number" min="0" max="999" step="1" value="0"><select id="pcMinutes">${pcMinuteOptions('overtime_pay')}</select></div><div id="pcMinuteHelp" class="help">加班計薪／換休取得以10分鐘為間隔。</div></div>
+          <div class="field full"><label>更正原因 *</label><textarea id="pcReason" placeholder="例如：8月薪資結算後發現 8/20 加班漏列 30 分鐘"></textarea></div>
+        </div>`,
+      confirmText:'建立更正單',
+      onConfirm:pcSubmitCorrection,
+      large:true
+    });
+    document.getElementById('pcType')?.addEventListener('change',()=>{
+      const type=document.getElementById('pcType').value;
+      const min=document.getElementById('pcMinutes');
+      min.innerHTML=pcMinuteOptions(type,'00');
+      document.getElementById('pcMinuteHelp').textContent=type==='comp_leave_used'?'換休使用以30分鐘為間隔。':'加班計薪／換休取得以10分鐘為間隔。';
+    });
+  }
+
+  async function pcSubmitCorrection(){
+    const settlement=pcSettlement();
+    if(!settlement){toast('找不到本月份的月結資料','error');return false;}
+    const staffId=document.getElementById('pcStaff')?.value;
+    const staff=(state.overtimeStaffDirectory||[]).find(s=>String(s.id)===String(staffId));
+    const type=document.getElementById('pcType')?.value;
+    const direction=Number(document.getElementById('pcDirection')?.value||1);
+    const hours=Math.max(0,Number(document.getElementById('pcHours')?.value)||0);
+    const minutes=Math.max(0,Number(document.getElementById('pcMinutes')?.value)||0);
+    const total=(hours*60+minutes)*direction;
+    const reason=String(document.getElementById('pcReason')?.value||'').trim();
+    if(!staff){toast('請選擇員工','warn');return false;}
+    if(!['overtime_pay','comp_leave_earned','comp_leave_used'].includes(type)){toast('請選擇更正項目','warn');return false;}
+    if(total===0){toast('更正時數不可為 0','warn');return false;}
+    if(!reason){toast('請填寫更正原因','warn');return false;}
+    if(!confirm(`確定建立這筆月結更正嗎？\n\n${staff.display_name}｜${pcTypeLabel(type)}｜${direction>0?'+':'−'}${pcDuration(Math.abs(total))}\n\n建立後不可直接修改或刪除。`))return false;
+    showLoading(true);
+    try{
+      const {error}=await db.from('payroll_settlement_corrections').insert({
+        settlement_id:settlement.id,
+        staff_id:staff.id,
+        staff_name:staff.display_name,
+        staff_role:staff.role,
+        adjustment_type:type,
+        adjustment_minutes:total,
+        reason,
+        created_by:state.user.id,
+        created_by_name:state.profile.display_name
+      });
+      if(error)throw error;
+      closeModal();
+      await pcLoadData(true);
+      toast('月結更正單已建立','success');
+      return true;
+    }catch(err){
+      console.error(err);
+      toast('建立月結更正失敗：'+(err?.message||err),'error');
+      return false;
+    }finally{showLoading(false);}
+  }
+
+  function pcTimeParts(value){
+    const raw=String(value||'').slice(0,5);
+    const m=raw.match(/^(\d{2}):(\d{2})$/);
+    return m?{hour:m[1],minute:m[2]}:{hour:'',minute:'00'};
+  }
+  function pcHourOptions(selected){
+    let out='<option value="">時</option>';
+    for(let i=0;i<24;i++){const v=String(i).padStart(2,'0');out+=`<option value="${v}" ${v===selected?'selected':''}>${v}</option>`;}
+    return out;
+  }
+  function pcSelectedTime(prefix){
+    const h=document.getElementById(prefix+'Hour')?.value,m=document.getElementById(prefix+'Minute')?.value;
+    return h&&m?`${h}:${m}`:null;
+  }
+  function pcMinutesBetween(start,end){
+    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start||'')||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end||''))return 0;
+    const a=start.split(':').map(Number),b=end.split(':').map(Number);
+    return Math.max(0,(b[0]*60+b[1])-(a[0]*60+a[1]));
+  }
+
+  function pcOpenLeaveModal(existing=null){
+    if(!pcCanSubmitLeave()){toast('目前帳號沒有換休使用申請權限','warn');return;}
+    const balance=pcBaseBalance(state.profile.id);
+    if(!existing&&balance.requestable<=0){toast('目前沒有可申請的換休時數','warn');return;}
+    const today=existing?.leave_date||isoDate(new Date());
+    const sp=pcTimeParts(existing?.start_time),ep=pcTimeParts(existing?.end_time);
+    openModal({
+      title:existing?'編輯換休使用申請':'申請使用換休',
+      html:`<div class="form-grid">
+        <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
+        <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(pcRoleLabel(state.profile?.role))}" disabled></div>
+        <div class="field"><label>換休日期 *</label><input id="clDate" type="date" value="${escapeHTML(today)}"></div>
+        <div class="field"><label>目前可再申請</label><input class="ot-readonly" value="${escapeHTML(pcDuration(balance.requestable))}" disabled><div class="help">已納入歷次月結更正。</div></div>
+        <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="clStartHour">${pcHourOptions(sp.hour)}</select><select id="clStartMinute"><option value="00" ${sp.minute==='00'?'selected':''}>00</option><option value="30" ${sp.minute==='30'?'selected':''}>30</option></select></div></div>
+        <div class="field"><label>結束時間 *</label><div class="ot-time-pair"><select id="clEndHour">${pcHourOptions(ep.hour)}</select><select id="clEndMinute"><option value="00" ${ep.minute==='00'?'selected':''}>00</option><option value="30" ${ep.minute==='30'?'selected':''}>30</option></select></div></div>
+        <div class="field full"><label>使用換休時數</label><div id="clDurationHelp" class="ot-calc">系統將依開始與結束時間自動計算</div></div>
+        <div class="field full"><label>換休事由 *</label><textarea id="clReason" placeholder="請簡要說明本次換休原因">${escapeHTML(existing?.reason||'')}</textarea></div>
+        <div class="field full"><label>備註</label><textarea id="clNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
+      </div>`,
+      confirmText:'送出審核',
+      onConfirm:()=>pcSaveLeave(existing,'pending'),
+      large:true
+    });
+    const foot=document.querySelector('#modalRoot .modal-foot');
+    if(foot&&!existing){
+      const draft=document.createElement('button');draft.className='btn';draft.textContent='儲存草稿';draft.addEventListener('click',()=>pcSaveLeave(null,'draft'));
+      foot.insertBefore(draft,document.getElementById('modalConfirm'));
+    }
+    const update=()=>{
+      const start=pcSelectedTime('clStart'),end=pcSelectedTime('clEnd'),mins=pcMinutesBetween(start,end),b=pcBaseBalance(state.profile.id);
+      const help=document.getElementById('clDurationHelp');
+      if(help)help.textContent=!start||!end?'請選擇完整的開始與結束時間':mins?`${mins}分鐘（${pcDuration(mins)}）；目前可再申請 ${pcDuration(b.requestable)}`:'結束時間須晚於開始時間';
+    };
+    ['clStartHour','clStartMinute','clEndHour','clEndMinute'].forEach(id=>document.getElementById(id)?.addEventListener('change',update));
+    update();
+  }
+
+  async function pcSaveLeave(existing,status){
+    const leaveDate=document.getElementById('clDate')?.value;
+    const start=pcSelectedTime('clStart'),end=pcSelectedTime('clEnd'),minutes=pcMinutesBetween(start,end);
+    const reason=String(document.getElementById('clReason')?.value||'').trim();
+    const notes=String(document.getElementById('clNotes')?.value||'').trim();
+    const balance=pcBaseBalance(state.profile.id);
+    if(!leaveDate){toast('請選擇換休日期','warn');return false;}
+    if(!start||!end){toast('請選擇完整的開始及結束時間','warn');return false;}
+    if(!['00','30'].includes(start.slice(3,5))||!['00','30'].includes(end.slice(3,5))){toast('換休時間請以30分鐘為間隔','warn');return false;}
+    if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
+    if(!reason){toast('請填寫換休事由','warn');return false;}
+    if(status==='pending'&&minutes>balance.requestable){toast(`可再申請換休僅剩 ${pcDuration(balance.requestable)}，請調整換休起訖時間`,'warn');return false;}
+    const payload={
+      applicant_staff_id:state.profile.id,applicant_name:state.profile.display_name,applicant_role:state.profile.role,
+      leave_date:leaveDate,start_time:start,end_time:end,minutes,reason,notes:notes||null,status,
+      submitted_at:status==='pending'?new Date().toISOString():null,review_note:null,reviewed_at:null,reviewed_by:null,updated_at:new Date().toISOString()
+    };
+    showLoading(true);
+    try{
+      let result;
+      if(existing)result=await db.from('comp_leave_usages').update(payload).eq('id',existing.id);
+      else{payload.created_by=state.user.id;result=await db.from('comp_leave_usages').insert(payload);}
+      if(result.error)throw result.error;
+      closeModal();
+      state.overtimeView='usage';
+      navigate('overtime');
+      toast(status==='pending'?'換休使用申請已送出審核':'換休使用草稿已儲存','success');
+      return true;
+    }catch(err){
+      console.error(err);toast('儲存換休使用申請失敗：'+(err?.message||err),'error');return false;
+    }finally{showLoading(false);}
+  }
+
+  function pcEnhance(){
+    if(state.page!=='overtime')return;
+    if(!state.payrollCorrectionsLoaded){pcLoadData();return;}
+    pcUpdateBalanceCards();
+    pcUpdatePayrollUI();
+  }
+
+  document.addEventListener('click',e=>{
+    const add=e.target.closest?.('#clAddBtn');
+    const edit=e.target.closest?.('[data-cl-edit]');
+    if(!add&&!edit)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const existing=edit?(state.compLeaveRows||[]).find(r=>r.id===edit.dataset.clEdit)||null:null;
+    (async()=>{if(!state.payrollCorrectionsLoaded)await pcLoadData();pcOpenLeaveModal(existing);})();
+  },true);
+
+  document.addEventListener('click',e=>{
+    if(!e.target.closest?.('#otReload'))return;
+    setTimeout(()=>pcLoadData(true),150);
+  },true);
+
+  let pcScheduled=false;
+  const pcObserver=new MutationObserver(mutations=>{
+    const relevant=mutations.some(m=>Array.from(m.addedNodes||[]).some(n=>n.nodeType===1&&(n.id==='otMain'||n.id==='clAddBtn'||n.matches?.('.ot-summary,.modal')||n.querySelector?.('#otMain,#clAddBtn,.ot-summary'))));
+    if(!relevant||pcScheduled)return;
+    pcScheduled=true;
+    setTimeout(()=>{pcScheduled=false;pcEnhance();},0);
+  });
+  pcObserver.observe(document.body,{childList:true,subtree:true});
+  setTimeout(pcEnhance,0);
+})();
