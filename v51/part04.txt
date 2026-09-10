@@ -6,6 +6,7 @@
     {section:'每天工作', id:'events', icon:'⚠️', label:'事件追蹤', crumb:'異常事件與申訴追蹤', features:['初報','續報','結報','意見申訴','追蹤期限提醒']},
     {section:'行政管理', id:'reviews', icon:'📄', label:'文件審核', crumb:'送審、列印與歸檔', features:['電子送審','退件修正','待列印','紙本核章','歷史送審紀錄']},
     {section:'行政管理', id:'regulations', icon:'📚', label:'內規文件', crumb:'內規發布與版本管理', ready:true},
+    {section:'行政管理', id:'overtime', icon:'⏱', label:'加班／換休管理', crumb:'加班申請、換休與審核', ready:true},
     {section:'行政管理', id:'training', icon:'🎓', label:'教育訓練', crumb:'年度訓練與積分追蹤', features:['年度課程規劃','員工完訓紀錄','積分與時數','CPR／必修課程效期','未完成提醒']},
     {section:'行政管理', id:'quality', icon:'✅', label:'品質管理', crumb:'服務品質與改善追蹤', features:['家訪／電訪追蹤','服務品質抽查','滿意度','改善事項','品質統計']},
     {section:'行政管理', id:'evaluation', icon:'📊', label:'評鑑管理', crumb:'評鑑指標與佐證資料', features:['A／B 指標','年度完成度','佐證文件','缺漏提醒','評鑑前檢核']},
