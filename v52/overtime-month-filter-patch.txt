@@ -74,7 +74,6 @@
       return;
     }
 
-    // 原表格列序與 state 陣列一致；只做顯示層篩選，不改動原資料與既有操作事件。
     if(domRows.length===items.length){
       let visible=0;
       domRows.forEach((tr,index)=>{
@@ -90,8 +89,40 @@
     }
   }
 
+  // 避免加班申請視窗中的即時計算提示被多個功能觀察器反覆重寫，造成文字快速閃爍。
+  // 僅略過「內容完全相同」的重複寫入；當使用者真的變更時間、類型或處理方式時，仍會正常更新。
+  const innerHTMLDescriptor=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
+  const textContentDescriptor=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
+
+  function stabilizeProperty(el,prop,descriptor,flag){
+    if(!el||el.dataset?.[flag]==='1'||!descriptor?.get||!descriptor?.set)return;
+    try{
+      Object.defineProperty(el,prop,{
+        configurable:true,
+        enumerable:false,
+        get(){return descriptor.get.call(this);},
+        set(value){
+          const next=value==null?'':String(value);
+          if(descriptor.get.call(this)===next)return;
+          descriptor.set.call(this,value);
+        }
+      });
+      el.dataset[flag]='1';
+    }catch(err){
+      console.debug('略過提示文字穩定化',err);
+    }
+  }
+
+  function stabilizePreviewNodes(){
+    document.querySelectorAll('#phApplicantHoursHint,#prAmountPreview,#phHourlyPreview,#wfDayTypeAutoNote,#prLegalWarn,.pr-rate-history').forEach(el=>{
+      stabilizeProperty(el,'innerHTML',innerHTMLDescriptor,'stableInnerHTML');
+      stabilizeProperty(el,'textContent',textContentDescriptor,'stableTextContent');
+    });
+  }
+
   function enhance(){
     if(state.page!=='overtime')return;
+    stabilizePreviewNodes();
     toggleMonthControl();
     applyTableMonthFilter();
   }
@@ -104,7 +135,10 @@
   }
 
   const observer=new MutationObserver(mutations=>{
-    if(mutations.some(m=>m.addedNodes&&m.addedNodes.length))scheduleEnhance();
+    if(mutations.some(m=>m.addedNodes&&m.addedNodes.length)){
+      stabilizePreviewNodes();
+      scheduleEnhance();
+    }
   });
   observer.observe(document.body,{childList:true,subtree:true});
 
@@ -115,5 +149,6 @@
     if(e.target?.id==='otMonth')scheduleEnhance();
   });
 
+  stabilizePreviewNodes();
   scheduleEnhance();
 })();
