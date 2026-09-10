@@ -70,12 +70,16 @@
     if(state.personalHoursLoaded&&!force){enhance();return;}
     state.personalHoursLoading=true;
     try{
-      const staffQuery=db.from('staff_users').select('id,display_name,role,is_active,agreed_daily_hours').eq('is_active',true).order('display_name');
-      const rateQuery=db.from('staff_payroll_rates').select('id,staff_id,effective_from,monthly_wage_base,agreed_daily_hours,note,created_by_name,created_at').order('effective_from',{ascending:false}).order('created_at',{ascending:false});
+      const staffQuery=canReview()
+        ? db.from('staff_users').select('id,display_name,role,is_active,agreed_daily_hours').eq('is_active',true).order('display_name')
+        : db.from('staff_users').select('id,display_name,role,is_active,agreed_daily_hours').eq('id',state.profile.id).limit(1);
+      const rateQuery=canReview()
+        ? db.from('staff_payroll_rates').select('id,staff_id,effective_from,monthly_wage_base,agreed_daily_hours,note,created_by_name,created_at').order('effective_from',{ascending:false}).order('created_at',{ascending:false})
+        : Promise.resolve({data:[],error:null});
       const [staffRes,rateRes]=await Promise.all([staffQuery,rateQuery]);
       if(staffRes.error)throw staffRes.error;if(rateRes.error)throw rateRes.error;
       state.personalHoursStaff=staffRes.data||[];
-      state.personalHoursRates=rateRes.data||[];
+      state.personalHoursRates=canReview()?(rateRes.data||[]):[];
       state.personalHoursLoaded=true;
       enhance();
     }catch(err){console.error('讀取個人約定工時失敗',err);toast('讀取個人約定工時失敗：'+(err?.message||err),'error');}
@@ -92,6 +96,7 @@
   }
 
   function enhanceRateModal(){
+    if(!canReview())return;
     const staffSel=document.getElementById('prRateStaff');
     const modal=staffSel?.closest('.modal');
     if(!staffSel||!modal)return;
@@ -156,11 +161,17 @@
     let hint=document.getElementById('phApplicantHoursHint');
     const anchor=document.getElementById('otMinuteCalc')?.closest('.field');
     if(!hint&&anchor){hint=document.createElement('div');hint.id='phApplicantHoursHint';hint.className='ph-inline';anchor.insertAdjacentElement('afterend',hint);}
-    if(hint)hint.innerHTML=hours?`你的約定每日工時：<span class="ph-hours-chip">${escapeHTML(String(hours))} 小時</span>。超過約定工時的申請時段，機構一律比照法定加班倍率。`:'尚未設定你的約定每日工時，請先由機構負責人或系統管理員完成設定。';
+    if(hint)hint.innerHTML=hours?`你的約定每日工時：<span class="ph-hours-chip">${escapeHTML(String(hours))} 小時</span>。超過約定工時的申請時段，機構一律比照法定加班倍率。`:'尚未設定你的約定每日工時，請洽機構負責人或系統管理員。';
 
     let box=modal.querySelector('#prAmountPreview');
     if(!box){box=document.createElement('div');box.id='prAmountPreview';box.className='pr-preview';anchor?.insertAdjacentElement('afterend',box);}
     const comp=document.getElementById('otCompensation')?.value;
+    if(!canReview()){
+      box.textContent=comp==='comp_leave'
+        ? '本次選擇換休；核准後將計入你的換休餘額，可於「我的換休」查看。'
+        : '本次選擇領加班費；實際金額由機構負責人於薪資作業中計算。';
+      return;
+    }
     if(comp==='comp_leave'){
       box.textContent=hours?`本次選擇換休；約定每日工時 ${hours} 小時。超過約定工時後即按機構規定認列加班，換休到期未休再依當時工資基準結清。`:'本次選擇換休；尚未設定約定每日工時。';
       return;
@@ -189,7 +200,7 @@
   }
 
   function enhancePayroll(){
-    if(state.page!=='overtime'||state.overtimeView!=='payroll'||settlement())return;
+    if(!canReview()||state.page!=='overtime'||state.overtimeView!=='payroll'||settlement())return;
     const section=[...document.querySelectorAll('#otMain .ot-rule-card')].find(s=>s.querySelector('h3')?.textContent.trim()==='員工月結摘要');
     const table=section?.querySelector('table');if(!table)return;
     [...table.querySelectorAll('tbody tr')].forEach(tr=>{
@@ -209,19 +220,36 @@
     if(state.page!=='overtime'||state.overtimeView!=='rules')return;
     const list=document.querySelector('#otMain .ot-rule-list');
     if(!list||list.querySelector('[data-ph-rule]'))return;
-    const li=document.createElement('li');li.dataset.phRule='1';li.innerHTML='機構採優於法令之約定：員工一旦超過其個人約定每日正常工時，即自第一分鐘認列為加班，並比照法定加班倍率計算或換休。平日時薪基數依機構約定以「月薪工資總額 ÷ 30 ÷ 約定每日工時」換算。';list.appendChild(li);
+    const li=document.createElement('li');li.dataset.phRule='1';
+    li.innerHTML=canReview()
+      ? '機構採優於法令之約定：員工一旦超過其個人約定每日正常工時，即自第一分鐘認列為加班，並比照法定加班倍率計算或換休。平日時薪基數依機構約定以「月薪工資總額 ÷ 30 ÷ 約定每日工時」換算。'
+      : '機構採優於法令之約定：員工一旦超過其個人約定每日正常工時，即自第一分鐘認列為加班，並可依機構規定選擇換休或領加班費；實際薪資金額由機構負責人辦理。';
+    list.appendChild(li);
   }
 
   document.addEventListener('click',e=>{
     const b=e.target.closest?.('button');if(!b)return;
     const modal=b.closest('.modal');
-    if(modal?.querySelector('#prRateStaff')&&b.id==='modalConfirm'){
+    if(canReview()&&modal?.querySelector('#prRateStaff')&&b.id==='modalConfirm'){
       e.preventDefault();e.stopImmediatePropagation();saveRateFromModal();return;
     }
   },true);
 
   function enhance(){
     if(state.page!=='overtime')return;
+    if(!canReview()&&['review','payroll'].includes(state.overtimeView)){
+      state.overtimeView='mine';
+      renderOvertimePage();
+      return;
+    }
+    if(!canReview()){
+      state.personalHoursRates=[];
+      state.payrollRateRows=[];
+      state.payrollAmountCorrections=[];
+      document.getElementById('prRateSettingsBtn')?.remove();
+      document.getElementById('ceHireSettingsBtn')?.remove();
+      document.getElementById('otCorrectionBtn')?.remove();
+    }
     enhanceRateModal();enhanceOvertimeModal();enhancePayroll();enhanceRules();
   }
 
