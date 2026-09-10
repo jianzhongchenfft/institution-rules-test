@@ -64,6 +64,8 @@
     overtimeLoaded: false,
     compLeaveRows: [],
     compLeaveLoaded: false,
+    payrollSettlements: [],
+    payrollSettlementsLoaded: false,
     overtimeView: 'mine',
     overtimeMonth: isoDate(new Date()).slice(0,7)
   });
@@ -219,7 +221,7 @@
     if(!state.profile) return;
     showLoading(true);
     try{
-      const [overtimeResult,leaveResult] = await Promise.all([
+      const [overtimeResult,leaveResult,settlementResult] = await Promise.all([
         db.from('overtime_requests')
           .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
           .order('work_date',{ascending:false})
@@ -227,14 +229,20 @@
         db.from('comp_leave_usages')
           .select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,start_time,end_time,minutes,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
           .order('leave_date',{ascending:false})
-          .order('created_at',{ascending:false})
+          .order('created_at',{ascending:false}),
+        db.from('payroll_month_settlements')
+          .select('id,settlement_month,summary,total_overtime_pay_minutes,total_comp_leave_earned_minutes,total_comp_leave_used_minutes,settled_by,settled_by_name,settled_at,created_at')
+          .order('settlement_month',{ascending:false})
       ]);
       if(overtimeResult.error) throw overtimeResult.error;
       if(leaveResult.error) throw leaveResult.error;
+      if(settlementResult.error) throw settlementResult.error;
       state.overtimeRows = overtimeResult.data || [];
       state.compLeaveRows = leaveResult.data || [];
+      state.payrollSettlements = settlementResult.data || [];
       state.overtimeLoaded = true;
       state.compLeaveLoaded = true;
+      state.payrollSettlementsLoaded = true;
     }catch(err){
       console.error(err);
       state.overtimeRows = [];
@@ -389,6 +397,224 @@
   }
 
 
+
+  function payrollSettlementForMonth(){
+    const monthStart=overtimeMonthRange(state.overtimeMonth).start;
+    return state.payrollSettlements.find(r=>r.settlement_month===monthStart)||null;
+  }
+
+  function payrollMonthLabel(month){
+    const safe=/^\d{4}-\d{2}$/.test(month||'')?month:isoDate(new Date()).slice(0,7);
+    const [year,mon]=safe.split('-').map(Number);
+    return `民國 ${year-1911} 年 ${mon} 月`;
+  }
+
+  function payrollBuildRows(){
+    const {start,end}=overtimeMonthRange(state.overtimeMonth);
+    const approvedOvertime=state.overtimeRows.filter(r=>r.status==='approved' && r.work_date<=end);
+    const approvedLeave=state.compLeaveRows.filter(r=>r.status==='approved' && r.leave_date<=end);
+    const staffIds=new Set([
+      ...approvedOvertime.map(r=>r.applicant_staff_id),
+      ...approvedLeave.map(r=>r.applicant_staff_id)
+    ]);
+    const rows=[];
+
+    staffIds.forEach(staffId=>{
+      const monthOvertime=approvedOvertime.filter(r=>r.applicant_staff_id===staffId && r.work_date>=start && r.work_date<=end);
+      const monthLeave=approvedLeave.filter(r=>r.applicant_staff_id===staffId && r.leave_date>=start && r.leave_date<=end);
+      const overtimePayItems=monthOvertime
+        .filter(r=>r.compensation_method==='overtime_pay')
+        .map(r=>({
+          id:r.id,
+          date:r.work_date,
+          type:r.request_type,
+          startTime:r.start_time?String(r.start_time).slice(0,5):null,
+          endTime:r.end_time?String(r.end_time).slice(0,5):null,
+          minutes:Number(r.overtime_minutes)||0,
+          reason:r.reason||''
+        }));
+      const compLeaveEarnedItems=monthOvertime
+        .filter(r=>r.compensation_method==='comp_leave')
+        .map(r=>({
+          id:r.id,
+          date:r.work_date,
+          type:r.request_type,
+          startTime:r.start_time?String(r.start_time).slice(0,5):null,
+          endTime:r.end_time?String(r.end_time).slice(0,5):null,
+          minutes:r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0),
+          reason:r.reason||''
+        }));
+      const compLeaveUsedItems=monthLeave.map(r=>({
+        id:r.id,
+        date:r.leave_date,
+        startTime:String(r.start_time||'').slice(0,5),
+        endTime:String(r.end_time||'').slice(0,5),
+        minutes:Number(r.minutes)||0,
+        reason:r.reason||''
+      }));
+
+      const earnedToEnd=approvedOvertime
+        .filter(r=>r.applicant_staff_id===staffId && r.compensation_method==='comp_leave')
+        .reduce((sum,r)=>sum+(r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0)),0);
+      const usedToEnd=approvedLeave
+        .filter(r=>r.applicant_staff_id===staffId)
+        .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+
+      const overtimePayMinutes=overtimePayItems.reduce((sum,r)=>sum+r.minutes,0);
+      const compLeaveEarnedMinutes=compLeaveEarnedItems.reduce((sum,r)=>sum+r.minutes,0);
+      const compLeaveUsedMinutes=compLeaveUsedItems.reduce((sum,r)=>sum+r.minutes,0);
+      const compLeaveBalanceMinutes=Math.max(0,earnedToEnd-usedToEnd);
+
+      if(overtimePayMinutes===0 && compLeaveEarnedMinutes===0 && compLeaveUsedMinutes===0 && compLeaveBalanceMinutes===0) return;
+
+      const meta=state.overtimeRows.find(r=>r.applicant_staff_id===staffId)
+        || state.compLeaveRows.find(r=>r.applicant_staff_id===staffId)
+        || {};
+      rows.push({
+        staffId,
+        name:meta.applicant_name||'未命名',
+        role:meta.applicant_role||'',
+        overtimePayMinutes,
+        compLeaveEarnedMinutes,
+        compLeaveUsedMinutes,
+        compLeaveBalanceMinutes,
+        overtimePayItems,
+        compLeaveEarnedItems,
+        compLeaveUsedItems
+      });
+    });
+
+    return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name),'zh-Hant'));
+  }
+
+  function payrollReportRows(){
+    const settlement=payrollSettlementForMonth();
+    const snapshotRows=settlement?.summary?.staff;
+    return settlement && Array.isArray(snapshotRows) ? snapshotRows : payrollBuildRows();
+  }
+
+  function payrollTotals(rows,settlement=null){
+    if(settlement){
+      return {
+        overtimePayMinutes:Number(settlement.total_overtime_pay_minutes)||0,
+        compLeaveEarnedMinutes:Number(settlement.total_comp_leave_earned_minutes)||0,
+        compLeaveUsedMinutes:Number(settlement.total_comp_leave_used_minutes)||0
+      };
+    }
+    return rows.reduce((acc,r)=>{
+      acc.overtimePayMinutes+=Number(r.overtimePayMinutes)||0;
+      acc.compLeaveEarnedMinutes+=Number(r.compLeaveEarnedMinutes)||0;
+      acc.compLeaveUsedMinutes+=Number(r.compLeaveUsedMinutes)||0;
+      return acc;
+    },{overtimePayMinutes:0,compLeaveEarnedMinutes:0,compLeaveUsedMinutes:0});
+  }
+
+  function payrollDetailTable(items,kind){
+    if(!items?.length) return '<div class="ot-empty"><p>本月無此類紀錄。</p></div>';
+    if(kind==='used'){
+      return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>時間</th><th>使用時數</th><th>事由</th></tr></thead><tbody>${items.map(r=>`<tr><td>${rocDate(r.date+'T00:00:00')}</td><td>${escapeHTML((r.startTime||'—')+'–'+(r.endTime||'—'))}</td><td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td><td>${escapeHTML(r.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>類型</th><th>時間</th><th>${kind==='pay'?'待計薪':'取得換休'}</th><th>事由</th></tr></thead><tbody>${items.map(r=>`<tr><td>${rocDate(r.date+'T00:00:00')}</td><td>${escapeHTML(overtimeTypeLabel(r.type))}</td><td>${r.startTime&&r.endTime?escapeHTML(r.startTime+'–'+r.endTime):'—'}</td><td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td><td>${escapeHTML(r.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function openPayrollDetail(staffId){
+    const row=payrollReportRows().find(r=>String(r.staffId)===String(staffId));
+    if(!row) return;
+    openModal({
+      title:`薪資結算明細｜${row.name}`,
+      html:`
+        <section class="ot-rule-card"><h3>待計薪加班</h3>${payrollDetailTable(row.overtimePayItems,'pay')}</section>
+        <section class="ot-rule-card"><h3>本月新增換休</h3>${payrollDetailTable(row.compLeaveEarnedItems,'earned')}</section>
+        <section class="ot-rule-card"><h3>本月使用換休</h3>${payrollDetailTable(row.compLeaveUsedItems,'used')}</section>
+        <div class="ot-rule-highlight">月底換休餘額：<strong>${overtimeDurationLabel(row.compLeaveBalanceMinutes)}</strong></div>
+      `,
+      large:true,
+      showConfirm:false
+    });
+  }
+
+  function renderPayrollReport(){
+    const settlement=payrollSettlementForMonth();
+    const rows=payrollReportRows();
+    const totals=payrollTotals(rows,settlement);
+    const settledInfo=settlement
+      ? `已結算｜${escapeHTML(settlement.settled_by_name||'—')}・${rocDate(settlement.settled_at)}`
+      : '尚未結算';
+    return `
+      <section class="ot-summary">
+        <article class="stat-card"><div class="stat-head"><span>本月待計薪加班</span><span class="stat-icon">💰</span></div><div class="stat-value">${overtimeDurationLabel(totals.overtimePayMinutes)}</div><div class="stat-foot">僅計已核准且選擇領加班費</div></article>
+        <article class="stat-card"><div class="stat-head"><span>本月新增換休</span><span class="stat-icon">➕</span></div><div class="stat-value">${overtimeDurationLabel(totals.compLeaveEarnedMinutes)}</div><div class="stat-foot">已核准且選擇換休</div></article>
+        <article class="stat-card"><div class="stat-head"><span>本月使用換休</span><span class="stat-icon">➖</span></div><div class="stat-value">${overtimeDurationLabel(totals.compLeaveUsedMinutes)}</div><div class="stat-foot">僅計已核准使用</div></article>
+        <article class="stat-card"><div class="stat-head"><span>結算狀態</span><span class="stat-icon">${settlement?'🔒':'📂'}</span></div><div class="stat-value" style="font-size:18px">${settlement?'已結算':'未結算'}</div><div class="stat-foot">${settlement?escapeHTML(settledInfo):'確認發薪資料後再鎖定'}</div></article>
+      </section>
+      <section class="ot-rule-card">
+        <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
+          <div>
+            <h3 style="margin-bottom:5px">${payrollMonthLabel(state.overtimeMonth)}薪資結算報表</h3>
+            <p>提供機構負責人發薪前核對已核准的加班與換休紀錄。</p>
+          </div>
+          ${!settlement?'<button id="payrollCloseBtn" class="btn primary">✓ 確認本月已結算</button>':'<span class="ot-status approved">🔒 已結算鎖定</span>'}
+        </div>
+        <div class="ot-rule-highlight">目前先以「待計薪加班時數」供薪資核對。系統尚未保存各員工月薪計算基數，且「假日加班」尚未細分休息日、例假日或國定假日，因此本版不自動換算加班費金額，避免誤算。</div>
+      </section>
+      <section class="ot-rule-card">
+        <h3>員工月結摘要</h3>
+        ${rows.length?`<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>員工</th><th>待計薪加班</th><th>新增換休</th><th>使用換休</th><th>月底換休餘額</th><th>操作</th></tr></thead><tbody>${rows.map(r=>`<tr><td><div class="ot-review-name">${escapeHTML(r.name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.role))}</div></td><td><span class="ot-amount">${overtimeDurationLabel(r.overtimePayMinutes)}</span></td><td>${overtimeDurationLabel(r.compLeaveEarnedMinutes)}</td><td>${overtimeDurationLabel(r.compLeaveUsedMinutes)}</td><td><strong>${overtimeDurationLabel(r.compLeaveBalanceMinutes)}</strong></td><td><button class="btn sm" data-payroll-detail="${escapeHTML(String(r.staffId))}">查看明細</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="ot-empty"><div class="icon">💰</div><h3>本月尚無可結算資料</h3><p>已核准的加班、換休取得或換休使用紀錄會顯示在這裡。</p></div>'}
+      </section>`;
+  }
+
+  function wirePayrollActions(){
+    document.querySelectorAll('[data-payroll-detail]').forEach(btn=>btn.addEventListener('click',()=>openPayrollDetail(btn.dataset.payrollDetail)));
+    $('payrollCloseBtn')?.addEventListener('click',closePayrollMonth);
+  }
+
+  async function closePayrollMonth(){
+    if(!overtimeCanReview()){toast('目前帳號沒有薪資結算權限','warn');return;}
+    if(payrollSettlementForMonth()){toast('本月份已完成結算','warn');return;}
+    const {start,end}=overtimeMonthRange(state.overtimeMonth);
+    const pendingOvertime=state.overtimeRows.filter(r=>r.work_date>=start && r.work_date<=end && r.status==='pending').length;
+    const pendingLeave=state.compLeaveRows.filter(r=>r.leave_date>=start && r.leave_date<=end && r.status==='pending').length;
+    if(pendingOvertime+pendingLeave>0){
+      toast(`本月尚有 ${pendingOvertime+pendingLeave} 筆待審核申請，請先完成審核再結算`,'warn');
+      return;
+    }
+
+    const rows=payrollBuildRows();
+    if(!rows.length){toast('本月尚無可結算資料','warn');return;}
+    const totals=payrollTotals(rows);
+    if(!confirm(`確定將「${payrollMonthLabel(state.overtimeMonth)}」標記為已結算嗎？\n\n結算後會保存目前報表快照並鎖定，不再因後續補登資料而改變本次結算結果。`)) return;
+
+    const payload={
+      settlement_month:start,
+      summary:{
+        version:1,
+        month:state.overtimeMonth,
+        generatedAt:new Date().toISOString(),
+        staff:rows,
+        totals
+      },
+      total_overtime_pay_minutes:totals.overtimePayMinutes,
+      total_comp_leave_earned_minutes:totals.compLeaveEarnedMinutes,
+      total_comp_leave_used_minutes:totals.compLeaveUsedMinutes,
+      settled_by:state.user.id,
+      settled_by_name:state.profile.display_name
+    };
+
+    showLoading(true);
+    try{
+      const {error}=await db.from('payroll_month_settlements').insert(payload);
+      if(error) throw error;
+      await loadOvertimeRows();
+      state.overtimeView='payroll';
+      renderOvertimePage();
+      toast('本月薪資結算已完成並鎖定','success');
+    }catch(err){
+      console.error(err);
+      const message=String(err?.message||err);
+      toast(message.includes('duplicate')?'本月份已完成結算':'薪資結算失敗：'+message,'error');
+    }finally{showLoading(false);}
+  }
+
   function renderOvertimePage(){
     if(state.page!=='overtime') return;
     const summary=overtimeSummary();
@@ -398,8 +624,8 @@
     const canReview=overtimeCanReview();
     const reviewCount=summary.pending;
     const validViews=canSubmit
-      ? (canReview?['mine','balance','usage','review','rules']:['mine','balance','usage','rules'])
-      : (canReview?['review','rules']:['rules']);
+      ? (canReview?['mine','balance','usage','review','payroll','rules']:['mine','balance','usage','rules'])
+      : (canReview?['review','payroll','rules']:['rules']);
     if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview&&!canSubmit?'review':'mine';
 
     $('content').innerHTML=`
@@ -425,7 +651,7 @@
           ${canSubmit?`<button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">我的申請</button>
           <button class="ot-tab ${state.overtimeView==='balance'?'active':''}" data-ot-view="balance">我的換休</button>
           <button class="ot-tab ${state.overtimeView==='usage'?'active':''}" data-ot-view="usage">換休使用紀錄</button>`:''}
-          ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${reviewCount}</button>`:''}
+          ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${reviewCount}</button><button class="ot-tab ${state.overtimeView==='payroll'?'active':''}" data-ot-view="payroll">薪資結算</button>`:''}
           <button class="ot-tab ${state.overtimeView==='rules'?'active':''}" data-ot-view="rules">加班規則</button>
         </div>
         <span class="spacer"></span>
@@ -436,6 +662,7 @@
       <div id="otMain">
         ${state.overtimeView==='rules' ? renderOvertimeRules()
           : state.overtimeView==='review' ? renderOvertimeReview()
+          : state.overtimeView==='payroll' ? renderPayrollReport()
           : state.overtimeView==='balance' ? renderCompLeaveOverview()
           : state.overtimeView==='usage' ? compLeaveUsageRenderTable(ownLeave)
           : overtimeRenderTable(own)}
@@ -448,6 +675,7 @@
     $('otReload').addEventListener('click',async()=>{await loadOvertimeRows();renderOvertimePage();toast('已重新整理加班／換休資料','success');});
     wireOvertimeTableActions();
     wireCompLeaveActions();
+    wirePayrollActions();
   }
 
   function overtimeFormHTML(existing){
