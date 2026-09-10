@@ -1,4 +1,4 @@
-// V5.2 加班／換休流程補強：在其他模組攔截事件前先記錄編輯中的申請
+// V5.2 加班／換休流程補強：編輯追蹤＋固定週一至週五班別自動判斷
 (() => {
   window.addEventListener('click',e=>{
     const b=e.target.closest?.('button');
@@ -7,5 +7,116 @@
     if(b.dataset.otEdit)state.workflowEditingOvertimeId=b.dataset.otEdit;
     if(b.id==='clAddBtn')state.workflowEditingLeaveId=null;
     if(b.dataset.clEdit)state.workflowEditingLeaveId=b.dataset.clEdit;
+
+    const modal=b.closest?.('.modal');
+    if(!modal||!modal.querySelector('#otWorkDate'))return;
+    const type=document.getElementById('otType')?.value;
+    if(type!=='regular_day_off_overtime')return;
+    const isSubmit=b.id==='modalConfirm' && b.textContent.trim()!=='儲存草稿';
+    if(!isSubmit)return;
+    const ack=document.getElementById('prEmergencyConfirm');
+    if(!ack?.checked)return;
+    if(!confirm('今天是例假，原則不得安排出勤。\n\n若仍要送出本次申請，請確認；送出僅代表提出申請，不代表系統認定已符合法定例外。')){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
   },true);
+
+  const timed=new Set(['overtime','rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+
+  function weekdayType(date){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))return '';
+    const d=new Date(String(date)+'T00:00:00');
+    if(Number.isNaN(d.getTime()))return '';
+    const day=d.getDay();
+    if(day===6)return 'rest_day_overtime';
+    if(day===0)return 'regular_day_off_overtime';
+    return 'overtime';
+  }
+
+  function typeLabel(type){
+    return ({
+      overtime:'平日加班',
+      rest_day_overtime:'休息日加班',
+      national_holiday_overtime:'國定假日出勤',
+      regular_day_off_overtime:'例假日出勤'
+    })[type]||'';
+  }
+
+  function rewriteRegularWarning(){
+    const type=document.getElementById('otType')?.value;
+    if(type!=='regular_day_off_overtime')return;
+    const warn=document.getElementById('prLegalWarn');
+    if(!warn)return;
+    warn.classList.remove('hidden');
+    warn.innerHTML=`⚠️ <strong>今天是例假，原則不得安排出勤。</strong><br>依勞動基準法，例假原則不得使勞工出勤；如屬天災、事變或突發事件等法定例外，另有補假及報備義務。若仍需提出申請，可在閱讀提醒後送出；送出不代表系統認定已符合法定例外。<label style="display:flex;gap:7px;align-items:flex-start;margin-top:7px;font-weight:700"><input id="prEmergencyConfirm" type="checkbox" style="margin-top:2px">我已閱讀上述提醒，仍要提出本次例假出勤申請。</label>`;
+  }
+
+  function updateAutoNote(manual=false){
+    const date=document.getElementById('otWorkDate')?.value;
+    const type=document.getElementById('otType')?.value;
+    const note=document.getElementById('wfDayTypeAutoNote');
+    if(!note)return;
+    if(!date){note.textContent='固定班別預設：週一至週五為平日、週六為休息日、週日為例假；國定假日或調移情形請手動改選。';return;}
+    if(type==='national_holiday_overtime'){
+      note.textContent='已手動改為國定假日出勤；如該假日已依法調移，請依實際約定日期選擇。';
+      return;
+    }
+    if(type==='holiday_visit_comp'){
+      note.textContent='目前選擇「假日家訪換休」，不套用一般加班日別自動判斷。';
+      return;
+    }
+    note.textContent=`系統依固定週一至週五班別${manual?'目前選擇':'自動判斷'}：${typeLabel(type)||'請確認日別'}。如當日屬國定假日或有休息日／例假調移，請手動改選。`;
+  }
+
+  function bindOvertimeModal(){
+    const date=document.getElementById('otWorkDate');
+    const sel=document.getElementById('otType');
+    if(!date||!sel)return;
+
+    const regularOpt=[...sel.options].find(o=>o.value==='regular_day_off_overtime');
+    if(regularOpt){regularOpt.textContent='例假日出勤（系統判定）';regularOpt.hidden=true;}
+
+    const field=sel.closest('.field');
+    if(field&&!document.getElementById('wfDayTypeAutoNote')){
+      const note=document.createElement('div');
+      note.id='wfDayTypeAutoNote';
+      note.className='help';
+      note.style.marginTop='5px';
+      field.appendChild(note);
+    }
+
+    if(date.dataset.wfDayTypeBound!=='1'){
+      date.dataset.wfDayTypeBound='1';
+      date.addEventListener('change',()=>{
+        const current=sel.value;
+        if(current==='holiday_visit_comp')return updateAutoNote(false);
+        const auto=weekdayType(date.value);
+        if(auto&&timed.has(current||auto)){
+          sel.value=auto;
+          sel.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+        setTimeout(()=>{rewriteRegularWarning();updateAutoNote(false);},20);
+      });
+      sel.addEventListener('change',()=>setTimeout(()=>{rewriteRegularWarning();updateAutoNote(true);},20));
+    }
+
+    if(!state.workflowEditingOvertimeId && date.value && (!sel.value||timed.has(sel.value))){
+      const auto=weekdayType(date.value);
+      if(auto&&sel.value!==auto){
+        sel.value=auto;
+        sel.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+    }
+    setTimeout(()=>{rewriteRegularWarning();updateAutoNote(false);},30);
+  }
+
+  let queued=false;
+  const observer=new MutationObserver(ms=>{
+    if(queued)return;
+    if(!ms.some(m=>Array.from(m.addedNodes||[]).some(n=>n.nodeType===1&&(n.id==='otWorkDate'||n.querySelector?.('#otWorkDate')))))return;
+    queued=true;
+    setTimeout(()=>{queued=false;bindOvertimeModal();},80);
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
 })();
