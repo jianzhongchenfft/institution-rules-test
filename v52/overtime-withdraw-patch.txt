@@ -1,17 +1,14 @@
-// V5.2 加班／換休：待審核申請撤回（撤回原因選填）
+// V5.2 加班／換休：待審核申請撤回（直接刪除，不追蹤原因）
 (() => {
   const style=document.createElement('style');
   style.id='v52-overtime-withdraw-style';
-  style.textContent=`
-    [data-wf-withdraw]{white-space:nowrap}
-    .wd-note{margin-top:10px;color:#667085;font-size:11.5px;line-height:1.6}
-  `;
+  style.textContent='[data-wf-withdraw]{white-space:nowrap}';
   document.head.appendChild(style);
 
   function normalizeButtons(){
     document.querySelectorAll('[data-wf-withdraw]').forEach(btn=>{
       btn.textContent='撤回申請';
-      btn.title='僅待審核中的申請可由本人撤回';
+      btn.title='僅待審核中的申請可由本人撤回；撤回後資料會直接刪除';
     });
   }
 
@@ -34,14 +31,9 @@
       title:'撤回待審核申請',
       html:`
         <div class="ot-rule-highlight" style="margin-top:0">
-          確定要撤回這筆待審核申請嗎？撤回後原申請會保留並標示「已撤回」，不會刪除；如仍需申請，請重新建立一筆新申請。
+          確定要撤回這筆待審核申請嗎？撤回後這筆申請會直接刪除，系統不保留撤回原因或撤回紀錄。
         </div>
-        <div class="ot-detail" style="margin-top:10px">日期：${escapeHTML(date||'—')}　｜　時間：${escapeHTML(time)}</div>
-        <div class="field" style="margin-top:14px">
-          <label>撤回原因（選填）</label>
-          <textarea id="wdReason" placeholder="例如：時間填寫錯誤，先撤回後重新申請"></textarea>
-          <div class="wd-note">未填寫原因也可以撤回；系統仍會保留撤回人與撤回時間。</div>
-        </div>`,
+        <div class="ot-detail" style="margin-top:10px">日期：${escapeHTML(date||'—')}　｜　時間：${escapeHTML(time)}</div>`,
       confirmText:'確認撤回',
       onConfirm:()=>submitWithdraw(kind,id)
     });
@@ -54,32 +46,22 @@
       return false;
     }
 
-    const input=String(document.getElementById('wdReason')?.value||'').trim();
-    // 現行資料庫政策要求 withdraw_reason 必須有值；使用者未填時以「未填寫」保存，介面仍視為選填。
-    const reason=input||'未填寫';
     const table=kind==='leave'?'comp_leave_usages':'overtime_requests';
     showLoading(true);
     try{
-      const now=new Date().toISOString();
       const {data,error}=await db.from(table)
-        .update({
-          status:'withdrawn',
-          withdraw_reason:reason,
-          withdrawn_by:state.user.id,
-          withdrawn_at:now,
-          updated_at:now
-        })
+        .delete()
         .eq('id',id)
         .eq('applicant_staff_id',state.profile.id)
         .eq('status','pending')
-        .select('id,status')
+        .select('id')
         .maybeSingle();
       if(error)throw error;
       if(!data)throw new Error('申請狀態已變更，請重新整理後再操作');
 
       closeModal();
       await navigate('overtime');
-      toast('申請已撤回，原紀錄已保留','success');
+      toast('申請已撤回並刪除','success');
       return true;
     }catch(err){
       console.error('撤回申請失敗',err);
@@ -90,7 +72,7 @@
     }
   }
 
-  // 攔截舊版「撤回」按鈕事件，改用本版流程；使用 capture 確保不會同時觸發舊版必填原因流程。
+  // 攔截舊版撤回事件，改用直接刪除流程。
   document.addEventListener('click',e=>{
     const btn=e.target.closest?.('[data-wf-withdraw]');
     if(!btn)return;
