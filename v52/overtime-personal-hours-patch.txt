@@ -140,13 +140,26 @@
     if(!staffId||!date||!Number.isFinite(amount)||amount<=0||!Number.isFinite(hours)||hours<=0||hours>8){toast('請完整填寫員工、生效日期、月薪工資總額與約定每日工時','warn');return;}
     showLoading(true);
     try{
-      const {error:updateErr}=await db.from('staff_users').update({agreed_daily_hours:hours,updated_at:new Date().toISOString()}).eq('id',staffId);
-      if(updateErr)throw updateErr;
-      const {error:insertErr}=await db.from('staff_payroll_rates').insert({staff_id:staffId,effective_from:date,monthly_wage_base:amount,agreed_daily_hours:hours,note:note||null,created_by:state.user.id,created_by_name:state.profile.display_name});
-      if(insertErr)throw insertErr;
-      closeModal();state.payrollRatesLoaded=false;state.personalHoursLoaded=false;await load(true);navigate('overtime');toast('薪資基數與約定每日工時已新增並保留版本紀錄','success');
-    }catch(err){console.error(err);toast('新增薪資計算設定失敗：'+(err?.message||err),'error');}
-    finally{showLoading(false);}
+      const {error}=await db.rpc('save_staff_payroll_rate',{
+        p_staff_id:staffId,
+        p_effective_from:date,
+        p_monthly_wage_base:amount,
+        p_agreed_daily_hours:hours,
+        p_note:note||null
+      });
+      if(error)throw error;
+      closeModal();
+      state.payrollRatesLoaded=false;
+      state.personalHoursLoaded=false;
+      await load(true);
+      navigate('overtime');
+      toast('薪資基數與約定每日工時已同步儲存並保留版本紀錄','success');
+    }catch(err){
+      console.error(err);
+      toast('新增薪資計算設定失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+    }
   }
 
   function currentStaffHours(){return Number(staffFor(state.profile?.id)?.agreed_daily_hours)||null;}
