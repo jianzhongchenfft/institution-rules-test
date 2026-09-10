@@ -73,34 +73,38 @@
   }
   function prCalc(type,minutes,rate){
     const monthly=Number(rate?.monthly_wage_base);
+    const hours=Number(rate?.agreed_daily_hours);
     const m=Number(minutes)||0;
     if(!rate||!Number.isFinite(monthly)||monthly<=0)return {ok:false,code:'missing_rate',text:'尚未設定有效薪資基數'};
+    if(!Number.isFinite(hours)||hours<=0||hours>8)return {ok:false,code:'missing_hours',text:'尚未設定有效的約定每日工時'};
     if(!timedTypes.has(type)||type==='holiday_overtime')return {ok:false,code:'legacy',text:'需先確認假日類型'};
     if(m<=0)return {ok:false,code:'invalid',text:'工時資料不完整'};
-    const h=monthly/240;
+    const h=monthly/30/hours;
     let amount=0,formula='';
     if(type==='overtime'){
       if(m>240)return {ok:false,code:'limit',text:'平日加班超過4小時，需人工確認'};
       const a=Math.min(m,120),b=Math.max(Math.min(m-120,120),0);
       amount=h*(a/60)*(4/3)+h*(b/60)*(5/3);
-      formula=`${monthly.toFixed(2)}÷240；前2小時×4/3、其後2小時×5/3`;
+      formula=`${monthly.toFixed(2)}÷30÷${hours}；前2小時×4/3、其後2小時×5/3`;
     }else if(type==='rest_day_overtime'){
       if(m>720)return {ok:false,code:'limit',text:'休息日出勤超過12小時'};
       const a=Math.min(m,120),b=Math.max(Math.min(m-120,360),0),c=Math.max(Math.min(m-480,240),0);
       amount=h*(a/60)*(4/3)+h*(b/60)*(5/3)+h*(c/60)*(8/3);
-      formula=`${monthly.toFixed(2)}÷240；前2小時×4/3、第3–8小時×5/3、第9–12小時×8/3`;
+      formula=`${monthly.toFixed(2)}÷30÷${hours}；前2小時×4/3、第3–8小時×5/3、第9–12小時×8/3`;
     }else if(type==='national_holiday_overtime'){
-      if(m>720)return {ok:false,code:'limit',text:'國定假日出勤超過12小時'};
-      amount=h*8;
-      const x=Math.max(m-480,0),a=Math.min(x,120),b=Math.max(Math.min(x-120,120),0);
+      const normalMinutes=Math.round(hours*60);
+      if(m>normalMinutes+240)return {ok:false,code:'limit',text:'國定假日出勤超過約定每日工時加4小時，請重新確認'};
+      amount=monthly/30;
+      const x=Math.max(m-normalMinutes,0),a=Math.min(x,120),b=Math.max(Math.min(x-120,120),0);
       amount+=h*(a/60)*(4/3)+h*(b/60)*(5/3);
-      formula=`${monthly.toFixed(2)}÷240；8小時內另加1日工資，超過8小時前2小時×4/3、再2小時×5/3`;
+      formula=`${monthly.toFixed(2)}÷30為1日工資；約定每日工時${hours}小時，超過後前2小時×4/3、再2小時×5/3`;
     }else if(type==='regular_day_off_overtime'){
-      if(m>720)return {ok:false,code:'limit',text:'例假日出勤超過12小時'};
-      amount=h*8+h*(Math.max(m-480,0)/60)*2;
-      formula=`${monthly.toFixed(2)}÷240；8小時內另加1日工資，超過8小時部分×2`;
+      const normalMinutes=Math.round(hours*60);
+      if(m>normalMinutes+240)return {ok:false,code:'limit',text:'例假日出勤超過約定每日工時加4小時，請重新確認'};
+      amount=monthly/30+h*(Math.max(m-normalMinutes,0)/60)*2;
+      formula=`${monthly.toFixed(2)}÷30為1日工資；約定每日工時${hours}小時，超過部分×2`;
     }
-    return {ok:true,amount:Math.round(amount*100)/100,hourly:Math.round(h*10000)/10000,monthly,formula};
+    return {ok:true,amount:Math.round(amount*100)/100,hourly:Math.round(h*10000)/10000,monthly,hours,formula};
   }
 
   async function prLoad(force=false){
@@ -110,11 +114,11 @@
     try{
       const ratesPromise=prCanReview()
         ? db.from('staff_payroll_rates')
-            .select('id,staff_id,effective_from,monthly_wage_base,note,created_by,created_by_name,created_at')
+            .select('id,staff_id,effective_from,monthly_wage_base,agreed_daily_hours,note,created_by,created_by_name,created_at')
             .order('effective_from',{ascending:false}).order('created_at',{ascending:false})
         : Promise.resolve({data:[],error:null});
       const staffPromise=prCanReview()
-        ? db.from('staff_users').select('id,display_name,role,is_active').eq('is_active',true).order('display_name')
+        ? db.from('staff_users').select('id,display_name,role,is_active,agreed_daily_hours').eq('is_active',true).order('display_name')
         : Promise.resolve({data:[{id:state.profile.id,display_name:state.profile.display_name,role:state.profile.role,is_active:true}],error:null});
       const corrPromise=prCanReview()
         ? db.from('payroll_settlement_corrections').select('id,settlement_id,staff_id,adjustment_type,adjustment_minutes,work_date,workday_type,calculated_amount,reason,created_at')
@@ -139,7 +143,7 @@
     openModal({
       title:'薪資計算設定',
       html:`
-        <div class="ot-rule-highlight" style="margin-top:0">「月薪工資總額」應填入作為平日每小時工資計算基礎的月薪工資總額，不宜只填底薪。系統以月薪工資總額 ÷ 240 試算。</div>
+        <div class="ot-rule-highlight" style="margin-top:0">「月薪工資總額」與「約定每日工時」共同作為加班費計算基礎。系統以月薪工資總額 ÷ 30 ÷ 約定每日工時試算。</div>
         <div class="form-grid" style="margin-top:12px">
           <div class="field"><label>員工 *</label><select id="prRateStaff">${prRateOptions()}</select></div>
           <div class="field"><label>生效日期 *</label><input id="prRateDate" type="date" value="${isoDate(new Date()).slice(0,7)}-01"></div>
@@ -149,7 +153,9 @@
         <div class="ot-rule-highlight">薪資基數採「版本紀錄」方式保存，不直接覆蓋舊資料。同一員工、同一生效日若再新增一筆，系統會以最後建立的版本作為有效基數，舊紀錄仍保留。</div>
         <div class="pr-rate-history">${history.length?history.map(r=>{
           const s=(state.payrollRateStaff||[]).find(x=>String(x.id)===String(r.staff_id));
-          return `<div class="pr-rate-item"><div class="pr-rate-top"><div><div class="pr-rate-main">${escapeHTML(s?.display_name||'未命名')}｜${prMoney(r.monthly_wage_base)}</div><div class="pr-rate-sub">生效：${rocDate(String(r.effective_from)+'T00:00:00')}｜平日時薪基數：約 ${prMoney(Number(r.monthly_wage_base)/240)}/小時${r.note?`<br>備註：${escapeHTML(r.note)}`:''}</div></div><div class="pr-rate-sub">建立：${escapeHTML(r.created_by_name||'—')}・${rocDate(r.created_at)}</div></div></div>`;
+          const hours=Number(r.agreed_daily_hours);
+          const hourly=Number.isFinite(hours)&&hours>0?Number(r.monthly_wage_base)/30/hours:null;
+          return `<div class="pr-rate-item"><div class="pr-rate-top"><div><div class="pr-rate-main">${escapeHTML(s?.display_name||'未命名')}｜${prMoney(r.monthly_wage_base)}</div><div class="pr-rate-sub">生效：${rocDate(String(r.effective_from)+'T00:00:00')}｜約定每日工時：${Number.isFinite(hours)&&hours>0?escapeHTML(String(hours))+'小時':'待設定'}｜平日時薪基數：約 ${hourly?prMoney(hourly)+'/小時':'待設定'}${r.note?`<br>備註：${escapeHTML(r.note)}`:''}</div></div><div class="pr-rate-sub">建立：${escapeHTML(r.created_by_name||'—')}・${rocDate(r.created_at)}</div></div></div>`;
         }).join(''):'<div class="ot-empty"><p>尚未設定任何薪資計算基數。</p></div>'}</div>`,
       confirmText:'新增薪資基數',
       onConfirm:prSaveRate,
@@ -350,12 +356,12 @@
       const all=ids.map(id=>({c:prStaffCalc(id),corr:prCorrectionAmount(id)}));
       const complete=all.every(x=>!x.c.details.length||x.c.ok);
       const total=all.reduce((s,x)=>s+(x.c.ok?x.c.total:0)+x.corr,0);
-      const foot=first.querySelector('.stat-foot');if(foot)foot.textContent=complete?`系統試算加班費 ${prMoney(total)}`:'部分員工尚未完成薪資基數或假日類型設定';
+      const foot=first.querySelector('.stat-foot');if(foot)foot.textContent=complete?`系統試算加班費 ${prMoney(total)}`:'部分員工尚未完成薪資基數、約定每日工時或假日類型設定';
     }
     const intro=[...document.querySelectorAll('#otMain .ot-rule-card')].find(s=>s.querySelector('h3')?.textContent.includes('薪資結算報表'));
     if(intro&&!intro.querySelector('[data-pr-pay-note]')){
       const n=document.createElement('div');n.dataset.prPayNote='1';n.className='ot-rule-highlight';
-      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 240」為平日每小時工資額。金額保留至小數2位，不逕自捨去。舊資料若仍為「假日加班」未細分假別，系統不會猜測金額。';
+      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 30 ÷ 約定每日工時」為平日每小時工資額。找不到當日有效的薪資基數或約定每日工時時顯示待設定，不以目前最新設定回推。';
       intro.appendChild(n);
     }
   }
@@ -366,7 +372,7 @@
     const body=modal.querySelector('.modal-body');if(!body)return;
     const calc=prStaffCalc(staffId),corr=prCorrectionAmount(staffId);
     const sec=document.createElement('section');sec.dataset.prDetail='1';sec.className='ot-rule-card';
-    sec.innerHTML=`<h3>加班費試算明細</h3>${calc.details.length?`<div class="ot-table-shell"><table class="pr-detail-table"><thead><tr><th>日期</th><th>類型</th><th>時數</th><th>薪資基數</th><th>試算</th></tr></thead><tbody>${calc.details.map(d=>`<tr><td>${rocDate(d.date+'T00:00:00')}</td><td>${escapeHTML(prTypeLabel(d.type))}</td><td>${escapeHTML(String(d.minutes))}分</td><td>${d.rate?prMoney(d.rate.monthly_wage_base):'未設定'}</td><td>${d.calc.ok?`<strong>${prMoney(d.calc.amount)}</strong><div class="ot-detail">${escapeHTML(d.calc.formula)}</div>`:`<span class="pr-money warn">${escapeHTML(d.calc.text)}</span>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="ot-empty"><p>本月沒有直接領加班費的紀錄。</p></div>'}
+    sec.innerHTML=`<h3>加班費試算明細</h3>${calc.details.length?`<div class="ot-table-shell"><table class="pr-detail-table"><thead><tr><th>日期</th><th>類型</th><th>時數</th><th>薪資基數</th><th>試算</th></tr></thead><tbody>${calc.details.map(d=>`<tr><td>${rocDate(d.date+'T00:00:00')}</td><td>${escapeHTML(prTypeLabel(d.type))}</td><td>${escapeHTML(String(d.minutes))}分</td><td>${d.rate?`${prMoney(d.rate.monthly_wage_base)}<div class="ot-detail">約定每日工時 ${d.rate.agreed_daily_hours??'待設定'} 小時</div>`:'未設定'}</td><td>${d.calc.ok?`<strong>${prMoney(d.calc.amount)}</strong><div class="ot-detail">${escapeHTML(d.calc.formula)}</div>`:`<span class="pr-money warn">${escapeHTML(d.calc.text)}</span>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="ot-empty"><p>本月沒有直接領加班費的紀錄。</p></div>'}
       ${corr?`<div class="ot-rule-highlight">月結後加班計薪更正金額：${corr>=0?'+':''}${prMoney(corr)}</div>`:''}`;
     body.appendChild(sec);
   }
@@ -384,7 +390,7 @@
     type.dataset.prAmountMeta='1';
     const grid=type.closest('.form-grid');if(!grid)return;
     const box=document.createElement('div');box.id='prCorrectionMeta';box.className='field full hidden';
-    box.innerHTML=`<div class="form-grid"><div class="field"><label>加班日期 *</label><input id="prCorrDate" type="date"></div><div class="field"><label>出勤類型 *</label><select id="prCorrDayType"><option value="overtime">平日加班</option><option value="rest_day_overtime">休息日加班</option><option value="national_holiday_overtime">國定假日出勤</option><option value="regular_day_off_overtime">例假日出勤</option></select></div></div><div class="help">加班計薪更正必須指定實際加班日期與出勤類型，系統才可依當日薪資基數重算金額。</div>`;
+    box.innerHTML=`<div class="form-grid"><div class="field"><label>加班日期 *</label><input id="prCorrDate" type="date"></div><div class="field"><label>出勤類型 *</label><select id="prCorrDayType"><option value="overtime">平日加班</option><option value="rest_day_overtime">休息日加班</option><option value="national_holiday_overtime">國定假日出勤</option><option value="regular_day_off_overtime">例假日出勤</option></select></div></div><div class="help">加班計薪更正必須指定實際加班日期與出勤類型，系統才可依當日薪資基數與約定每日工時重算金額。</div>`;
     grid.insertBefore(box,grid.lastElementChild);
     const refresh=()=>box.classList.toggle('hidden',type.value!=='overtime_pay');
     type.addEventListener('change',refresh);refresh();
