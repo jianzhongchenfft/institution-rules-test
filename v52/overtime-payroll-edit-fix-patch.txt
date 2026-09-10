@@ -41,3 +41,14 @@
   obs.observe(document.body,{childList:true,subtree:true});
   setTimeout(apply,250);
 })();
+
+// 載入全站介面文字精簡規則。
+(async()=>{
+  try{
+    const res=await fetch('v52/ui-concise-copy-patch.txt',{cache:'no-store'});
+    if(!res.ok)throw new Error(`v52/ui-concise-copy-patch.txt 載入失敗（${res.status}）`);
+    eval(await res.text());
+  }catch(err){
+    console.error('介面文字精簡模組載入失敗',err);
+  }
+})();
