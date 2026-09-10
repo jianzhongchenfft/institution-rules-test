@@ -228,3 +228,9 @@
   stabilizePreviewNodes();
   scheduleEnhance();
 })();
+
+// 載入待審核申請撤回增強版（原因選填、撤回後保留紀錄）。
+fetch('v52/overtime-withdraw-patch.txt',{cache:'no-store'})
+  .then(res=>{if(!res.ok)throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${res.status}）`);return res.text();})
+  .then(code=>eval(code))
+  .catch(err=>console.error('撤回申請模組載入失敗',err));
