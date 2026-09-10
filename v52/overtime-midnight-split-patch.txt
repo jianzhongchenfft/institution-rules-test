@@ -1,7 +1,8 @@
 // V5.2 跨午夜加班：送出時自動拆成兩筆單日申請
 // 不包裝 navigate、不重載模組、不使用 MutationObserver；只處理跨午夜送出與成組審核。
 (() => {
-  const timedTypes=new Set(['overtime','rest_day_overtime','national_holiday_overtime']);
+  const directTypes=new Set(['overtime','rest_day_overtime','national_holiday_overtime']);
+  const timedTypes=new Set([...directTypes,'regular_day_off_overtime']);
   const activeStatuses=new Set(['draft','pending','approved']);
 
   const norm=v=>{
@@ -34,7 +35,8 @@
   const typeLabel=type=>({
     overtime:'平日加班',
     rest_day_overtime:'休息日加班',
-    national_holiday_overtime:'國定假日出勤'
+    national_holiday_overtime:'國定假日出勤',
+    regular_day_off_overtime:'例假日延續（前一日跨午夜）'
   })[type]||type||'—';
 
   function crosses(start,end){
@@ -80,7 +82,7 @@
     const date=document.getElementById('otWorkDate')?.value;
     const type=document.getElementById('otType')?.value;
     const start=selected('otStart'),end=selected('otEnd');
-    if(!date||!timedTypes.has(type)||!norm(start)||!norm(end)||!crosses(start,end))return;
+    if(!date||!directTypes.has(type)||!norm(start)||!norm(end)||!crosses(start,end))return;
 
     const total=duration(start,end);
     const first=1440-toMin(start);
@@ -112,7 +114,7 @@
   }
 
   function validateBase(v){
-    if(!v.workDate||!timedTypes.has(v.type)||!norm(v.start)||!norm(v.end)||!v.compensationMethod||!v.reason){
+    if(!v.workDate||!directTypes.has(v.type)||!norm(v.start)||!norm(v.end)||!v.compensationMethod||!v.reason){
       toast('請完整填寫日期、時間、處理方式與加班事由','warn');
       return false;
     }
@@ -291,8 +293,9 @@
             <option value="overtime">平日加班</option>
             <option value="rest_day_overtime">休息日加班</option>
             <option value="national_holiday_overtime">國定假日出勤</option>
+            <option value="regular_day_off_overtime">例假日（僅前一日跨午夜延續）</option>
           </select>
-          <div class="help">若翌日為例假日，請先退回本組申請，暫不直接核准。</div>
+          <div class="help">例假日不可直接提出加班申請；此選項僅供前一日實際加班跨午夜後的翌日延續時段使用。</div>
         </div>`,
       confirmText:'兩筆一起核准',
       onConfirm:async()=>{
@@ -381,7 +384,7 @@
 
     const type=document.getElementById('otType')?.value;
     const start=selected('otStart'),end=selected('otEnd');
-    if(!timedTypes.has(type)||!norm(start)||!norm(end)||!crosses(start,end))return;
+    if(!directTypes.has(type)||!norm(start)||!norm(end)||!crosses(start,end))return;
 
     e.preventDefault();
     e.stopPropagation();
