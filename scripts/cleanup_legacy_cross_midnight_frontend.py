@@ -48,6 +48,14 @@ if 'regular_day_off_overtime' in s:
     raise SystemExit('regular_day_off_overtime remains in workflow patch')
 p.write_text(s, encoding='utf-8')
 
+# Edit helper: no longer restore a removed regular-day type.
+p = Path('v52/overtime-payroll-edit-fix-patch.txt')
+s = p.read_text(encoding='utf-8')
+s = s.replace("const newTypes=new Set(['rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);", "const newTypes=new Set(['rest_day_overtime','national_holiday_overtime']);")
+if 'regular_day_off_overtime' in s:
+    raise SystemExit('regular_day_off_overtime remains in payroll edit fix')
+p.write_text(s, encoding='utf-8')
+
 # No runtime V5.2 text patch may refer to removed split columns/types.
 for q in Path('v52').glob('*.txt'):
     text = q.read_text(encoding='utf-8')
