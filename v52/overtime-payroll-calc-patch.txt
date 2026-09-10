@@ -62,7 +62,15 @@
   function prMinutes(a,b){
     a=prNormTime(a);b=prNormTime(b);if(!a||!b)return 0;
     const [ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);
-    return Math.max(0,(bh*60+bm)-(ah*60+am));
+    const start=ah*60+am,end=bh*60+bm;
+    if(end===0&&start>0)return 1440-start;
+    return end>start?end-start:0;
+  }
+  function prCrossesMidnight(a,b){
+    a=prNormTime(a);b=prNormTime(b);if(!a||!b)return false;
+    const [ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);
+    const start=ah*60+am,end=bh*60+bm;
+    return end<start&&end!==0;
   }
   function prMonthRange(){
     const month=/^\d{4}-\d{2}$/.test(state.overtimeMonth||'')?state.overtimeMonth:isoDate(new Date()).slice(0,7);
@@ -254,6 +262,7 @@
     }
     if(comp==='comp_leave'){box.textContent='本次選擇換休，因此不列入直接加班費；換休到期與未休結清另依換休規則處理。';return;}
     const start=prSelected('otStart'),end=prSelected('otEnd');
+    if(prCrossesMidnight(start,end)){box.textContent='跨午夜加班請分成兩筆申請：第一天申請至 00:00（視同 24:00），第二天改以隔日 00:00 起另行申請。';return;}
     const minutes=prMinutes(start,end);
     const rate=prRateFor(state.profile?.id,date);
     const position=prPreviewPosition(state.profile?.id,date,start,state.workflowEditingOvertimeId||null);
@@ -269,6 +278,7 @@
     const reason=String(document.getElementById('otReason')?.value||'').trim();
     const notes=String(document.getElementById('otNotes')?.value||'').trim();
     const existingId=state.workflowEditingOvertimeId||null;
+    if(prCrossesMidnight(start,end)){toast('跨午夜加班請分成兩筆申請：第一天申請至 00:00（視同 24:00），第二天改以隔日 00:00 起另行申請。','warn');return false;}
     if(!date||!start||!end||minutes<=0||!reason||!comp){toast('請完整填寫日期、時間、處理方式與加班事由','warn');return false;}
     if(!['00','10','20','30','40','50'].includes(start.slice(3,5))||!['00','10','20','30','40','50'].includes(end.slice(3,5))){toast('加班時間請以10分鐘為間隔','warn');return false;}
     if(type==='rest_day_overtime'&&minutes>720){toast('休息日出勤不得超過12小時','warn');return false;}

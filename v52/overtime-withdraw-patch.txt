@@ -26,14 +26,11 @@
     const time=row.start_time&&row.end_time
       ? `${String(row.start_time).slice(0,5)}–${String(row.end_time).slice(0,5)}`
       : '—';
-    const grouped=kind==='overtime'&&!!row.split_group_id;
-
     openModal({
-      title:grouped?'撤回跨午夜申請':'撤回申請',
+      title:'撤回申請',
       html:`
-        <div style="font-size:14px;font-weight:800;color:#344054">${grouped?'確定撤回這組跨午夜申請？':'確定撤回此筆申請？'}</div>
-        <div class="ot-detail" style="margin-top:10px">日期：${escapeHTML(date||'—')}　｜　時間：${escapeHTML(time)}</div>
-        ${grouped?'<div class="ot-rule-highlight">此申請是跨午夜自動拆成的兩筆紀錄，撤回時會將同一組兩筆一起刪除。</div>':''}`,
+        <div style="font-size:14px;font-weight:800;color:#344054">確定撤回此筆申請？</div>
+        <div class="ot-detail" style="margin-top:10px">日期：${escapeHTML(date||'—')}　｜　時間：${escapeHTML(time)}</div>`,
       confirmText:'確認撤回',
       onConfirm:()=>submitWithdraw(kind,id)
     });
@@ -48,26 +45,20 @@
 
     showLoading(true);
     try{
-      if(kind==='overtime'&&row.split_group_id){
-        const {data,error}=await db.rpc('delete_split_overtime_group',{p_group_id:row.split_group_id});
-        if(error)throw error;
-        if(Number(data)!==2)throw new Error('跨午夜申請未能完整撤回，請重新整理後再操作');
-      }else{
-        const table=kind==='leave'?'comp_leave_usages':'overtime_requests';
-        const {data,error}=await db.from(table)
-          .delete()
-          .eq('id',id)
-          .eq('applicant_staff_id',state.profile.id)
-          .eq('status','pending')
-          .select('id')
-          .maybeSingle();
-        if(error)throw error;
-        if(!data)throw new Error('申請狀態已變更，請重新整理後再操作');
-      }
+      const table=kind==='leave'?'comp_leave_usages':'overtime_requests';
+      const {data,error}=await db.from(table)
+        .delete()
+        .eq('id',id)
+        .eq('applicant_staff_id',state.profile.id)
+        .eq('status','pending')
+        .select('id')
+        .maybeSingle();
+      if(error)throw error;
+      if(!data)throw new Error('申請狀態已變更，請重新整理後再操作');
 
       closeModal();
       navigate('overtime');
-      toast(kind==='overtime'&&row.split_group_id?'跨午夜兩筆申請已一起撤回':'申請已撤回','success');
+      toast('申請已撤回','success');
       return true;
     }catch(err){
       console.error('撤回申請失敗',err);

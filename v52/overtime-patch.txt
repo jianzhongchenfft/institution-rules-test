@@ -129,7 +129,17 @@
       const [h,m] = String(value).split(':').map(Number);
       return h*60 + m;
     };
-    return Math.max(0, toMin(e)-toMin(s));
+    const startMin=toMin(s),endMin=toMin(e);
+    if(endMin===0 && startMin>0) return 1440-startMin;
+    return endMin>startMin ? endMin-startMin : 0;
+  }
+
+  function overtimeCrossesMidnight(start,end){
+    const s=overtimeNormalizeTime(start),e=overtimeNormalizeTime(end);
+    if(!overtimeValid24h(s) || !overtimeValid24h(e)) return false;
+    const [sh,sm]=s.split(':').map(Number),[eh,em]=e.split(':').map(Number);
+    const startMin=sh*60+sm,endMin=eh*60+em;
+    return endMin<startMin && endMin!==0;
   }
 
   function overtimeTimeParts(value){
@@ -234,7 +244,7 @@
     try{
       const [overtimeResult,leaveResult,settlementResult,creditResult] = await Promise.all([
         db.from('overtime_requests')
-          .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at,split_group_id,split_part,split_day_type_confirmed')
+          .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
           .order('work_date',{ascending:false})
           .order('created_at',{ascending:false}),
         db.from('comp_leave_usages')
@@ -293,6 +303,7 @@
         <ol class="ot-rule-list">
           <li>如有加班需要，應向「機構負責人」提出申請，並由機構負責人審核。</li>
           <li>申請時應填寫日期、開始時間、結束時間及加班事由；開始與結束時間採24小時制，並以10分鐘為間隔（分鐘僅00、10、20、30、40、50），系統依時間自動計算加班分鐘數。</li>
+          <li>加班不得以單一申請跨越午夜；如實際工作跨日，請自行分成兩筆申請。第一天結束時間填00:00（視同當日24:00），第二天以隔日00:00為開始時間另行申請。</li>
           <li>申請類型分為「平日加班」、「假日加班」及「假日家訪換休」。</li>
           <li>平日加班及假日加班應選擇「領加班費」或「換休」；選擇換休時，應依勞工意願並經機構同意後辦理。</li>
           <li>提早到班或延後離開，不因打卡時間本身當然認列為加班，仍以該時段是否實際執行機構交辦工作為準。</li>
@@ -783,7 +794,13 @@
       const end=overtimeSelectedTime('otEnd');
       const minutes=overtimeMinutesBetween(start,end);
       const valid=overtimeValid24h(start)&&overtimeValid24h(end);
-      if($('otMinuteCalc')) $('otMinuteCalc').textContent=!valid?'請選擇完整的開始與結束時間':minutes?`${minutes}分鐘（${overtimeDurationLabel(minutes)}）`:'結束時間須晚於開始時間';
+      if($('otMinuteCalc')) $('otMinuteCalc').textContent=!valid
+        ? '請選擇完整的開始與結束時間'
+        : overtimeCrossesMidnight(start,end)
+          ? '跨午夜加班不可用一筆申請；請分成兩筆。第一天結束時間填 00:00（視同 24:00），第二天改以隔日 00:00 起另行申請。'
+          : minutes
+            ? `${minutes}分鐘（${overtimeDurationLabel(minutes)}）`
+            : '結束時間須晚於開始時間';
     }
   }
 
@@ -806,6 +823,7 @@
     if(type!=='holiday_visit_comp' && !compensationMethod){toast('請選擇加班處理方式','warn');return false;}
     if(timeBased && (!overtimeValid24h(start)||!overtimeValid24h(end))){toast('請選擇完整的開始及結束時間','warn');return false;}
     if(timeBased && (!['00','10','20','30','40','50'].includes(String(start).slice(3,5)) || !['00','10','20','30','40','50'].includes(String(end).slice(3,5)))){toast('加班時間請以10分鐘為間隔','warn');return false;}
+    if(timeBased && overtimeCrossesMidnight(start,end)){toast('跨午夜加班請分成兩筆申請：第一天申請至 00:00（視同 24:00），第二天改以隔日 00:00 起另行申請。','warn');return false;}
     if(timeBased && overtimeMinutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
     if(type==='holiday_visit_comp' && (caseCount<1 || caseCount>4)){toast('假日家訪案數請選擇1至4案','warn');return false;}
 

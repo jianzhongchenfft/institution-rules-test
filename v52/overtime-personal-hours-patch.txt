@@ -167,7 +167,8 @@
 
   function currentStaffHours(){return Number(staffFor(state.profile?.id)?.agreed_daily_hours)||null;}
   function selectedTime(prefix){const h=document.getElementById(prefix+'Hour')?.value||'',m=document.getElementById(prefix+'Minute')?.value||'';return h&&m?`${h}:${m}`:null;}
-  function minutesBetween(a,b){if(!a||!b)return 0;const [ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);return Math.max(0,bh*60+bm-ah*60-am);}
+  function minutesBetween(a,b){if(!a||!b)return 0;const [ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);const start=ah*60+am,end=bh*60+bm;if(end===0&&start>0)return 1440-start;return end>start?end-start:0;}
+  function crossesMidnight(a,b){if(!a||!b)return false;const [ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);const start=ah*60+am,end=bh*60+bm;return end<start&&end!==0;}
 
   function updateFormPreview(){
     const modal=document.getElementById('otWorkDate')?.closest('.modal');if(!modal)return;
@@ -193,6 +194,7 @@
       return;
     }
     const start=selectedTime('otStart'),end=selectedTime('otEnd');
+    if(crossesMidnight(start,end)){box.textContent='跨午夜加班請分成兩筆申請：第一天申請至 00:00（視同 24:00），第二天改以隔日 00:00 起另行申請。';return;}
     const rate=rateFor(state.profile?.id,date),minutes=minutesBetween(start,end);
     let c;
     if(typeof globalThis.v52OvertimePayrollPreviewPosition==='function'&&typeof globalThis.v52OvertimePayrollCalcSegment==='function'){
