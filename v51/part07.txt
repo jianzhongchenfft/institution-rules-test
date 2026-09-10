@@ -105,12 +105,17 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
     }
   }
 
-  loadCaseVisitsModulePatch()
-    .then(()=>init())
-    .catch(err=>{
-      console.error('系統初始化延後失敗',err);
-      init();
-    });
+  const initAfterModules=init;
+  init=async function(){
+    try{
+      await loadCaseVisitsModulePatch();
+    }catch(err){
+      console.error('系統功能模組載入未完整完成',err);
+    }
+    return initAfterModules();
+  };
+
+  init();
 })();
 </script>
 </body>
