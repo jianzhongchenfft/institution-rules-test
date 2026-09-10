@@ -1,0 +1,11 @@
+// V5.2 加班／換休流程補強：在其他模組攔截事件前先記錄編輯中的申請
+(() => {
+  window.addEventListener('click',e=>{
+    const b=e.target.closest?.('button');
+    if(!b)return;
+    if(b.id==='otAddBtn')state.workflowEditingOvertimeId=null;
+    if(b.dataset.otEdit)state.workflowEditingOvertimeId=b.dataset.otEdit;
+    if(b.id==='clAddBtn')state.workflowEditingLeaveId=null;
+    if(b.dataset.clEdit)state.workflowEditingLeaveId=b.dataset.clEdit;
+  },true);
+})();
