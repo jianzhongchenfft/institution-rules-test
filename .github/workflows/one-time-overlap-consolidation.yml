@@ -39,17 +39,8 @@ jobs:
 
           workflow_path = Path('v52/overtime-workflow-patch.txt')
           workflow = workflow_path.read_text(encoding='utf-8')
-          old_types = """      'overtime',
-      'holiday_overtime',
-      'rest_day_overtime',
-      'national_holiday_overtime'
-"""
-          new_types = """      'overtime',
-      'holiday_overtime',
-      'rest_day_overtime',
-      'national_holiday_overtime',
-      'regular_day_off_overtime'
-"""
+          old_types = "      'overtime',\n      'holiday_overtime',\n      'rest_day_overtime',\n      'national_holiday_overtime'\n"
+          new_types = "      'overtime',\n      'holiday_overtime',\n      'rest_day_overtime',\n      'national_holiday_overtime',\n      'regular_day_off_overtime'\n"
           if old_types not in workflow:
               raise SystemExit('workflow timed type block not found')
           workflow = workflow.replace(old_types, new_types, 1)
