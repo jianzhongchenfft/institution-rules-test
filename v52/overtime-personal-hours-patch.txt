@@ -207,6 +207,9 @@
   }
 
   function staffLiveCalc(staffId){
+    if(typeof globalThis.v52OvertimePayrollStaffCalc==='function'){
+      return globalThis.v52OvertimePayrollStaffCalc(staffId,rateFor);
+    }
     const {start,end}=monthRange();
     const details=(state.overtimeRows||[])
       .filter(r=>String(r.applicant_staff_id)===String(staffId)&&r.status==='approved'&&r.compensation_method==='overtime_pay'&&r.work_date>=start&&r.work_date<=end&&timedTypes.has(r.request_type))
@@ -229,7 +232,7 @@
       else td.innerHTML=`<span class="pr-money warn">待設定</span><div class="ot-detail">${escapeHTML(c.missing[0]?.calc?.text||'資料未完整')}</div>`;
     });
     const note=[...document.querySelectorAll('#otMain .ot-rule-highlight')].find(x=>x.textContent.includes('待計薪加班時數')||x.textContent.includes('月薪工資總額'));
-    if(note)note.innerHTML='加班費依各員工於加班日有效的「<strong>月薪工資總額 ÷ 30 ÷ 約定每日工時</strong>」換算平日時薪；計算全程保留完整精度，明細僅顯示2位小數，各員工整月加總後的實際應發金額才四捨五入至整元。';
+    if(note)note.innerHTML='加班費依各員工於加班日有效的「<strong>月薪工資總額 ÷ 30 ÷ 約定每日工時</strong>」換算平日時薪；同一員工同一天依實際起訖時間排序累計倍率順位，選擇換休的實際加班時數也會占用順位，假日家訪換休除外；計算全程保留完整精度，明細僅顯示2位小數，各員工整月加總後的實際應發金額才四捨五入至整元。';
   }
 
   function enhanceRules(){

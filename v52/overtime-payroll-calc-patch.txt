@@ -75,10 +75,16 @@
       .sort((a,b)=>String(b.effective_from).localeCompare(String(a.effective_from))||String(b.created_at).localeCompare(String(a.created_at)));
     return rows[0]||null;
   }
-  function prCalc(type,minutes,rate){
+  function prRangeMinutes(start,minutes,from,to){
+    const end=start+minutes;
+    return Math.max(0,Math.min(end,to)-Math.max(start,from));
+  }
+  function prCalc(type,minutes,rate,dayOffset=0,includeDayBase=true){
     const monthly=Number(rate?.monthly_wage_base);
     const hours=Number(rate?.agreed_daily_hours);
     const m=Number(minutes)||0;
+    const offset=Math.max(0,Number(dayOffset)||0);
+    const dayEnd=offset+m;
     if(!rate||!Number.isFinite(monthly)||monthly<=0)return {ok:false,code:'missing_rate',text:'尚未設定有效薪資基數'};
     if(!Number.isFinite(hours)||hours<=0||hours>8)return {ok:false,code:'missing_hours',text:'尚未設定有效的約定每日工時'};
     if(!timedTypes.has(type)||type==='holiday_overtime')return {ok:false,code:'legacy',text:'需先確認假日類型'};
@@ -86,29 +92,31 @@
     const h=monthly/30/hours;
     let amount=0,formula='';
     if(type==='overtime'){
-      if(m>240)return {ok:false,code:'limit',text:'平日加班超過4小時，需人工確認'};
-      const a=Math.min(m,120),b=Math.max(Math.min(m-120,120),0);
+      if(dayEnd>240)return {ok:false,code:'limit',text:'平日當日累計加班超過4小時，需人工確認'};
+      const a=prRangeMinutes(offset,m,0,120),b=prRangeMinutes(offset,m,120,240);
       amount=h*(a/60)*(4/3)+h*(b/60)*(5/3);
-      formula=`${monthly.toFixed(2)}÷30÷${hours}；前2小時×4/3、其後2小時×5/3`;
+      formula=`${monthly.toFixed(2)}÷30÷${hours}；同日依實際時間順序累計，本筆位於當日第${offset+1}–${dayEnd}分鐘；前2小時×4/3、其後2小時×5/3`;
     }else if(type==='rest_day_overtime'){
-      if(m>720)return {ok:false,code:'limit',text:'休息日出勤超過12小時'};
-      const a=Math.min(m,120),b=Math.max(Math.min(m-120,360),0),c=Math.max(Math.min(m-480,240),0);
+      if(dayEnd>720)return {ok:false,code:'limit',text:'休息日當日累計出勤超過12小時'};
+      const a=prRangeMinutes(offset,m,0,120),b=prRangeMinutes(offset,m,120,480),c=prRangeMinutes(offset,m,480,720);
       amount=h*(a/60)*(4/3)+h*(b/60)*(5/3)+h*(c/60)*(8/3);
-      formula=`${monthly.toFixed(2)}÷30÷${hours}；前2小時×4/3、第3–8小時×5/3、第9–12小時×8/3`;
+      formula=`${monthly.toFixed(2)}÷30÷${hours}；同日依實際時間順序累計，本筆位於當日第${offset+1}–${dayEnd}分鐘；前2小時×4/3、第3–8小時×5/3、第9–12小時×8/3`;
     }else if(type==='national_holiday_overtime'){
       const normalMinutes=Math.round(hours*60);
-      if(m>normalMinutes+240)return {ok:false,code:'limit',text:'國定假日出勤超過約定每日工時加4小時，請重新確認'};
-      amount=monthly/30;
-      const x=Math.max(m-normalMinutes,0),a=Math.min(x,120),b=Math.max(Math.min(x-120,120),0);
+      if(dayEnd>normalMinutes+240)return {ok:false,code:'limit',text:'國定假日當日累計出勤超過約定每日工時加4小時，請重新確認'};
+      amount=includeDayBase?monthly/30:0;
+      const a=prRangeMinutes(offset,m,normalMinutes,normalMinutes+120),b=prRangeMinutes(offset,m,normalMinutes+120,normalMinutes+240);
       amount+=h*(a/60)*(4/3)+h*(b/60)*(5/3);
-      formula=`${monthly.toFixed(2)}÷30為1日工資；約定每日工時${hours}小時，超過後前2小時×4/3、再2小時×5/3`;
+      formula=`${includeDayBase?monthly.toFixed(2)+'÷30為當日一次日工資；':'當日日工資已於同日其他領加班費紀錄認列；'}同日依實際時間順序累計，本筆位於當日第${offset+1}–${dayEnd}分鐘；約定每日工時${hours}小時，超過後前2小時×4/3、再2小時×5/3`;
     }else if(type==='regular_day_off_overtime'){
       const normalMinutes=Math.round(hours*60);
-      if(m>normalMinutes+240)return {ok:false,code:'limit',text:'例假日出勤超過約定每日工時加4小時，請重新確認'};
-      amount=monthly/30+h*(Math.max(m-normalMinutes,0)/60)*2;
-      formula=`${monthly.toFixed(2)}÷30為1日工資；約定每日工時${hours}小時，超過部分×2`;
+      if(dayEnd>normalMinutes+240)return {ok:false,code:'limit',text:'例假日當日累計出勤超過約定每日工時加4小時，請重新確認'};
+      amount=includeDayBase?monthly/30:0;
+      const extra=prRangeMinutes(offset,m,normalMinutes,normalMinutes+240);
+      amount+=h*(extra/60)*2;
+      formula=`${includeDayBase?monthly.toFixed(2)+'÷30為當日一次日工資；':'當日日工資已於同日其他領加班費紀錄認列；'}同日依實際時間順序累計，本筆位於當日第${offset+1}–${dayEnd}分鐘；約定每日工時${hours}小時，超過部分×2`;
     }
-    return {ok:true,amount,hourly:h,monthly,hours,formula};
+    return {ok:true,amount,hourly:h,monthly,hours,formula,dayOffset:offset,dayEnd};
   }
 
   async function prLoad(force=false){
@@ -287,17 +295,38 @@
       .filter(r=>String(r.applicant_staff_id)===String(staffId)&&r.status==='approved'&&r.compensation_method==='overtime_pay'&&r.work_date>=start&&r.work_date<=end)
       .map(r=>({id:r.id,date:r.work_date,type:r.request_type,startTime:String(r.start_time||'').slice(0,5),endTime:String(r.end_time||'').slice(0,5),minutes:Number(r.overtime_minutes)||0,reason:r.reason||'',staffId}));
   }
-  function prStaffCalc(staffId){
-    const items=prReportItems(staffId);
-    const details=items.map(i=>{
-      const rate=prRateFor(staffId,i.date);
-      const c=prCalc(i.type,i.minutes,rate);
-      return {...i,rate,calc:c};
+  function prStaffCalc(staffId,rateResolver=prRateFor){
+    const {start,end}=prMonthRange();
+    const rows=(state.overtimeRows||[])
+      .filter(r=>String(r.applicant_staff_id)===String(staffId)&&r.status==='approved'&&r.work_date>=start&&r.work_date<=end&&timedTypes.has(r.request_type))
+      .filter(r=>r.request_type!=='holiday_visit_comp')
+      .sort((a,b)=>String(a.work_date).localeCompare(String(b.work_date))||String(a.start_time||'').localeCompare(String(b.start_time||''))||String(a.end_time||'').localeCompare(String(b.end_time||''))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
+    const details=[];
+    let currentDate=null,dayOffset=0,dayBasePaid=false;
+    rows.forEach(r=>{
+      if(currentDate!==r.work_date){currentDate=r.work_date;dayOffset=0;dayBasePaid=false;}
+      const minutes=Number(r.overtime_minutes)||0;
+      const rowOffset=dayOffset;
+      const isCash=r.compensation_method==='overtime_pay';
+      if(isCash){
+        const rate=rateResolver(staffId,r.work_date);
+        const includeDayBase=!dayBasePaid;
+        const c=prCalc(r.request_type,minutes,rate,rowOffset,includeDayBase);
+        details.push({
+          id:r.id,date:r.work_date,type:r.request_type,
+          startTime:String(r.start_time||'').slice(0,5),endTime:String(r.end_time||'').slice(0,5),
+          minutes,reason:r.reason||'',staffId,row:r,rate,calc:c,dayOffset:rowOffset
+        });
+        if(c.ok&&includeDayBase&&['national_holiday_overtime','regular_day_off_overtime'].includes(r.request_type))dayBasePaid=true;
+      }
+      dayOffset+=minutes;
     });
     const ok=details.length>0&&details.every(d=>d.calc.ok);
     const total=details.filter(d=>d.calc.ok).reduce((s,d)=>s+d.calc.amount,0);
     return {details,ok,total,missing:details.filter(d=>!d.calc.ok)};
   }
+  globalThis.v52OvertimePayrollStaffCalc=prStaffCalc;
+
   function prSettlement(){
     const start=prMonthRange().start;
     return (state.payrollSettlements||[]).find(r=>r.settlement_month===start)||null;
@@ -339,7 +368,7 @@
     const intro=[...document.querySelectorAll('#otMain .ot-rule-card')].find(s=>s.querySelector('h3')?.textContent.includes('薪資結算報表'));
     if(intro&&!intro.querySelector('[data-pr-pay-note]')){
       const n=document.createElement('div');n.dataset.prPayNote='1';n.className='ot-rule-highlight';
-      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 30 ÷ 約定每日工時」為平日每小時工資額。計算過程保留完整精度，明細僅顯示至小數點後2位；各員工整月加總完成後，實際應發加班費才四捨五入至整元。找不到當日有效的薪資基數或約定每日工時時顯示待設定，不以目前最新設定回推。';
+      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 30 ÷ 約定每日工時」為平日每小時工資額。同一員工同一天的實際加班會依起訖時間排序累計倍率順位，包含選擇換休的實際加班時數；假日家訪換休不列入倍率順位。計算過程保留完整精度，明細僅顯示至小數點後2位；各員工整月加總完成後，實際應發加班費才四捨五入至整元。找不到當日有效的薪資基數或約定每日工時時顯示待設定，不以目前最新設定回推。';
       intro.appendChild(n);
     }
   }
