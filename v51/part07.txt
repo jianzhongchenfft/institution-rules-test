@@ -52,6 +52,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimeIntegrityRes.ok) throw new Error(`v52/overtime-integrity-patch.txt 載入失敗（${overtimeIntegrityRes.status}）`);
       eval(await overtimeIntegrityRes.text());
 
+      const payrollCorrectionRes = await fetch('v52/payroll-correction-patch.txt',{cache:'no-store'});
+      if(!payrollCorrectionRes.ok) throw new Error(`v52/payroll-correction-patch.txt 載入失敗（${payrollCorrectionRes.status}）`);
+      eval(await payrollCorrectionRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
