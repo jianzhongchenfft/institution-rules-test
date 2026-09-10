@@ -1,0 +1,49 @@
+name: Run fixed cross-midnight base migration
+
+on:
+  push:
+    paths:
+      - '.github/workflows/run-cross-midnight-base-fixed.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Execute repaired migration script
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          wf=Path('.github/workflows/one-time-cross-midnight-base.yml').read_text(encoding='utf-8')
+          marker="          python - <<'PY'\n"
+          start=wf.index(marker)+len(marker)
+          end=wf.index("\n          PY",start)
+          script=textwrap.dedent(wf[start:end])
+          script=script.replace(
+              "s2, n = re.subn(pattern, repl, s, count=1, flags=re.S)",
+              "s2, n = re.subn(pattern, lambda _m: repl, s, count=1, flags=re.S)",
+              1
+          )
+          exec(compile(script,'cross_midnight_migration','exec'))
+          PY
+      - name: Static checks
+        run: |
+          grep -q "globalThis.v52OvertimeSegments=overtimeSegments" v52/overtime-patch.txt
+          grep -q "next_day_request_type" v52/overtime-patch.txt
+          grep -q "跨午夜，00:00後歸翌日" v52/overtime-patch.txt
+          node --check < v52/overtime-patch.txt
+      - name: Commit base overtime changes
+        run: |
+          git config user.name "openai-maintenance-bot"
+          git config user.email "openai-maintenance-bot@users.noreply.github.com"
+          git add v52/overtime-patch.txt
+          git commit -m "Split base overtime views across midnight"
+          git push origin main
