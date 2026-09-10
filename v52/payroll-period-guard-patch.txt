@@ -1,5 +1,17 @@
-// V5.2 薪資結算月份防呆：僅允許已完整結束的月份進行月結
+// V5.2 共通版面去除重複標題 + 薪資結算月份防呆
 (() => {
+  // 上方導覽列已顯示模組名稱與說明，內容區不再重複顯示相同標題。
+  if(!document.getElementById('v52-page-head-dedup-style')){
+    const layoutStyle=document.createElement('style');
+    layoutStyle.id='v52-page-head-dedup-style';
+    layoutStyle.textContent=`
+      .page-head > div:first-child:has(> h1){display:none!important}
+      .page-head:has(> div:first-child:only-child > h1){display:none!important}
+      .page-head:has(> .actions){justify-content:flex-end!important;align-items:center!important}
+    `;
+    document.head.appendChild(layoutStyle);
+  }
+
   function payrollCurrentMonth(){
     const now=new Date();
     return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
