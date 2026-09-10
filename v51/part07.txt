@@ -48,6 +48,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!payrollGuardRes.ok) throw new Error(`v52/payroll-period-guard-patch.txt 載入失敗（${payrollGuardRes.status}）`);
       eval(await payrollGuardRes.text());
 
+      const overtimeIntegrityRes = await fetch('v52/overtime-integrity-patch.txt',{cache:'no-store'});
+      if(!overtimeIntegrityRes.ok) throw new Error(`v52/overtime-integrity-patch.txt 載入失敗（${overtimeIntegrityRes.status}）`);
+      eval(await overtimeIntegrityRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
