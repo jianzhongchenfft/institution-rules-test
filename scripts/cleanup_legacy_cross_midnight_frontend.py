@@ -56,11 +56,22 @@ if 'regular_day_off_overtime' in s:
     raise SystemExit('regular_day_off_overtime remains in payroll edit fix')
 p.write_text(s, encoding='utf-8')
 
-# No runtime V5.2 text patch may refer to removed split columns/types.
+# Payroll summary: only current supported overtime day types remain.
+p = Path('v52/overtime-payroll-summary-patch.txt')
+s = p.read_text(encoding='utf-8')
+s = s.replace("const timed=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);", "const timed=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime']);")
+if 'regular_day_off_overtime' in s:
+    raise SystemExit('regular_day_off_overtime remains in payroll summary')
+p.write_text(s, encoding='utf-8')
+
+# Report every remaining runtime reference in one pass.
+issues=[]
 for q in Path('v52').glob('*.txt'):
     text = q.read_text(encoding='utf-8')
     for token in ('split_group_id','split_part','split_day_type_confirmed','next_day_request_type','regular_day_off_overtime'):
         if token in text:
-            raise SystemExit(f'{token} remains in {q}')
+            issues.append(f'{token} remains in {q}')
+if issues:
+    raise SystemExit('\n'.join(issues))
 
 print('legacy cross-midnight frontend references removed')
