@@ -18,6 +18,7 @@
   const timedTypes=new Set(['overtime','rest_day_overtime','national_holiday_overtime']);
   const canReview=()=>!!state.profile&&['organization_manager','admin'].includes(state.profile.role);
   const money=n=>`NT$ ${(Number(n)||0).toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const moneyFinal=n=>`NT$ ${Math.round(Number(n)||0).toLocaleString('zh-TW')}`;
   const dur=n=>{n=Math.max(0,Number(n)||0);const h=Math.floor(n/60),m=n%60;return h&&m?`${h}小時${m}分`:h?`${h}小時`:`${m}分鐘`;};
   const typeLabel=t=>({overtime:'平日加班',rest_day_overtime:'休息日加班',national_holiday_overtime:'國定假日出勤'})[t]||t||'—';
 
@@ -62,7 +63,7 @@
       amount+=hourly*(a/60)*(4/3)+hourly*(b/60)*(5/3);
       formula=`${monthly.toFixed(2)}÷30為1日工資；約定每日工時${hours}小時，超過後前2小時×4/3、再2小時×5/3`;
     }
-    return {ok:true,amount:Math.round(amount*100)/100,hourly:Math.round(hourly*10000)/10000,monthly,hours,formula};
+    return {ok:true,amount,hourly,monthly,hours,formula};
   }
 
   async function load(force=false){
@@ -224,11 +225,11 @@
       if(td.dataset.snapshotLocked==='1')return;
       const c=staffLiveCalc(btn.dataset.payrollDetail);
       if(!c.details.length)td.innerHTML='<span class="pr-money">NT$ 0.00</span>';
-      else if(c.ok)td.innerHTML=`<span class="pr-money">${money(c.total)}</span><div class="ot-detail">依個人約定每日工時換算</div>`;
+      else if(c.ok)td.innerHTML=`<span class="pr-money">${moneyFinal(c.total)}</span><div class="ot-detail">整月加總後四捨五入至整元；明細僅顯示2位小數</div>`;
       else td.innerHTML=`<span class="pr-money warn">待設定</span><div class="ot-detail">${escapeHTML(c.missing[0]?.calc?.text||'資料未完整')}</div>`;
     });
     const note=[...document.querySelectorAll('#otMain .ot-rule-highlight')].find(x=>x.textContent.includes('待計薪加班時數')||x.textContent.includes('月薪工資總額'));
-    if(note)note.innerHTML='加班費依各員工於加班日有效的「<strong>月薪工資總額 ÷ 30 ÷ 約定每日工時</strong>」換算平日時薪；超過個人約定正常工時後，即依機構約定比照法定加班倍率。';
+    if(note)note.innerHTML='加班費依各員工於加班日有效的「<strong>月薪工資總額 ÷ 30 ÷ 約定每日工時</strong>」換算平日時薪；計算全程保留完整精度，明細僅顯示2位小數，各員工整月加總後的實際應發金額才四捨五入至整元。';
   }
 
   function enhanceRules(){

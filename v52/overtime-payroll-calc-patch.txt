@@ -46,6 +46,10 @@
     const v=Number(n);
     return Number.isFinite(v)?`NT$ ${v.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—';
   }
+  function prFinalMoney(n){
+    const v=Number(n);
+    return Number.isFinite(v)?`NT$ ${Math.round(v).toLocaleString('zh-TW')}`:'—';
+  }
   function prNormTime(v){
     const x=String(v||'').slice(0,5);
     return /^([01]\d|2[0-3]):[0-5]\d$/.test(x)?x:null;
@@ -104,7 +108,7 @@
       amount=monthly/30+h*(Math.max(m-normalMinutes,0)/60)*2;
       formula=`${monthly.toFixed(2)}÷30為1日工資；約定每日工時${hours}小時，超過部分×2`;
     }
-    return {ok:true,amount:Math.round(amount*100)/100,hourly:Math.round(h*10000)/10000,monthly,hours,formula};
+    return {ok:true,amount,hourly:h,monthly,hours,formula};
   }
 
   async function prLoad(force=false){
@@ -292,7 +296,7 @@
     });
     const ok=details.length>0&&details.every(d=>d.calc.ok);
     const total=details.filter(d=>d.calc.ok).reduce((s,d)=>s+d.calc.amount,0);
-    return {details,ok,total:Math.round(total*100)/100,missing:details.filter(d=>!d.calc.ok)};
+    return {details,ok,total,missing:details.filter(d=>!d.calc.ok)};
   }
   function prSettlement(){
     const start=prMonthRange().start;
@@ -320,7 +324,7 @@
       const calc=prStaffCalc(staffId),corr=prCorrectionAmount(staffId);
       const td=document.createElement('td');td.dataset.prMoneyCell='1';
       if(!calc.details.length)td.innerHTML='<span class="pr-money">NT$ 0.00</span>';
-      else if(calc.ok)td.innerHTML=`<span class="pr-money">${prMoney(calc.total+corr)}</span>${corr?`<div class="ot-detail">含月結更正 ${corr>=0?'+':''}${prMoney(corr)}</div>`:''}`;
+      else if(calc.ok)td.innerHTML=`<span class="pr-money">${prFinalMoney(calc.total+corr)}</span><div class="ot-detail">月底實際應發金額；明細試算顯示至小數點後2位</div>${corr?`<div class="ot-detail">含月結更正 ${corr>=0?'+':''}${prMoney(corr)}</div>`:''}`;
       else td.innerHTML=`<span class="pr-money warn">待確認</span><div class="ot-detail">${escapeHTML(calc.missing[0]?.calc?.text||'資料未完整')}</div>`;
       tr.children[1]?.insertAdjacentElement('afterend',td);
     });
@@ -329,13 +333,13 @@
       const ids=[...table.querySelectorAll('[data-payroll-detail]')].map(b=>b.dataset.payrollDetail);
       const all=ids.map(id=>({c:prStaffCalc(id),corr:prCorrectionAmount(id)}));
       const complete=all.every(x=>!x.c.details.length||x.c.ok);
-      const total=all.reduce((s,x)=>s+(x.c.ok?x.c.total:0)+x.corr,0);
-      const foot=first.querySelector('.stat-foot');if(foot)foot.textContent=complete?`系統試算加班費 ${prMoney(total)}`:'部分員工尚未完成薪資基數、約定每日工時或假日類型設定';
+      const total=all.reduce((s,x)=>s+Math.round((x.c.ok?x.c.total:0)+x.corr),0);
+      const foot=first.querySelector('.stat-foot');if(foot)foot.textContent=complete?`系統試算加班費 ${prFinalMoney(total)}（各員工月總額最後四捨五入至整元）`:'部分員工尚未完成薪資基數、約定每日工時或假日類型設定';
     }
     const intro=[...document.querySelectorAll('#otMain .ot-rule-card')].find(s=>s.querySelector('h3')?.textContent.includes('薪資結算報表'));
     if(intro&&!intro.querySelector('[data-pr-pay-note]')){
       const n=document.createElement('div');n.dataset.prPayNote='1';n.className='ot-rule-highlight';
-      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 30 ÷ 約定每日工時」為平日每小時工資額。找不到當日有效的薪資基數或約定每日工時時顯示待設定，不以目前最新設定回推。';
+      n.innerHTML='加班費試算以「該加班日有效的月薪工資總額 ÷ 30 ÷ 約定每日工時」為平日每小時工資額。計算過程保留完整精度，明細僅顯示至小數點後2位；各員工整月加總完成後，實際應發加班費才四捨五入至整元。找不到當日有效的薪資基數或約定每日工時時顯示待設定，不以目前最新設定回推。';
       intro.appendChild(n);
     }
   }
