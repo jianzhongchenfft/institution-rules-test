@@ -84,10 +84,6 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimePersonalHoursRes.ok) throw new Error(`v52/overtime-personal-hours-patch.txt 載入失敗（${overtimePersonalHoursRes.status}）`);
       eval(await overtimePersonalHoursRes.text());
 
-      const overtimeCrossMidnightRes = await fetch('v52/overtime-cross-midnight-patch.txt',{cache:'no-store'});
-      if(!overtimeCrossMidnightRes.ok) throw new Error(`v52/overtime-cross-midnight-patch.txt 載入失敗（${overtimeCrossMidnightRes.status}）`);
-      eval(await overtimeCrossMidnightRes.text());
-
       const overtimeMonthFilterRes = await fetch('v52/overtime-month-filter-patch.txt',{cache:'no-store'});
       if(!overtimeMonthFilterRes.ok) throw new Error(`v52/overtime-month-filter-patch.txt 載入失敗（${overtimeMonthFilterRes.status}）`);
       eval(await overtimeMonthFilterRes.text());
