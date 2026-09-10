@@ -80,6 +80,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimePayrollEditFixRes.ok) throw new Error(`v52/overtime-payroll-edit-fix-patch.txt 載入失敗（${overtimePayrollEditFixRes.status}）`);
       eval(await overtimePayrollEditFixRes.text());
 
+      const overtimePersonalHoursRes = await fetch('v52/overtime-personal-hours-patch.txt',{cache:'no-store'});
+      if(!overtimePersonalHoursRes.ok) throw new Error(`v52/overtime-personal-hours-patch.txt 載入失敗（${overtimePersonalHoursRes.status}）`);
+      eval(await overtimePersonalHoursRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
