@@ -11,14 +11,11 @@
     const modal=b.closest?.('.modal');
     if(!modal||!modal.querySelector('#otWorkDate'))return;
     const type=document.getElementById('otType')?.value;
-    if(type!=='regular_day_off_overtime')return;
-    const isSubmit=b.id==='modalConfirm' && b.textContent.trim()!=='儲存草稿';
-    if(!isSubmit)return;
-    const ack=document.getElementById('prEmergencyConfirm');
-    if(!ack?.checked)return;
-    if(!confirm('今天是例假，原則不得安排出勤。\n\n若仍要送出本次申請，請確認；送出僅代表提出申請，不代表系統認定已符合法定例外。')){
+    const isSave=b.id==='modalConfirm'||b.textContent.trim()==='儲存草稿';
+    if(type==='regular_day_off_overtime'&&isSave){
       e.preventDefault();
       e.stopImmediatePropagation();
+      toast('今天是例假，不能提出加班申請；建議改為週六休息日加班。','warn');
     }
   },true);
 
@@ -39,17 +36,40 @@
       overtime:'平日加班',
       rest_day_overtime:'休息日加班',
       national_holiday_overtime:'國定假日出勤',
-      regular_day_off_overtime:'例假日出勤'
+      regular_day_off_overtime:'例假日'
     })[type]||'';
+  }
+
+  function previousSaturday(date){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))return '';
+    const d=new Date(String(date)+'T00:00:00');
+    if(Number.isNaN(d.getTime())||d.getDay()!==0)return '';
+    d.setDate(d.getDate()-1);
+    return isoDate(d);
   }
 
   function rewriteRegularWarning(){
     const type=document.getElementById('otType')?.value;
-    if(type!=='regular_day_off_overtime')return;
     const warn=document.getElementById('prLegalWarn');
-    if(!warn)return;
+    if(type!=='regular_day_off_overtime'||!warn)return;
+    const date=document.getElementById('otWorkDate')?.value||'';
+    const saturday=previousSaturday(date);
     warn.classList.remove('hidden');
-    warn.innerHTML=`⚠️ <strong>今天是例假，原則不得安排出勤。</strong><br>依勞動基準法，例假原則不得使勞工出勤；如屬天災、事變或突發事件等法定例外，另有補假及報備義務。若仍需提出申請，可在閱讀提醒後送出；送出不代表系統認定已符合法定例外。<label style="display:flex;gap:7px;align-items:flex-start;margin-top:7px;font-weight:700"><input id="prEmergencyConfirm" type="checkbox" style="margin-top:2px">我已閱讀上述提醒，仍要提出本次例假出勤申請。</label>`;
+    warn.innerHTML=`⚠️ <strong>今天是例假，原則不得安排出勤。</strong><br>依機構規定，例假日不開放加班申請。${saturday?`建議將日期改為 <strong>${escapeHTML(saturday)}</strong>（週六），並以「休息日加班」提出申請。`:''}${saturday?`<div style="margin-top:8px"><button id="wfMoveToSaturdayBtn" type="button" class="btn sm">改為週六休息日加班</button></div>`:''}`;
+    const btn=document.getElementById('wfMoveToSaturdayBtn');
+    if(btn&&!btn.dataset.bound){
+      btn.dataset.bound='1';
+      btn.addEventListener('click',()=>{
+        const dateEl=document.getElementById('otWorkDate');
+        const typeEl=document.getElementById('otType');
+        if(!dateEl||!typeEl||!saturday)return;
+        dateEl.value=saturday;
+        typeEl.value='rest_day_overtime';
+        typeEl.dispatchEvent(new Event('change',{bubbles:true}));
+        setTimeout(()=>updateAutoNote(false),20);
+        toast('已改為週六休息日加班，請再確認時間與事由。','success');
+      });
+    }
   }
 
   function updateAutoNote(manual=false){
@@ -58,6 +78,11 @@
     const note=document.getElementById('wfDayTypeAutoNote');
     if(!note)return;
     if(!date){note.textContent='固定班別預設：週一至週五為平日、週六為休息日、週日為例假；國定假日或調移情形請手動改選。';return;}
+    if(type==='regular_day_off_overtime'){
+      const saturday=previousSaturday(date);
+      note.textContent=`系統判定本日為例假，不能申請加班。${saturday?`建議改為 ${saturday}（週六）休息日加班。`:''}`;
+      return;
+    }
     if(type==='national_holiday_overtime'){
       note.textContent='已手動改為國定假日出勤；如該假日已依法調移，請依實際約定日期選擇。';
       return;
@@ -75,7 +100,7 @@
     if(!date||!sel)return;
 
     const regularOpt=[...sel.options].find(o=>o.value==='regular_day_off_overtime');
-    if(regularOpt){regularOpt.textContent='例假日出勤（系統判定）';regularOpt.hidden=true;}
+    if(regularOpt){regularOpt.textContent='例假日（不可申請加班）';regularOpt.hidden=true;}
 
     const field=sel.closest('.field');
     if(field&&!document.getElementById('wfDayTypeAutoNote')){
