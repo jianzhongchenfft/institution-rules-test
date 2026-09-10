@@ -1,4 +1,5 @@
 name: One-time cleanup legacy cross-midnight frontend
+# run 3 after removing stale Sunday regular-day type
 on:
   push:
     paths:
