@@ -1,0 +1,15 @@
+// V5.2 薪資計算補強：新假別納入「本月我的加班」統計
+(() => {
+  const timed=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+  const dur=n=>{n=Math.max(0,Number(n)||0);const h=Math.floor(n/60),m=n%60;return h&&m?`${h}小時${m}分`:h?`${h}小時`:`${m}分鐘`;};
+  function update(){
+    if(state.page!=='overtime'||!state.profile)return;
+    const month=/^\d{4}-\d{2}$/.test(state.overtimeMonth||'')?state.overtimeMonth:isoDate(new Date()).slice(0,7);
+    const [y,m]=month.split('-').map(Number),start=`${y}-${String(m).padStart(2,'0')}-01`,end=isoDate(new Date(y,m,0));
+    const mins=(state.overtimeRows||[]).filter(r=>String(r.applicant_staff_id)===String(state.profile.id)&&r.status==='approved'&&r.work_date>=start&&r.work_date<=end&&timed.has(r.request_type)).reduce((s,r)=>s+(Number(r.overtime_minutes)||0),0);
+    const card=[...document.querySelectorAll('#content .stat-card')].find(c=>c.querySelector('.stat-head span:first-child')?.textContent.trim()==='本月我的加班');
+    if(!card)return;const val=card.querySelector('.stat-value');if(val)val.textContent=dur(mins);
+  }
+  let q=false;const obs=new MutationObserver(ms=>{if(q||!ms.some(m=>m.addedNodes?.length))return;q=true;setTimeout(()=>{q=false;update();},20);});obs.observe(document.body,{childList:true,subtree:true});
+  setTimeout(update,250);
+})();
