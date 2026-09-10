@@ -1,5 +1,5 @@
 name: One-time cleanup legacy cross-midnight frontend
-# run 3 after removing stale Sunday regular-day type
+# run 4 after removing obsolete overlap patch
 on:
   push:
     paths:
@@ -21,6 +21,7 @@ jobs:
           node --check < v52/overtime-personal-hours-patch.txt
           node --check < v52/overtime-workflow-patch.txt
           node --check < v52/overtime-payroll-edit-fix-patch.txt
+          node --check < v52/overtime-workflow-tracking-patch.txt
           git diff --check
       - run: |
           git config user.name openai-maintenance-bot
