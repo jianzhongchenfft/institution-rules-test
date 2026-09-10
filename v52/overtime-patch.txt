@@ -123,16 +123,57 @@
   }
 
   function overtimeMinutesBetween(start,end){
-    const s=overtimeNormalizeTime(start),e=overtimeNormalizeTime(end);
-    if(!overtimeValid24h(s) || !overtimeValid24h(e)) return 0;
-    const toMin = value => {
-      const [h,m] = String(value).split(':').map(Number);
-      return h*60 + m;
-    };
-    return Math.max(0, toMin(e)-toMin(s));
-  }
+  const s=overtimeNormalizeTime(start),e=overtimeNormalizeTime(end);
+  if(!overtimeValid24h(s) || !overtimeValid24h(e)) return 0;
+  const toMin = value => {
+    const [h,m] = String(value).split(':').map(Number);
+    return h*60 + m;
+  };
+  const sm=toMin(s),em=toMin(e);
+  if(sm===em) return 0;
+  return em>sm ? em-sm : (1440-sm)+em;
+}
 
-  function overtimeTimeParts(value){
+function overtimeCrossesMidnight(start,end){
+  const s=overtimeNormalizeTime(start),e=overtimeNormalizeTime(end);
+  if(!overtimeValid24h(s)||!overtimeValid24h(e)) return false;
+  const toMin=value=>{const [h,m]=String(value).split(':').map(Number);return h*60+m;};
+  return toMin(e)<toMin(s);
+}
+
+function overtimeNextDate(date){
+  const m=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return '';
+  const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3])+1));
+  return d.toISOString().slice(0,10);
+}
+
+function overtimeSegments(row){
+  if(!row||row.request_type==='holiday_visit_comp') return [];
+  const start=overtimeNormalizeTime(row.start_time),end=overtimeNormalizeTime(row.end_time);
+  if(!overtimeValid24h(start)||!overtimeValid24h(end)) return [];
+  const [sh,sm]=start.split(':').map(Number),[eh,em]=end.split(':').map(Number);
+  const smin=sh*60+sm,emin=eh*60+em;
+  if(smin===emin) return [];
+  const common={requestId:row.id,staffId:row.applicant_staff_id,compensationMethod:row.compensation_method,reason:row.reason||'',createdAt:row.created_at||'',row};
+  if(emin>smin){
+    return [{...common,segmentIndex:1,date:row.work_date,type:row.request_type,startTime:start,endTime:end,startMin:smin,minutes:emin-smin}];
+  }
+  const out=[{...common,segmentIndex:1,date:row.work_date,type:row.request_type,startTime:start,endTime:'24:00',startMin:smin,minutes:1440-smin}];
+  if(emin>0){
+    out.push({...common,segmentIndex:2,date:overtimeNextDate(row.work_date),type:row.next_day_request_type||null,startTime:'00:00',endTime:end,startMin:0,minutes:emin});
+  }
+  return out;
+}
+
+function overtimeRowTouchesRange(row,start,end){
+  if(row?.request_type==='holiday_visit_comp') return row.work_date>=start&&row.work_date<=end;
+  return overtimeSegments(row).some(seg=>seg.date>=start&&seg.date<=end);
+}
+
+globalThis.v52OvertimeSegments=overtimeSegments;
+
+function overtimeTimeParts(value){
     const normalized=overtimeNormalizeTime(value);
     if(!overtimeValid24h(normalized)) return {hour:'',minute:''};
     const [hour,minute]=normalized.split(':');
@@ -234,7 +275,7 @@
     try{
       const [overtimeResult,leaveResult,settlementResult,creditResult] = await Promise.all([
         db.from('overtime_requests')
-          .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
+          .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at,next_day_request_type')
           .order('work_date',{ascending:false})
           .order('created_at',{ascending:false}),
         db.from('comp_leave_usages')
@@ -274,18 +315,24 @@
   }
 
   function overtimeSummary(){
-    const {start,end}=overtimeMonthRange(state.overtimeMonth);
-    const own=overtimeOwnRows().filter(r=>r.work_date>=start && r.work_date<=end && r.status==='approved');
-    const overtimeMinutes=own.filter(r=>['overtime','holiday_overtime'].includes(r.request_type)).reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
-    const compMinutes=own.filter(r=>r.request_type==='holiday_visit_comp').reduce((sum,r)=>sum+(Number(r.comp_minutes)||0),0);
-    const pendingOvertime=state.overtimeRows.filter(r=>r.status==='pending').length;
-    const pendingLeave=state.compLeaveRows.filter(r=>r.status==='pending').length;
-    const ownPending=overtimeOwnRows().filter(r=>r.status==='pending').length+compLeaveOwnRows().filter(r=>r.status==='pending').length;
-    const balance=compLeaveBalance(state.profile?.id,isoDate(new Date()));
-    return {overtimeMinutes,compMinutes,pending:pendingOvertime+pendingLeave,pendingOvertime,pendingLeave,ownPending,balance};
-  }
+  const {start,end}=overtimeMonthRange(state.overtimeMonth);
+  const own=overtimeOwnRows().filter(r=>r.status==='approved');
+  const overtimeMinutes=own
+    .filter(r=>r.request_type!=='holiday_visit_comp')
+    .flatMap(r=>overtimeSegments(r))
+    .filter(seg=>seg.date>=start&&seg.date<=end)
+    .reduce((sum,seg)=>sum+(Number(seg.minutes)||0),0);
+  const compMinutes=own
+    .filter(r=>r.request_type==='holiday_visit_comp'&&r.work_date>=start&&r.work_date<=end)
+    .reduce((sum,r)=>sum+(Number(r.comp_minutes)||0),0);
+  const pendingOvertime=state.overtimeRows.filter(r=>r.status==='pending').length;
+  const pendingLeave=state.compLeaveRows.filter(r=>r.status==='pending').length;
+  const ownPending=overtimeOwnRows().filter(r=>r.status==='pending').length+compLeaveOwnRows().filter(r=>r.status==='pending').length;
+  const balance=compLeaveBalance(state.profile?.id,isoDate(new Date()));
+  return {overtimeMinutes,compMinutes,pending:pendingOvertime+pendingLeave,pendingOvertime,pendingLeave,ownPending,balance};
+}
 
-  function renderOvertimeRules(){
+function renderOvertimeRules(){
     return `
       <section class="ot-rule-card">
         <h3>加班申請原則</h3>
@@ -293,6 +340,7 @@
         <ol class="ot-rule-list">
           <li>如有加班需要，應向「機構負責人」提出申請，並由機構負責人審核。</li>
           <li>申請時應填寫日期、開始時間、結束時間及加班事由；開始與結束時間採24小時制，並以10分鐘為間隔（分鐘僅00、10、20、30、40、50），系統依時間自動計算加班分鐘數。</li>
+          <li>加班若跨越午夜，系統會於 00:00 自動拆分為兩個日期；翌日日別由審核者依實際排班／假別確認，各段分別使用當日有效薪資設定與倍率順位。</li>
           <li>申請類型分為「平日加班」、「假日加班」及「假日家訪換休」。</li>
           <li>平日加班及假日加班應選擇「領加班費」或「換休」；選擇換休時，應依勞工意願並經機構同意後辦理。</li>
           <li>提早到班或延後離開，不因打卡時間本身當然認列為加班，仍以該時段是否實際執行機構交辦工作為準。</li>
@@ -318,17 +366,19 @@
   }
 
   function overtimeRowDetail(r){
-    if(r.request_type==='holiday_visit_comp'){
-      return `<div class="ot-detail">${Number(r.holiday_case_count)||0} 案・換休 ${overtimeDurationLabel(r.comp_minutes)}</div>`;
-    }
-    return `<div class="ot-detail">${String(r.start_time||'').slice(0,5)}–${String(r.end_time||'').slice(0,5)}・${overtimeDurationLabel(r.overtime_minutes)}・${overtimeCompensationLabel(r.compensation_method)}</div>`;
+  if(r.request_type==='holiday_visit_comp'){
+    return `<div class="ot-detail">${Number(r.holiday_case_count)||0} 案・換休 ${overtimeDurationLabel(r.comp_minutes)}</div>`;
   }
+  const start=String(r.start_time||'').slice(0,5),end=String(r.end_time||'').slice(0,5);
+  const cross=overtimeCrossesMidnight(start,end);
+  const endMinute=(()=>{const x=overtimeNormalizeTime(end);if(!overtimeValid24h(x))return 0;const [h,m]=x.split(':').map(Number);return h*60+m;})();
+  const nextInfo=cross&&endMinute>0
+    ? `<div class="ot-detail">跨午夜：翌日 ${escapeHTML(overtimeNextDate(r.work_date))}・${escapeHTML(r.next_day_request_type?overtimeTypeLabel(r.next_day_request_type):'日別待審核確認')}</div>`
+    : cross?'<div class="ot-detail">跨午夜：至翌日 00:00</div>':'';
+  return `<div class="ot-detail">${escapeHTML(start)}–${cross?'翌日 ':''}${escapeHTML(end)}・${overtimeDurationLabel(r.overtime_minutes)}・${overtimeCompensationLabel(r.compensation_method)}</div>${nextInfo}`;
+}
 
-  function overtimeAmount(r){
-    return r.request_type==='holiday_visit_comp' ? overtimeDurationLabel(r.comp_minutes) : overtimeDurationLabel(r.overtime_minutes);
-  }
-
-  function overtimeRenderTable(rows,{review=false}={}){
+function overtimeRenderTable(rows,{review=false}={}){
     if(!rows.length){
       return `<div class="ot-empty"><div class="icon">✓</div><h3>目前沒有資料</h3><p>${review?'沒有待審核的加班／換休申請。':'尚無符合條件的申請紀錄。'}</p></div>`;
     }
@@ -426,84 +476,44 @@
   }
 
   function payrollBuildRows(){
-    const {start,end}=overtimeMonthRange(state.overtimeMonth);
-    const approvedOvertime=state.overtimeRows.filter(r=>r.status==='approved' && r.work_date<=end);
-    const approvedLeave=state.compLeaveRows.filter(r=>r.status==='approved' && r.leave_date<=end);
-    const staffIds=new Set([
-      ...approvedOvertime.map(r=>r.applicant_staff_id),
-      ...approvedLeave.map(r=>r.applicant_staff_id)
-    ]);
-    const rows=[];
+  const {start,end}=overtimeMonthRange(state.overtimeMonth);
+  const approvedOvertime=state.overtimeRows.filter(r=>r.status==='approved');
+  const approvedLeave=state.compLeaveRows.filter(r=>r.status==='approved'&&r.leave_date<=end);
+  const staffIds=new Set([
+    ...approvedOvertime.filter(r=>overtimeRowTouchesRange(r,start,end)).map(r=>r.applicant_staff_id),
+    ...approvedLeave.filter(r=>r.leave_date>=start&&r.leave_date<=end).map(r=>r.applicant_staff_id)
+  ]);
+  const rows=[];
 
-    staffIds.forEach(staffId=>{
-      const monthOvertime=approvedOvertime.filter(r=>r.applicant_staff_id===staffId && r.work_date>=start && r.work_date<=end);
-      const monthLeave=approvedLeave.filter(r=>r.applicant_staff_id===staffId && r.leave_date>=start && r.leave_date<=end);
-      const overtimePayItems=monthOvertime
-        .filter(r=>r.compensation_method==='overtime_pay')
-        .map(r=>({
-          id:r.id,
-          date:r.work_date,
-          type:r.request_type,
-          startTime:r.start_time?String(r.start_time).slice(0,5):null,
-          endTime:r.end_time?String(r.end_time).slice(0,5):null,
-          minutes:Number(r.overtime_minutes)||0,
-          reason:r.reason||''
-        }));
-      const compLeaveEarnedItems=monthOvertime
-        .filter(r=>r.compensation_method==='comp_leave')
-        .map(r=>({
-          id:r.id,
-          date:r.work_date,
-          type:r.request_type,
-          startTime:r.start_time?String(r.start_time).slice(0,5):null,
-          endTime:r.end_time?String(r.end_time).slice(0,5):null,
-          minutes:r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0),
-          reason:r.reason||''
-        }));
-      const compLeaveUsedItems=monthLeave.map(r=>({
-        id:r.id,
-        date:r.leave_date,
-        startTime:String(r.start_time||'').slice(0,5),
-        endTime:String(r.end_time||'').slice(0,5),
-        minutes:Number(r.minutes)||0,
-        reason:r.reason||''
-      }));
+  staffIds.forEach(staffId=>{
+    const staffOvertime=approvedOvertime.filter(r=>r.applicant_staff_id===staffId);
+    const timedSegments=staffOvertime.filter(r=>r.request_type!=='holiday_visit_comp').flatMap(r=>overtimeSegments(r)).filter(seg=>seg.date>=start&&seg.date<=end);
+    const holidayRows=staffOvertime.filter(r=>r.request_type==='holiday_visit_comp'&&r.work_date>=start&&r.work_date<=end);
+    const monthLeave=approvedLeave.filter(r=>r.applicant_staff_id===staffId&&r.leave_date>=start&&r.leave_date<=end);
+    const overtimePayItems=timedSegments.filter(seg=>seg.compensationMethod==='overtime_pay').map(seg=>({
+      id:seg.requestId,segmentIndex:seg.segmentIndex,date:seg.date,type:seg.type,startTime:seg.startTime,endTime:seg.endTime,minutes:Number(seg.minutes)||0,reason:seg.reason||''
+    }));
+    const compLeaveEarnedItems=[
+      ...timedSegments.filter(seg=>seg.compensationMethod==='comp_leave').map(seg=>({
+        id:seg.requestId,segmentIndex:seg.segmentIndex,date:seg.date,type:seg.type,startTime:seg.startTime,endTime:seg.endTime,minutes:Number(seg.minutes)||0,reason:seg.reason||''
+      })),
+      ...holidayRows.map(r=>({id:r.id,date:r.work_date,type:r.request_type,startTime:null,endTime:null,minutes:Number(r.comp_minutes)||0,reason:r.reason||''}))
+    ];
+    const compLeaveUsedItems=monthLeave.map(r=>({id:r.id,date:r.leave_date,startTime:String(r.start_time||'').slice(0,5),endTime:String(r.end_time||'').slice(0,5),minutes:Number(r.minutes)||0,reason:r.reason||''}));
 
-      const earnedToEnd=approvedOvertime
-        .filter(r=>r.applicant_staff_id===staffId && r.compensation_method==='comp_leave')
-        .reduce((sum,r)=>sum+(r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0)),0);
-      const usedToEnd=approvedLeave
-        .filter(r=>r.applicant_staff_id===staffId)
-        .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    const balance=compLeaveBalance(staffId,end);
+    const overtimePayMinutes=overtimePayItems.reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    const compLeaveEarnedMinutes=compLeaveEarnedItems.reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    const compLeaveUsedMinutes=compLeaveUsedItems.reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    const compLeaveBalanceMinutes=Math.max(0,Number(balance.ledgerRemaining)||0);
+    if(overtimePayMinutes===0&&compLeaveEarnedMinutes===0&&compLeaveUsedMinutes===0&&compLeaveBalanceMinutes===0)return;
+    const meta=state.overtimeRows.find(r=>r.applicant_staff_id===staffId)||state.compLeaveRows.find(r=>r.applicant_staff_id===staffId)||{};
+    rows.push({staffId,name:meta.applicant_name||'未命名',role:meta.applicant_role||'',overtimePayMinutes,compLeaveEarnedMinutes,compLeaveUsedMinutes,compLeaveBalanceMinutes,overtimePayItems,compLeaveEarnedItems,compLeaveUsedItems});
+  });
+  return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name),'zh-Hant'));
+}
 
-      const overtimePayMinutes=overtimePayItems.reduce((sum,r)=>sum+r.minutes,0);
-      const compLeaveEarnedMinutes=compLeaveEarnedItems.reduce((sum,r)=>sum+r.minutes,0);
-      const compLeaveUsedMinutes=compLeaveUsedItems.reduce((sum,r)=>sum+r.minutes,0);
-      const compLeaveBalanceMinutes=Math.max(0,earnedToEnd-usedToEnd);
-
-      if(overtimePayMinutes===0 && compLeaveEarnedMinutes===0 && compLeaveUsedMinutes===0 && compLeaveBalanceMinutes===0) return;
-
-      const meta=state.overtimeRows.find(r=>r.applicant_staff_id===staffId)
-        || state.compLeaveRows.find(r=>r.applicant_staff_id===staffId)
-        || {};
-      rows.push({
-        staffId,
-        name:meta.applicant_name||'未命名',
-        role:meta.applicant_role||'',
-        overtimePayMinutes,
-        compLeaveEarnedMinutes,
-        compLeaveUsedMinutes,
-        compLeaveBalanceMinutes,
-        overtimePayItems,
-        compLeaveEarnedItems,
-        compLeaveUsedItems
-      });
-    });
-
-    return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name),'zh-Hant'));
-  }
-
-  function payrollReportRows(){
+function payrollReportRows(){
     const settlement=payrollSettlementForMonth();
     const snapshotRows=settlement?.summary?.staff;
     return settlement && Array.isArray(snapshotRows) ? snapshotRows : payrollBuildRows();
@@ -588,7 +598,7 @@
     if(!overtimeCanReview()){toast('目前帳號沒有薪資結算權限','warn');return;}
     if(payrollSettlementForMonth()){toast('本月份已完成結算','warn');return;}
     const {start,end}=overtimeMonthRange(state.overtimeMonth);
-    const pendingOvertime=state.overtimeRows.filter(r=>r.work_date>=start && r.work_date<=end && r.status==='pending').length;
+    const pendingOvertime=state.overtimeRows.filter(r=>r.status==='pending'&&overtimeRowTouchesRange(r,start,end)).length;
     const pendingLeave=state.compLeaveRows.filter(r=>r.leave_date>=start && r.leave_date<=end && r.status==='pending').length;
     if(pendingOvertime+pendingLeave>0){
       toast(`本月尚有 ${pendingOvertime+pendingLeave} 筆待審核申請，請先完成審核再結算`,'warn');
@@ -783,7 +793,7 @@
       const end=overtimeSelectedTime('otEnd');
       const minutes=overtimeMinutesBetween(start,end);
       const valid=overtimeValid24h(start)&&overtimeValid24h(end);
-      if($('otMinuteCalc')) $('otMinuteCalc').textContent=!valid?'請選擇完整的開始與結束時間':minutes?`${minutes}分鐘（${overtimeDurationLabel(minutes)}）`:'結束時間須晚於開始時間';
+      if($('otMinuteCalc')) $('otMinuteCalc').textContent=!valid?'請選擇完整的開始與結束時間':minutes?`${minutes}分鐘（${overtimeDurationLabel(minutes)}）${overtimeCrossesMidnight(start,end)?'；跨午夜，00:00後歸翌日':''}`:'開始時間與結束時間不可相同';
     }
   }
 
@@ -806,7 +816,7 @@
     if(type!=='holiday_visit_comp' && !compensationMethod){toast('請選擇加班處理方式','warn');return false;}
     if(timeBased && (!overtimeValid24h(start)||!overtimeValid24h(end))){toast('請選擇完整的開始及結束時間','warn');return false;}
     if(timeBased && (!['00','10','20','30','40','50'].includes(String(start).slice(3,5)) || !['00','10','20','30','40','50'].includes(String(end).slice(3,5)))){toast('加班時間請以10分鐘為間隔','warn');return false;}
-    if(timeBased && overtimeMinutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
+    if(timeBased && overtimeMinutes<=0){toast('開始時間與結束時間不可相同','warn');return false;}
     if(type==='holiday_visit_comp' && (caseCount<1 || caseCount>4)){toast('假日家訪案數請選擇1至4案','warn');return false;}
 
     const payload={
@@ -818,6 +828,7 @@
       start_time:timeBased?start:null,
       end_time:timeBased?end:null,
       overtime_minutes:overtimeMinutes,
+      next_day_request_type:null,
       compensation_method:compensationMethod,
       reason,
       holiday_case_count:type==='holiday_visit_comp'?caseCount:null,
