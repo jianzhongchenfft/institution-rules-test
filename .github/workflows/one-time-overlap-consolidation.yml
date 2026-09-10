@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   update:
-    if: github.event.head_commit.message == 'Add one-time overtime overlap consolidation workflow'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
