@@ -8,6 +8,12 @@
     .ot-month-filter-empty .icon{font-size:28px;margin-bottom:7px}
     .ot-month-filter-empty h3{margin:0 0 6px;color:#344054;font-size:15px}
     .ot-month-filter-empty p{margin:0;font-size:12px;line-height:1.6}
+
+    /* 加班申請視窗：將「約定每日工時」與「薪資基數」固定拆成兩列，避免共用提示區反覆切換 */
+    #phApplicantHoursHint,#prAmountPreview{display:none!important}
+    .ot-stable-status-stack{grid-column:1 / -1;width:100%;display:grid;gap:10px;margin-top:0}
+    .ot-stable-status-row{width:100%;box-sizing:border-box;border:1px solid #eaded9;background:#fffaf8;color:#667085;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.55}
+    .ot-stable-status-row strong{color:#344054}
   `;
   document.head.appendChild(style);
 
@@ -89,8 +95,77 @@
     }
   }
 
-  // 避免加班申請視窗中的即時計算提示被多個功能觀察器反覆重寫，造成文字快速閃爍。
-  // 僅略過「內容完全相同」的重複寫入；當使用者真的變更時間、類型或處理方式時，仍會正常更新。
+  function reviewerCanSeeWageBase(){
+    return !!state.profile&&['organization_manager','admin'].includes(state.profile.role);
+  }
+
+  function currentDailyHours(){
+    const staff=(state.personalHoursStaff||[]).find(s=>String(s.id)===String(state.profile?.id));
+    const h=Number(staff?.agreed_daily_hours ?? state.profile?.agreed_daily_hours);
+    return Number.isFinite(h)&&h>0?h:null;
+  }
+
+  function currentWageRate(){
+    if(!reviewerCanSeeWageBase())return null;
+    const date=document.getElementById('otWorkDate')?.value||isoDate(new Date());
+    const staffId=String(state.profile?.id||'');
+    const rows=[...(state.personalHoursRates||[]),...(state.payrollRateRows||[])]
+      .filter(r=>String(r.staff_id)===staffId&&String(r.effective_from||'')<=String(date))
+      .sort((a,b)=>String(b.effective_from||'').localeCompare(String(a.effective_from||''))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    return rows[0]||null;
+  }
+
+  function formatMoney(v){
+    const n=Number(v);
+    if(!Number.isFinite(n)||n<=0)return null;
+    return `NT$ ${n.toLocaleString('zh-TW',{maximumFractionDigits:0})}`;
+  }
+
+  function stableStatusTexts(){
+    const h=currentDailyHours();
+    const hoursText=h
+      ? `約定每日工時：<strong>${escapeHTML(String(h))} 小時</strong>`
+      : '約定每日工時：<strong>尚未設定</strong>';
+
+    let wageText='薪資計算基數：<strong>由機構負責人於薪資作業中管理</strong>';
+    if(reviewerCanSeeWageBase()){
+      const rate=currentWageRate();
+      const amount=formatMoney(rate?.monthly_wage_base);
+      wageText=amount
+        ? `薪資計算基數：<strong>${escapeHTML(amount)}</strong>${rate?.effective_from?`（${escapeHTML(String(rate.effective_from))} 起生效）`:''}`
+        : '薪資計算基數：<strong>尚未設定有效薪資基數</strong>';
+    }
+    return {hoursText,wageText};
+  }
+
+  function ensureStableStatusRows(){
+    const modal=document.getElementById('otWorkDate')?.closest('.modal');
+    if(!modal)return;
+    const type=document.getElementById('otType')?.value;
+    if(type==='holiday_visit_comp'){
+      modal.querySelector('#otStableStatusStack')?.remove();
+      return;
+    }
+
+    const anchor=document.getElementById('otMinuteCalc')?.closest('.field');
+    if(!anchor)return;
+    let stack=modal.querySelector('#otStableStatusStack');
+    if(!stack){
+      stack=document.createElement('div');
+      stack.id='otStableStatusStack';
+      stack.className='ot-stable-status-stack';
+      stack.innerHTML='<div id="otDailyHoursStable" class="ot-stable-status-row"></div><div id="otWageBaseStable" class="ot-stable-status-row"></div>';
+      anchor.insertAdjacentElement('afterend',stack);
+    }
+
+    const {hoursText,wageText}=stableStatusTexts();
+    const hoursRow=stack.querySelector('#otDailyHoursStable');
+    const wageRow=stack.querySelector('#otWageBaseStable');
+    if(hoursRow&&hoursRow.innerHTML!==hoursText)hoursRow.innerHTML=hoursText;
+    if(wageRow&&wageRow.innerHTML!==wageText)wageRow.innerHTML=wageText;
+  }
+
+  // 舊提示元件即使仍被其他補丁更新，也已隱藏；以下只避免無意義的相同內容重寫。
   const innerHTMLDescriptor=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
   const textContentDescriptor=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
 
@@ -123,6 +198,7 @@
   function enhance(){
     if(state.page!=='overtime')return;
     stabilizePreviewNodes();
+    ensureStableStatusRows();
     toggleMonthControl();
     applyTableMonthFilter();
   }
@@ -143,10 +219,10 @@
   observer.observe(document.body,{childList:true,subtree:true});
 
   document.addEventListener('click',e=>{
-    if(e.target.closest?.('[data-ot-view],#otReload'))scheduleEnhance();
+    if(e.target.closest?.('[data-ot-view],#otReload,#otAddBtn'))scheduleEnhance();
   });
   document.addEventListener('change',e=>{
-    if(e.target?.id==='otMonth')scheduleEnhance();
+    if(['otMonth','otWorkDate','otType','otStartHour','otStartMinute','otEndHour','otEndMinute','otCompensation'].includes(e.target?.id))scheduleEnhance();
   });
 
   stabilizePreviewNodes();
