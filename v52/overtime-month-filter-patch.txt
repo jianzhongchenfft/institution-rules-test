@@ -1,0 +1,119 @@
+// V5.2 加班／換休：月份篩選完整套用
+(() => {
+  const style=document.createElement('style');
+  style.id='v52-overtime-month-filter-style';
+  style.textContent=`
+    .ot-month-filter-hidden{display:none!important}
+    .ot-month-filter-empty{padding:34px 18px;text-align:center;color:#667085;background:#fff;border:1px solid var(--line);border-radius:14px}
+    .ot-month-filter-empty .icon{font-size:28px;margin-bottom:7px}
+    .ot-month-filter-empty h3{margin:0 0 6px;color:#344054;font-size:15px}
+    .ot-month-filter-empty p{margin:0;font-size:12px;line-height:1.6}
+  `;
+  document.head.appendChild(style);
+
+  function selectedMonth(){
+    return /^\d{4}-\d{2}$/.test(String(state.overtimeMonth||''))
+      ? String(state.overtimeMonth)
+      : isoDate(new Date()).slice(0,7);
+  }
+
+  function isInSelectedMonth(date){
+    return String(date||'').slice(0,7)===selectedMonth();
+  }
+
+  function ownOvertimeRows(){
+    return (state.overtimeRows||[]).filter(r=>r.applicant_staff_id===state.profile?.id);
+  }
+
+  function ownLeaveRows(){
+    return (state.compLeaveRows||[]).filter(r=>r.applicant_staff_id===state.profile?.id);
+  }
+
+  function toggleMonthControl(){
+    const view=state.overtimeView;
+    const show=['mine','usage','payroll'].includes(view);
+    const input=document.getElementById('otMonth');
+    const label=document.querySelector('label[for="otMonth"]');
+    input?.classList.toggle('ot-month-filter-hidden',!show);
+    label?.classList.toggle('ot-month-filter-hidden',!show);
+  }
+
+  function clearEmptyNotice(){
+    document.getElementById('otMonthFilterEmpty')?.remove();
+  }
+
+  function showEmptyNotice(tableShell,view){
+    clearEmptyNotice();
+    if(!tableShell)return;
+    tableShell.classList.add('ot-month-filter-hidden');
+    const month=selectedMonth();
+    const [year,mon]=month.split('-').map(Number);
+    const label=`民國 ${year-1911} 年 ${mon} 月`;
+    const box=document.createElement('div');
+    box.id='otMonthFilterEmpty';
+    box.className='ot-month-filter-empty';
+    box.innerHTML=`<div class="icon">✓</div><h3>${label}目前沒有資料</h3><p>${view==='usage'?'本月份沒有換休使用紀錄。':'本月份沒有加班／換休申請紀錄。'}</p>`;
+    tableShell.insertAdjacentElement('afterend',box);
+  }
+
+  function applyTableMonthFilter(){
+    if(state.page!=='overtime')return;
+    const view=state.overtimeView;
+    if(!['mine','usage'].includes(view)){
+      clearEmptyNotice();
+      document.querySelector('#otMain .ot-table-shell')?.classList.remove('ot-month-filter-hidden');
+      return;
+    }
+
+    const items=view==='mine'?ownOvertimeRows():ownLeaveRows();
+    const dateKey=view==='mine'?'work_date':'leave_date';
+    const tableShell=document.querySelector('#otMain .ot-table-shell');
+    const domRows=[...document.querySelectorAll('#otMain .ot-table tbody tr')];
+    if(!tableShell||!domRows.length){
+      clearEmptyNotice();
+      return;
+    }
+
+    // 原表格列序與 state 陣列一致；只做顯示層篩選，不改動原資料與既有操作事件。
+    if(domRows.length===items.length){
+      let visible=0;
+      domRows.forEach((tr,index)=>{
+        const match=isInSelectedMonth(items[index]?.[dateKey]);
+        tr.classList.toggle('ot-month-filter-hidden',!match);
+        if(match)visible++;
+      });
+      if(visible===0)showEmptyNotice(tableShell,view);
+      else{
+        tableShell.classList.remove('ot-month-filter-hidden');
+        clearEmptyNotice();
+      }
+    }
+  }
+
+  function enhance(){
+    if(state.page!=='overtime')return;
+    toggleMonthControl();
+    applyTableMonthFilter();
+  }
+
+  let queued=false;
+  function scheduleEnhance(){
+    if(queued)return;
+    queued=true;
+    setTimeout(()=>{queued=false;enhance();},30);
+  }
+
+  const observer=new MutationObserver(mutations=>{
+    if(mutations.some(m=>m.addedNodes&&m.addedNodes.length))scheduleEnhance();
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-ot-view],#otReload'))scheduleEnhance();
+  });
+  document.addEventListener('change',e=>{
+    if(e.target?.id==='otMonth')scheduleEnhance();
+  });
+
+  scheduleEnhance();
+})();
