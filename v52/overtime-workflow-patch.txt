@@ -115,8 +115,7 @@
       'overtime',
       'holiday_overtime',
       'rest_day_overtime',
-      'national_holiday_overtime',
-      'regular_day_off_overtime'
+      'national_holiday_overtime'
     ]);
     const timed=rows.filter(r=>timedTypes.has(r.request_type));
 

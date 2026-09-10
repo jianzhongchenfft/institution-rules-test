@@ -26,7 +26,7 @@
     payrollAmountCorrections:state.payrollAmountCorrections||[]
   });
 
-  const timedTypes=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+  const timedTypes=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime']);
   const newTimedTypes=new Set(['rest_day_overtime','national_holiday_overtime']);
 
   function prCanReview(){return !!state.profile&&['organization_manager','admin'].includes(state.profile.role);}
@@ -37,8 +37,7 @@
       holiday_overtime:'假日加班（舊分類）',
       rest_day_overtime:'休息日加班',
       national_holiday_overtime:'國定假日出勤',
-      regular_day_off_overtime:'例假日延續（前一日跨午夜）',
-      holiday_visit_comp:'假日家訪換休'
+            holiday_visit_comp:'假日家訪換休'
     })[type]||type||'—';
   }
   function prRole(role){return roleLabels?.[role]||role||'—';}
@@ -116,13 +115,6 @@
       const a=prRangeMinutes(offset,m,normalMinutes,normalMinutes+120),b=prRangeMinutes(offset,m,normalMinutes+120,normalMinutes+240);
       amount+=h*(a/60)*(4/3)+h*(b/60)*(5/3);
       formula=`${includeDayBase?monthly.toFixed(2)+'÷30為當日一次日工資；':'當日日工資已於同日其他領加班費紀錄認列；'}同日依實際時間順序累計，本筆位於當日第${offset+1}–${dayEnd}分鐘；約定每日工時${hours}小時，超過後前2小時×4/3、再2小時×5/3`;
-    }else if(type==='regular_day_off_overtime'){
-      const normalMinutes=Math.round(hours*60);
-      if(dayEnd>normalMinutes+240)return {ok:false,code:'limit',text:'例假日當日累計出勤超過約定每日工時加4小時，請重新確認'};
-      amount=includeDayBase?monthly/30:0;
-      const extra=prRangeMinutes(offset,m,normalMinutes,normalMinutes+240);
-      amount+=h*(extra/60)*2;
-      formula=`${includeDayBase?monthly.toFixed(2)+'÷30為當日一次日工資；':'當日日工資已於同日其他領加班費紀錄認列；'}同日依實際時間順序累計，本筆位於當日第${offset+1}–${dayEnd}分鐘；約定每日工時${hours}小時，超過部分×2`;
     }
     return {ok:true,amount,hourly:h,monthly,hours,formula,dayOffset:offset,dayEnd};
   }
@@ -139,7 +131,7 @@
     let offset=0,dayBasePaid=false;
     earlier.forEach(r=>{
       offset+=Number(r.overtime_minutes)||prMinutes(r.start_time,r.end_time);
-      if(r.compensation_method==='overtime_pay'&&['national_holiday_overtime','regular_day_off_overtime'].includes(r.request_type))dayBasePaid=true;
+      if(r.compensation_method==='overtime_pay'&&['national_holiday_overtime'].includes(r.request_type))dayBasePaid=true;
     });
     return {offset,includeDayBase:!dayBasePaid};
   }
@@ -334,7 +326,7 @@
           startTime:String(r.start_time||'').slice(0,5),endTime:String(r.end_time||'').slice(0,5),
           minutes,reason:r.reason||'',staffId,row:r,rate,calc:c,dayOffset:rowOffset
         });
-        if(c.ok&&includeDayBase&&['national_holiday_overtime','regular_day_off_overtime'].includes(r.request_type))dayBasePaid=true;
+        if(c.ok&&includeDayBase&&['national_holiday_overtime'].includes(r.request_type))dayBasePaid=true;
       }
       dayOffset+=minutes;
     });
@@ -402,7 +394,7 @@
   }
 
   function prNormalizeLabels(){
-    const map={rest_day_overtime:'休息日加班',national_holiday_overtime:'國定假日出勤',regular_day_off_overtime:'例假日延續（前一日跨午夜）',holiday_overtime:'假日加班（舊分類）'};
+    const map={rest_day_overtime:'休息日加班',national_holiday_overtime:'國定假日出勤',holiday_overtime:'假日加班（舊分類）'};
     document.querySelectorAll('#content .ot-type,#content td,#modalRoot td').forEach(el=>{
       const t=el.textContent.trim();if(map[t]&&el.children.length===0)el.textContent=map[t];
     });

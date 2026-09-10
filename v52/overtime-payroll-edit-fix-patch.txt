@@ -1,6 +1,6 @@
 // V5.2 新假別編輯補強＋新申請預設換休
 (() => {
-  const newTypes=new Set(['rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+  const newTypes=new Set(['rest_day_overtime','national_holiday_overtime']);
 
   function restore(){
     const sel=document.getElementById('otType');

@@ -173,7 +173,7 @@
   function updateFormPreview(){
     const modal=document.getElementById('otWorkDate')?.closest('.modal');if(!modal)return;
     const type=document.getElementById('otType')?.value,date=document.getElementById('otWorkDate')?.value;
-    if(!type||type==='holiday_visit_comp'||type==='regular_day_off_overtime')return;
+    if(!type||type==='holiday_visit_comp')return;
     const hours=currentStaffHours();
     let hint=document.getElementById('phApplicantHoursHint');
     const anchor=document.getElementById('otMinuteCalc')?.closest('.field');

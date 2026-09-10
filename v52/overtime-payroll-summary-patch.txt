@@ -1,6 +1,6 @@
 // V5.2 薪資計算補強：新假別統計＋月結金額快照顯示
 (() => {
-  const timed=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+  const timed=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime']);
   const dur=n=>{n=Math.max(0,Number(n)||0);const h=Math.floor(n/60),m=n%60;return h&&m?`${h}小時${m}分`:h?`${h}小時`:`${m}分鐘`;};
   const money=n=>`NT$ ${(Number(n)||0).toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const typeLabel=t=>({overtime:'平日加班',rest_day_overtime:'休息日加班',national_holiday_overtime:'國定假日出勤',holiday_visit_comp:'假日家訪換休'})[t]||t||'—';
