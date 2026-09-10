@@ -108,9 +108,11 @@
     if(state.payrollRatesLoaded&&!force){prEnhance();return;}
     state.payrollRatesLoading=true;
     try{
-      const ratesPromise=db.from('staff_payroll_rates')
-        .select('id,staff_id,effective_from,monthly_wage_base,note,created_by,created_by_name,created_at')
-        .order('effective_from',{ascending:false}).order('created_at',{ascending:false});
+      const ratesPromise=prCanReview()
+        ? db.from('staff_payroll_rates')
+            .select('id,staff_id,effective_from,monthly_wage_base,note,created_by,created_by_name,created_at')
+            .order('effective_from',{ascending:false}).order('created_at',{ascending:false})
+        : Promise.resolve({data:[],error:null});
       const staffPromise=prCanReview()
         ? db.from('staff_users').select('id,display_name,role,is_active').eq('is_active',true).order('display_name')
         : Promise.resolve({data:[{id:state.profile.id,display_name:state.profile.display_name,role:state.profile.role,is_active:true}],error:null});
@@ -230,6 +232,12 @@
     let box=modal.querySelector('#prAmountPreview');
     if(!box){box=document.createElement('div');box.id='prAmountPreview';box.className='pr-preview';document.getElementById('otMinuteCalc')?.closest('.field')?.insertAdjacentElement('afterend',box);}
     const comp=document.getElementById('otCompensation')?.value;
+    if(!prCanReview()){
+      box.textContent=comp==='comp_leave'
+        ? '本次選擇換休；核准後將計入你的換休餘額，可於「我的換休」查看。'
+        : '本次選擇領加班費；實際金額由機構負責人於薪資作業中計算。';
+      return;
+    }
     if(comp==='comp_leave'){box.textContent='本次選擇換休，因此不列入直接加班費；換休到期與未休結清另依換休規則處理。';return;}
     const minutes=prMinutes(prSelected('otStart'),prSelected('otEnd'));
     const rate=prRateFor(state.profile?.id,date);
@@ -353,6 +361,7 @@
   }
 
   function prAppendPayrollDetail(staffId){
+    if(!prCanReview())return;
     const modal=document.querySelector('#modalRoot .modal');if(!modal||modal.querySelector('[data-pr-detail]'))return;
     const body=modal.querySelector('.modal-body');if(!body)return;
     const calc=prStaffCalc(staffId),corr=prCorrectionAmount(staffId);
@@ -370,6 +379,7 @@
   }
 
   function prEnhanceCorrectionModal(){
+    if(!prCanReview())return;
     const type=document.getElementById('pcType');if(!type||type.dataset.prAmountMeta==='1')return;
     type.dataset.prAmountMeta='1';
     const grid=type.closest('.form-grid');if(!grid)return;
@@ -412,7 +422,7 @@
 
   document.addEventListener('click',e=>{
     const b=e.target.closest?.('button');if(!b)return;
-    if(b.dataset.payrollDetail){const id=b.dataset.payrollDetail;setTimeout(()=>prAppendPayrollDetail(id),0);}
+    if(b.dataset.payrollDetail&&prCanReview()){const id=b.dataset.payrollDetail;setTimeout(()=>prAppendPayrollDetail(id),0);}
     const modal=b.closest('.modal');if(!modal)return;
     const submit=b.id==='modalConfirm'||b.textContent.trim()==='儲存草稿';
     if(!submit)return;
@@ -425,13 +435,18 @@
         e.preventDefault();e.stopImmediatePropagation();prSaveNewType(status);return;
       }
     }
-    if(modal.querySelector('#pcType')&&document.getElementById('pcType')?.value==='overtime_pay'){
+    if(prCanReview()&&modal.querySelector('#pcType')&&document.getElementById('pcType')?.value==='overtime_pay'){
       e.preventDefault();e.stopImmediatePropagation();prSubmitCorrectionAmount();
     }
   },true);
 
   function prEnhance(){
     if(state.page!=='overtime')return;
+    if(!prCanReview()&&['review','payroll'].includes(state.overtimeView)){
+      state.overtimeView='mine';
+      renderOvertimePage();
+      return;
+    }
     prEnsureSettingsButton();prEnhanceTypeSelect();prEnhancePayroll();prEnhanceCorrectionModal();prNormalizeLabels();
   }
 
