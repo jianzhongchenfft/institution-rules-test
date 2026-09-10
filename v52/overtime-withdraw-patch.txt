@@ -153,9 +153,7 @@
   normalizeButtons();
 })();
 
-// 統一換休餘額顯示：以 comp_leave_credits 台帳為唯一真實來源。
-// 目前剩餘換休 = 指定日期以前已取得、且當日尚未到期的台帳剩餘 - 待審核使用。
-// 已核准但取得日在未來的換休，不會提前列入可用餘額。
+// 顯示層只負責統一名稱與卡片數量；餘額來源與核心模組相同，皆讀取 comp_leave_credits 台帳。
 (() => {
   const style=document.createElement('style');
   style.id='v52-overtime-balance-inline-style';
@@ -175,11 +173,10 @@
   }
 
   function canonicalRemaining(asOfDate){
-    if(state.compLeaveExpiryLoaded!==true)return null;
+    if(!Array.isArray(state.compLeaveCredits))return null;
     const staffId=String(state.profile?.id||'');
-    const asOf=/^\d{4}-\d{2}-\d{2}$/.test(String(asOfDate||''))
-      ? String(asOfDate)
-      : isoDate(new Date());
+    const raw=String(asOfDate||'');
+    const asOf=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw:isoDate(new Date());
 
     const ledgerRemaining=(state.compLeaveCredits||[])
       .filter(c=>
@@ -214,7 +211,7 @@
         const foot=remainingCard.querySelector('.stat-foot');
         const next=durationLabel(remaining);
         if(value&&value.textContent!==next)value.textContent=next;
-        if(foot&&foot.textContent!=='依換休台帳，已扣除已使用與待審核')foot.textContent='依換休台帳，已扣除已使用與待審核';
+        if(foot&&foot.textContent!=='依換休台帳，已扣除待審核')foot.textContent='依換休台帳，已扣除待審核';
       }
 
       if(requestableCard)requestableCard.remove();
@@ -225,19 +222,25 @@
   }
 
   function fixCompLeaveModal(){
-    const modal=document.getElementById('clDate')?.closest('.modal');
+    const dateInput=document.getElementById('clDate');
+    const modal=dateInput?.closest('.modal');
     if(!modal)return;
-    const leaveDate=document.getElementById('clDate')?.value||isoDate(new Date());
-    const remaining=canonicalRemaining(leaveDate);
+    const remaining=canonicalRemaining(dateInput.value||isoDate(new Date()));
     if(remaining===null)return;
+
+    const directInput=document.getElementById('clBalanceValue');
+    if(directInput)directInput.value=durationLabel(remaining);
+
     modal.querySelectorAll('.field').forEach(field=>{
       const label=field.querySelector('label');
-      if(label?.textContent?.trim()==='目前可再申請'){
-        label.textContent='目前剩餘換休';
+      const text=label?.textContent?.trim();
+      if(text==='目前可再申請'||text==='目前剩餘換休'){
+        if(label)label.textContent='目前剩餘換休';
         const input=field.querySelector('input');
         if(input)input.value=durationLabel(remaining);
       }
     });
+
     const help=document.getElementById('clDurationHelp');
     if(help&&help.textContent.includes('目前可再申請')){
       help.textContent=help.textContent.replace('目前可再申請','目前剩餘換休');
