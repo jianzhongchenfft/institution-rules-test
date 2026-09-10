@@ -72,6 +72,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimePayrollCalcRes.ok) throw new Error(`v52/overtime-payroll-calc-patch.txt 載入失敗（${overtimePayrollCalcRes.status}）`);
       eval(await overtimePayrollCalcRes.text());
 
+      const overtimePayrollSummaryRes = await fetch('v52/overtime-payroll-summary-patch.txt',{cache:'no-store'});
+      if(!overtimePayrollSummaryRes.ok) throw new Error(`v52/overtime-payroll-summary-patch.txt 載入失敗（${overtimePayrollSummaryRes.status}）`);
+      eval(await overtimePayrollSummaryRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
