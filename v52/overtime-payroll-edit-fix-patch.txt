@@ -1,6 +1,7 @@
-// V5.2 新假別編輯補強：還原既有草稿／退回資料的類型選擇
+// V5.2 新假別編輯補強＋新申請預設換休
 (() => {
   const newTypes=new Set(['rest_day_overtime','national_holiday_overtime','regular_day_off_overtime']);
+
   function restore(){
     const sel=document.getElementById('otType');
     const id=state.workflowEditingOvertimeId;
@@ -12,6 +13,31 @@
       sel.dispatchEvent(new Event('change',{bubbles:true}));
     }
   }
-  let q=false;const obs=new MutationObserver(ms=>{if(q||!ms.some(m=>m.addedNodes?.length))return;q=true;setTimeout(()=>{q=false;restore();},40);});obs.observe(document.body,{childList:true,subtree:true});
-  setTimeout(restore,250);
+
+  function defaultCompLeave(){
+    const comp=document.getElementById('otCompensation');
+    const modal=comp?.closest('.modal');
+    if(!comp||!modal||!modal.querySelector('#otWorkDate'))return;
+    if(state.workflowEditingOvertimeId)return;
+    if(comp.dataset.defaultCompLeaveApplied==='1')return;
+    if(![...comp.options].some(o=>o.value==='comp_leave'))return;
+
+    comp.value='comp_leave';
+    comp.dataset.defaultCompLeaveApplied='1';
+    comp.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+
+  function apply(){
+    restore();
+    defaultCompLeave();
+  }
+
+  let q=false;
+  const obs=new MutationObserver(ms=>{
+    if(q||!ms.some(m=>m.addedNodes?.length))return;
+    q=true;
+    setTimeout(()=>{q=false;apply();},80);
+  });
+  obs.observe(document.body,{childList:true,subtree:true});
+  setTimeout(apply,250);
 })();
