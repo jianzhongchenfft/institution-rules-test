@@ -38,7 +38,6 @@
       state.overtimeLoaded=true;
       state.compLeaveLoaded=true;
 
-      // 透過目前作用中的頁籤重新渲染既有加班頁，不顯示「重新整理完成」提示。
       const activeTab=document.querySelector('#otMain [data-ot-view].active');
       if(activeTab) activeTab.click();
     }catch(err){
@@ -51,7 +50,6 @@
     clearTimeout(balanceRefreshTimer1);
     clearTimeout(balanceRefreshTimer2);
 
-    // 第一次於頁面建立後立即抓取；第二次作為初次登入／權限狀態尚未完全穩定時的補抓。
     balanceRefreshTimer1=setTimeout(()=>refreshOvertimeDataSilently(token),180);
     balanceRefreshTimer2=setTimeout(()=>{
       if(token!==balanceRefreshSeq || state.page!=='overtime') return;
@@ -73,7 +71,6 @@
     return result;
   };
 
-  // 若本補丁載入時已位於加班／換休頁，也主動取得一次最新資料。
   if(state.page==='overtime') scheduleAutomaticBalanceRefresh();
 
   function ownRow(kind,id){
@@ -134,7 +131,6 @@
     }
   }
 
-  // 攔截舊版撤回事件，改用直接刪除流程。
   document.addEventListener('click',e=>{
     const btn=e.target.closest?.('[data-wf-withdraw]');
     if(!btn)return;
@@ -156,3 +152,8 @@
 
   normalizeButtons();
 })();
+
+fetch('v52/overtime-balance-clarity-patch.txt',{cache:'no-store'})
+  .then(res=>{if(!res.ok)throw new Error(`v52/overtime-balance-clarity-patch.txt 載入失敗（${res.status}）`);return res.text();})
+  .then(code=>eval(code))
+  .catch(err=>console.error('換休餘額顯示模組載入失敗',err));
