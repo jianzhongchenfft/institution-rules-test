@@ -234,7 +234,7 @@
     try{
       const [overtimeResult,leaveResult,settlementResult,creditResult] = await Promise.all([
         db.from('overtime_requests')
-          .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at')
+          .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at,split_group_id,split_part,split_day_type_confirmed')
           .order('work_date',{ascending:false})
           .order('created_at',{ascending:false}),
         db.from('comp_leave_usages')

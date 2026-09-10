@@ -44,6 +44,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimeRes.ok) throw new Error(`v52/overtime-patch.txt 載入失敗（${overtimeRes.status}）`);
       eval(await overtimeRes.text());
 
+      const midnightSplitRes = await fetch('v52/overtime-midnight-split-patch.txt',{cache:'no-store'});
+      if(!midnightSplitRes.ok) throw new Error(`v52/overtime-midnight-split-patch.txt 載入失敗（${midnightSplitRes.status}）`);
+      eval(await midnightSplitRes.text());
+
       const payrollGuardRes = await fetch('v52/payroll-period-guard-patch.txt',{cache:'no-store'});
       if(!payrollGuardRes.ok) throw new Error(`v52/payroll-period-guard-patch.txt 載入失敗（${payrollGuardRes.status}）`);
       eval(await payrollGuardRes.text());
