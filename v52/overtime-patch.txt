@@ -1,4 +1,4 @@
-// V5.2 加班／換休管理：申請、審核與規則
+// V5.2 加班／換休管理：申請與審核
 (() => {
   const overtimeStyle = document.createElement('style');
   overtimeStyle.id = 'v52-overtime-style';
@@ -293,39 +293,6 @@
     const ownPending=overtimeOwnRows().filter(r=>r.status==='pending').length+compLeaveOwnRows().filter(r=>r.status==='pending').length;
     const balance=compLeaveBalance(state.profile?.id,isoDate(new Date()));
     return {overtimeMinutes,compMinutes,pending:pendingOvertime+pendingLeave,pendingOvertime,pendingLeave,ownPending,balance};
-  }
-
-  function renderOvertimeRules(){
-    return `
-      <section class="ot-rule-card">
-        <h3>加班申請原則</h3>
-        <p>加班以實際執行機構交辦工作為認列基礎，並依機構規定提出申請及完成審核。</p>
-        <ol class="ot-rule-list">
-          <li>如有加班需要，應向「機構負責人」提出申請，並由機構負責人審核。</li>
-          <li>申請時應填寫日期、開始時間、結束時間及加班事由；開始與結束時間採24小時制，並以10分鐘為間隔（分鐘僅00、10、20、30、40、50），系統依時間自動計算加班分鐘數。</li>
-          <li>加班不得以單一申請跨越午夜；如實際工作跨日，請自行分成兩筆申請。第一天結束時間填00:00（視同當日24:00），第二天以隔日00:00為開始時間另行申請。</li>
-          <li>申請類型分為「平日加班」、「假日加班」及「假日家訪換休」。</li>
-          <li>平日加班及假日加班應選擇「領加班費」或「換休」；選擇換休時，應依勞工意願並經機構同意後辦理。</li>
-          <li>提早到班或延後離開，不因打卡時間本身當然認列為加班，仍以該時段是否實際執行機構交辦工作為準。</li>
-          <li>例如機構正常上班時間為上午9時，如因9時需直接至案家家訪而於8時40分先到機構，應視8時40分至9時之間是否有實際執行機構交辦工作，再判斷是否申請加班。</li>
-          <li>加班申請經核准後，始納入機構加班紀錄；如資料不足或不符規定，機構負責人得退回並註明原因。</li>
-        </ol>
-      </section>
-      <section class="ot-rule-card">
-        <h3>假日家訪換休</h3>
-        <p>因個案情形確有需要於假日進行家訪時，依當日完成之家訪案數計算換休：</p>
-        <div class="ot-rule-highlight">1個個案換休2小時；2個個案換休4小時；以此類推，由系統依「家訪案數 × 2小時」自動計算。</div>
-      </section>
-      <section class="ot-rule-card">
-        <h3>換休使用</h3>
-        <ol class="ot-rule-list">
-          <li>只有已核准且處理方式為「換休」的加班，以及已核准的假日家訪換休，才會列入可用換休時數。</li>
-          <li>使用換休應另提出申請，填寫換休日期、開始時間、結束時間及換休事由；開始與結束時間以30分鐘為間隔（分鐘僅00或30），系統依起訖時間自動計算使用換休時數。</li>
-          <li>換休使用申請送出後會先列為待審核，該時數暫時保留；機構負責人核准後才正式列入已使用時數。</li>
-          <li>已退回的換休使用申請不扣除換休時數，申請人可修改後重新送審。</li>
-          <li>申請使用的換休時數不得超過所選換休日期當日的可用換休餘額。</li>
-        </ol>
-      </section>`;
   }
 
   function overtimeRowDetail(r){
@@ -651,8 +618,8 @@
     const canReview=overtimeCanReview();
     const reviewCount=summary.pending;
     const validViews=canSubmit
-      ? (canReview?['mine','balance','usage','review','payroll','rules']:['mine','balance','usage','rules'])
-      : (canReview?['review','payroll','rules']:['rules']);
+      ? (canReview?['mine','balance','usage','review','payroll']:['mine','balance','usage'])
+      : (canReview?['review','payroll']:['mine']);
     if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview&&!canSubmit?'review':'mine';
 
     $('content').innerHTML=`
@@ -679,7 +646,6 @@
           <button class="ot-tab ${state.overtimeView==='balance'?'active':''}" data-ot-view="balance">我的換休</button>
           <button class="ot-tab ${state.overtimeView==='usage'?'active':''}" data-ot-view="usage">換休使用紀錄</button>`:''}
           ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${reviewCount}</button><button class="ot-tab ${state.overtimeView==='payroll'?'active':''}" data-ot-view="payroll">薪資結算</button>`:''}
-          <button class="ot-tab ${state.overtimeView==='rules'?'active':''}" data-ot-view="rules">加班規則</button>
         </div>
         <span class="spacer"></span>
         <label class="schedule-filter-label" for="otMonth">月份</label>
@@ -687,8 +653,7 @@
         <button id="otReload" class="btn">↻ 重新整理</button>
       </div>
       <div id="otMain">
-        ${state.overtimeView==='rules' ? renderOvertimeRules()
-          : state.overtimeView==='review' ? renderOvertimeReview()
+        ${state.overtimeView==='review' ? renderOvertimeReview()
           : state.overtimeView==='payroll' ? renderPayrollReport()
           : state.overtimeView==='balance' ? renderCompLeaveOverview()
           : state.overtimeView==='usage' ? compLeaveUsageRenderTable(ownLeave)
