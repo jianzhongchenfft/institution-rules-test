@@ -20,35 +20,20 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('v52/overtime-patch.txt')
           s=p.read_text(encoding='utf-8')
           s=s.replace('// V5.2 加班／換休管理：申請、審核與規則','// V5.2 加班／換休管理：申請與審核',1)
-          start=s.find('  function renderOvertimeRules(){')
-          end=s.find('  function overtimeRowDetail', start)
-          if start<0 or end<0:
-              raise SystemExit('renderOvertimeRules block not found')
-          s=s[:start]+s[end:]
-          old="""    const validViews=canSubmit
-      ? (canReview?['mine','balance','usage','review','payroll','rules']:['mine','balance','usage','rules'])
-      : (canReview?['review','payroll','rules']:['rules']);
-    if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview&&!canSubmit?'review':'mine';"""
-          new="""    const validViews=canSubmit
-      ? (canReview?['mine','balance','usage','review','payroll']:['mine','balance','usage'])
-      : (canReview?['review','payroll']:['mine']);
-    if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview&&!canSubmit?'review':'mine';"""
-          if old not in s:
-              raise SystemExit('validViews block not found')
-          s=s.replace(old,new,1)
-          old_btn='          <button class="ot-tab ${state.overtimeView===\'rules\'?\'active\':\'\'}" data-ot-view="rules">加班規則</button>\n'
-          if old_btn not in s:
-              raise SystemExit('rules button not found')
-          s=s.replace(old_btn,'',1)
-          old_render="""        ${state.overtimeView==='rules' ? renderOvertimeRules()
-          : state.overtimeView==='review' ? renderOvertimeReview()"""
-          new_render="""        ${state.overtimeView==='review' ? renderOvertimeReview()"""
-          if old_render not in s:
-              raise SystemExit('rules render branch not found')
-          s=s.replace(old_render,new_render,1)
+          s,n=re.subn(r'  function renderOvertimeRules\(\)\{.*?^  function overtimeRowDetail', '  function overtimeRowDetail', s, count=1, flags=re.S|re.M)
+          if n!=1: raise SystemExit('renderOvertimeRules block not found')
+          s=s.replace("['mine','balance','usage','review','payroll','rules']","['mine','balance','usage','review','payroll']",1)
+          s=s.replace("['mine','balance','usage','rules']","['mine','balance','usage']",1)
+          s=s.replace("['review','payroll','rules']","['review','payroll']",1)
+          s=s.replace("['rules']","['mine']",1)
+          s,n=re.subn(r'\n\s*<button class="ot-tab[^\n]*data-ot-view="rules"[^\n]*</button>', '', s, count=1)
+          if n!=1: raise SystemExit('rules button not found')
+          s,n=re.subn(r"\$\{state\.overtimeView==='rules' \? renderOvertimeRules\(\)\s*: state\.overtimeView==='review' \? renderOvertimeReview\(\)", "${state.overtimeView==='review' ? renderOvertimeReview()", s, count=1)
+          if n!=1: raise SystemExit('rules render branch not found')
           p.write_text(s,encoding='utf-8')
           PY
       - name: Verify
