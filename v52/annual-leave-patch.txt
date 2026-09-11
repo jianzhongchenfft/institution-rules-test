@@ -137,9 +137,11 @@
     const head=$('content')?.querySelector('.page-head');
     if(!head) return;
     const h1=head.querySelector('h1');
-    if(h1) h1.textContent='🗓 出勤／休假管理';
-    if(!$('attendanceSectionTabs')) head.insertAdjacentHTML('afterend',attendanceTabs('overtime'));
-    wireAttendanceTabs();
+    if(h1 && h1.textContent!=='🗓 出勤／休假管理') h1.textContent='🗓 出勤／休假管理';
+    if(!$('attendanceSectionTabs')){
+      head.insertAdjacentHTML('afterend',attendanceTabs('overtime'));
+      wireAttendanceTabs();
+    }
   }
 
   async function loadAnnualLeaveData(){
