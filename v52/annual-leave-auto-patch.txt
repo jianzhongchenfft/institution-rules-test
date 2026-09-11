@@ -75,24 +75,32 @@
   }
 
   function renderOwnReminder(){
-    document.getElementById('alaOwnReminder')?.remove();
     if(state.page!=='overtime'||state.attendanceSection!=='annual')return;
     const summary=document.querySelector('#content .al-summary');
     if(!summary)return;
     const expiring=ownExpiring();
-    if(!expiring.length)return;
+    const existing=document.getElementById('alaOwnReminder');
+    if(!expiring.length){existing?.remove();return;}
     const total=expiring.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
     const nearest=expiring.slice().sort((a,b)=>String(a.period_end).localeCompare(String(b.period_end)))[0];
+    const html=`你目前有 <strong>${escapeHTML(duration(total))}</strong> 特休將於 <strong>${escapeHTML(dateText(nearest.period_end))}</strong> 前到期；到期未休將轉為待結清，不會直接消失。`;
+    if(existing){
+      if(existing.innerHTML!==html)existing.innerHTML=html;
+      return;
+    }
     const box=document.createElement('div');
     box.id='alaOwnReminder';
     box.className='ala-reminder';
-    box.innerHTML=`你目前有 <strong>${escapeHTML(duration(total))}</strong> 特休將於 <strong>${escapeHTML(dateText(nearest.period_end))}</strong> 前到期；到期未休將轉為待結清，不會直接消失。`;
+    box.innerHTML=html;
     summary.insertAdjacentElement('afterend',box);
   }
 
   function renderManagerPanel(){
-    document.getElementById('alaManagerPanel')?.remove();
-    if(!canManage()||state.page!=='overtime'||state.attendanceSection!=='annual'||state.annualLeaveView!=='credits')return;
+    const existing=document.getElementById('alaManagerPanel');
+    if(!canManage()||state.page!=='overtime'||state.attendanceSection!=='annual'||state.annualLeaveView!=='credits'){
+      existing?.remove();
+      return;
+    }
     const main=document.getElementById('alMain');
     if(!main)return;
     const t=today();
@@ -111,10 +119,15 @@
       return `<div class="ala-row"><div><div class="ala-name">${escapeHTML(s.display_name||'—')}</div><div class="ala-sub">${escapeHTML(roleText(s.role))}</div></div><div>到職：${escapeHTML(dateText(s.hire_date))}</div><div>每日 ${s.agreed_daily_hours?escapeHTML(String(Number(s.agreed_daily_hours))):'—'} 小時</div><div>${status}<div style="margin-top:5px">${entitlement}</div></div></div>`;
     }).join('');
 
+    const html=`<h3>特休自動產生狀態</h3><div class="ala-note">週年制。系統每日 00:10（台灣時間）檢查一次；滿半年起依年資自動建立特休批次。額度依該批次生效時的約定每日工時快照換算，特休申請維持 30 分鐘為單位。</div><div class="ala-grid">${rows||'<div class="ala-note">目前沒有可顯示的人員。</div>'}</div>`;
+    if(existing){
+      if(existing.innerHTML!==html)existing.innerHTML=html;
+      return;
+    }
     const panel=document.createElement('section');
     panel.id='alaManagerPanel';
     panel.className='ala-panel';
-    panel.innerHTML=`<h3>特休自動產生狀態</h3><div class="ala-note">週年制。系統每日 00:10（台灣時間）檢查一次；滿半年起依年資自動建立特休批次。額度依該批次生效時的約定每日工時快照換算，特休申請維持 30 分鐘為單位。</div><div class="ala-grid">${rows||'<div class="ala-note">目前沒有可顯示的人員。</div>'}</div>`;
+    panel.innerHTML=html;
     main.insertAdjacentElement('afterend',panel);
   }
 
