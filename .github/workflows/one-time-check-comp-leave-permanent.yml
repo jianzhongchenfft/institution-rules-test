@@ -1,4 +1,5 @@
 name: One-time check permanent holiday comp leave
+# run syntax check after permanent holiday comp leave update
 on:
   push:
     paths:
