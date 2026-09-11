@@ -84,3 +84,15 @@
     openWithdrawModal(kind,id);
   },true);
 })();
+
+// V5.2 測試版：最後載入特休模組，維持加班／換休既有邏輯獨立。
+(async()=>{
+  try{
+    const res=await fetch('v52/annual-leave-patch.txt',{cache:'no-store'});
+    if(!res.ok) throw new Error(`v52/annual-leave-patch.txt 載入失敗（${res.status}）`);
+    eval(await res.text());
+  }catch(err){
+    console.error('特休模組載入失敗',err);
+    if(state.profile) toast('特休模組載入失敗，請重新整理頁面。','error');
+  }
+})();
