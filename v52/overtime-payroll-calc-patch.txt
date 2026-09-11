@@ -349,6 +349,8 @@
 
   function prEnhancePayroll(){
     if(state.page!=='overtime'||state.overtimeView!=='payroll'||!prCanReview()||!state.payrollRatesLoaded)return;
+    // 已月結月份一律由月結快照＋更正紀錄顯示，禁止再用目前資料即時重算。
+    if(prSettlement())return;
     const section=[...document.querySelectorAll('#otMain .ot-rule-card')].find(s=>s.querySelector('h3')?.textContent.trim()==='員工月結摘要');
     const table=section?.querySelector('table');if(!table)return;
     const hr=table.querySelector('thead tr');
@@ -383,7 +385,7 @@
   }
 
   function prAppendPayrollDetail(staffId){
-    if(!prCanReview())return;
+    if(!prCanReview()||prSettlement())return;
     const modal=document.querySelector('#modalRoot .modal');if(!modal||modal.querySelector('[data-pr-detail]'))return;
     const body=modal.querySelector('.modal-body');if(!body)return;
     const calc=prStaffCalc(staffId),corr=prCorrectionAmount(staffId);
