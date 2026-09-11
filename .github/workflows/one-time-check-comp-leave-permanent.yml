@@ -1,0 +1,13 @@
+name: One-time check permanent holiday comp leave
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-check-comp-leave-permanent.yml'
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node --check < v52/comp-leave-expiry-patch.txt
