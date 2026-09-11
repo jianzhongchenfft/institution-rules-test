@@ -36,21 +36,25 @@
     const granted=credits.reduce((sum,c)=>sum+(Number(c.granted_minutes)||0),0);
     const remaining=credits.reduce((sum,c)=>sum+(Number(c.remaining_minutes)||0),0);
     const pendingCount=(state.annualLeaveRows||[]).filter(r=>r.status==='pending').length;
+    const grantedText=duration(granted);
+    const remainingText=duration(remaining);
+    const pendingText=String(pendingCount);
 
     const desired=`
-      <article class="stat-card"><div class="stat-head"><span>特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${duration(granted)}</div></article>
-      <article class="stat-card"><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${duration(remaining)}</div></article>
-      <article class="stat-card"><div class="stat-head"><span>全部待審核</span><span class="stat-icon">⏳</span></div><div class="stat-value">${pendingCount}</div></article>`;
+      <article class="stat-card"><div class="stat-head"><span>特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${grantedText}</div></article>
+      <article class="stat-card"><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${remainingText}</div></article>
+      <article class="stat-card"><div class="stat-head"><span>全部待審核</span><span class="stat-icon">⏳</span></div><div class="stat-value">${pendingText}</div></article>`;
 
     if(summary.dataset.summaryVersion!=='three-cards-v1'){
       summary.innerHTML=desired;
       summary.dataset.summaryVersion='three-cards-v1';
-    }else{
-      const values=summary.querySelectorAll('.stat-value');
-      if(values[0])values[0].textContent=duration(granted);
-      if(values[1])values[1].textContent=duration(remaining);
-      if(values[2])values[2].textContent=String(pendingCount);
+      return;
     }
+
+    const values=summary.querySelectorAll('.stat-value');
+    if(values[0]&&values[0].textContent!==grantedText)values[0].textContent=grantedText;
+    if(values[1]&&values[1].textContent!==remainingText)values[1].textContent=remainingText;
+    if(values[2]&&values[2].textContent!==pendingText)values[2].textContent=pendingText;
   }
 
   const observer=new MutationObserver(refreshAnnualSummary);
