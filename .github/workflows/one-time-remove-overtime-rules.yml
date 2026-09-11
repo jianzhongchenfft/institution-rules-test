@@ -1,0 +1,68 @@
+name: One-time remove overtime rules tab
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-remove-overtime-rules.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove overtime rules view
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('v52/overtime-patch.txt')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('// V5.2 加班／換休管理：申請、審核與規則','// V5.2 加班／換休管理：申請與審核',1)
+          start=s.find('  function renderOvertimeRules(){')
+          end=s.find('  function overtimeRowDetail', start)
+          if start<0 or end<0:
+              raise SystemExit('renderOvertimeRules block not found')
+          s=s[:start]+s[end:]
+          old="""    const validViews=canSubmit
+      ? (canReview?['mine','balance','usage','review','payroll','rules']:['mine','balance','usage','rules'])
+      : (canReview?['review','payroll','rules']:['rules']);
+    if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview&&!canSubmit?'review':'mine';"""
+          new="""    const validViews=canSubmit
+      ? (canReview?['mine','balance','usage','review','payroll']:['mine','balance','usage'])
+      : (canReview?['review','payroll']:['mine']);
+    if(!validViews.includes(state.overtimeView)) state.overtimeView=canReview&&!canSubmit?'review':'mine';"""
+          if old not in s:
+              raise SystemExit('validViews block not found')
+          s=s.replace(old,new,1)
+          old_btn='          <button class="ot-tab ${state.overtimeView===\'rules\'?\'active\':\'\'}" data-ot-view="rules">加班規則</button>\n'
+          if old_btn not in s:
+              raise SystemExit('rules button not found')
+          s=s.replace(old_btn,'',1)
+          old_render="""        ${state.overtimeView==='rules' ? renderOvertimeRules()
+          : state.overtimeView==='review' ? renderOvertimeReview()"""
+          new_render="""        ${state.overtimeView==='review' ? renderOvertimeReview()"""
+          if old_render not in s:
+              raise SystemExit('rules render branch not found')
+          s=s.replace(old_render,new_render,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Verify
+        run: |
+          set -euo pipefail
+          node --check < v52/overtime-patch.txt
+          ! grep -q '加班規則' v52/overtime-patch.txt
+          ! grep -q 'renderOvertimeRules' v52/overtime-patch.txt
+          ! grep -q "overtimeView==='rules'" v52/overtime-patch.txt
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add v52/overtime-patch.txt
+          git commit -m 'Remove overtime rules tab from test'
+          git push origin main
