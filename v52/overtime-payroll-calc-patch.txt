@@ -400,17 +400,7 @@
     });
   }
 
-  function prEnhanceCorrectionModal(){
-    if(!prCanReview())return;
-    const type=document.getElementById('pcType');if(!type||type.dataset.prAmountMeta==='1')return;
-    type.dataset.prAmountMeta='1';
-    const grid=type.closest('.form-grid');if(!grid)return;
-    const box=document.createElement('div');box.id='prCorrectionMeta';box.className='field full hidden';
-    box.innerHTML=`<div class="form-grid"><div class="field"><label>加班日期 *</label><input id="prCorrDate" type="date"></div><div class="field"><label>出勤類型 *</label><select id="prCorrDayType"><option value="overtime">平日加班</option><option value="rest_day_overtime">休息日加班</option><option value="national_holiday_overtime">國定假日出勤</option></select></div></div><div class="help">加班計薪更正必須指定實際加班日期與出勤類型，系統才可依當日薪資基數與約定每日工時重算金額。</div>`;
-    grid.insertBefore(box,grid.lastElementChild);
-    const refresh=()=>box.classList.toggle('hidden',type.value!=='overtime_pay');
-    type.addEventListener('change',refresh);refresh();
-  }
+  function prEnhanceCorrectionModal(){ return; }
 
   async function prSubmitCorrectionAmount(){
     const settlement=prSettlement();if(!settlement){toast('找不到本月份月結資料','error');return false;}
@@ -457,9 +447,7 @@
         e.preventDefault();e.stopImmediatePropagation();prSaveNewType(status);return;
       }
     }
-    if(prCanReview()&&modal.querySelector('#pcType')&&document.getElementById('pcType')?.value==='overtime_pay'){
-      e.preventDefault();e.stopImmediatePropagation();prSubmitCorrectionAmount();
-    }
+
   },true);
 
   function prEnhance(){
