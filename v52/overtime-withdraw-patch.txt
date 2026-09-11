@@ -95,6 +95,10 @@
     const summaryRes=await fetch('v52/annual-leave-summary-cards-patch.txt',{cache:'no-store'});
     if(!summaryRes.ok) throw new Error(`v52/annual-leave-summary-cards-patch.txt 載入失敗（${summaryRes.status}）`);
     eval(await summaryRes.text());
+
+    const autoRes=await fetch('v52/annual-leave-auto-patch.txt',{cache:'no-store'});
+    if(!autoRes.ok) throw new Error(`v52/annual-leave-auto-patch.txt 載入失敗（${autoRes.status}）`);
+    eval(await autoRes.text());
   }catch(err){
     console.error('特休模組載入失敗',err);
     if(state.profile) toast('特休模組載入失敗，請重新整理頁面。','error');
