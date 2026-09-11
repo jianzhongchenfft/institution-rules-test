@@ -1,0 +1,39 @@
+// V5.2 測試版：業務負責人不顯示特休額度控管，只保留個人特休帳本。
+(() => {
+  const isBusinessManager=()=>state.profile?.role==='business_manager';
+
+  function adjust(){
+    if(!isBusinessManager()||state.page!=='overtime'||state.attendanceSection!=='annual')return;
+
+    document.getElementById('alCreditBtn')?.remove();
+    document.getElementById('alaManagerPanel')?.remove();
+
+    const creditTab=document.querySelector('[data-al-view="credits"]');
+    if(creditTab) creditTab.textContent='我的特休帳本';
+
+    const main=document.getElementById('alMain');
+    if(state.annualLeaveView==='credits'&&main){
+      main.querySelectorAll('thead th').forEach(th=>{
+        if(th.textContent.trim()==='員工'){
+          const index=[...th.parentElement.children].indexOf(th);
+          th.remove();
+          main.querySelectorAll('tbody tr').forEach(tr=>tr.children[index]?.remove());
+        }
+      });
+    }
+  }
+
+  let timer=null;
+  const observer=new MutationObserver(()=>{
+    if(!isBusinessManager())return;
+    clearTimeout(timer);
+    timer=setTimeout(adjust,20);
+  });
+  observer.observe(document.getElementById('content'),{childList:true,subtree:true});
+
+  document.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-al-view="credits"],#alReload')) setTimeout(adjust,30);
+  });
+
+  adjust();
+})();
