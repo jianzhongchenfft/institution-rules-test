@@ -1,0 +1,29 @@
+name: One-time fix snapshot render loop
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-fix-snapshot-render-loop.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: python scripts/one_time_fix_snapshot_render_loop.py
+      - name: Syntax check
+        run: |
+          node --check < v52/overtime-payroll-summary-patch.txt
+          git diff --check
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add v52/overtime-payroll-summary-patch.txt
+          git commit -m 'Stop payroll snapshot render loop'
+          git push
