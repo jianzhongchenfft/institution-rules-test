@@ -1,4 +1,4 @@
-// V5.2 換休期限／到期管理：到職週年制、FIFO、到期提醒
+// V5.2 換休期限／到期管理：一般加班週年制到期、假日家訪換休永久有效、到期提醒
 // 換休台帳由 overtime-patch 統一載入；本檔只負責期限設定與明細呈現。
 (() => {
   const style=document.createElement('style');
@@ -11,6 +11,7 @@
     .ce-chip.missing{background:#f2f4f7;color:#667085}
     .ce-chip.used{background:#f8fafc;color:#98a2b3}
     .ce-chip.future{background:#eef4ff;color:#3538cd}
+    .ce-chip.permanent{background:#eef4ff;color:#3538cd}
     .ce-warn{margin-top:7px;border:1px solid #fedf89;background:#fffaeb;color:#93370d;border-radius:8px;padding:7px 9px;font-size:11px;line-height:1.55}
     .ce-hire-grid{display:grid;gap:8px}
     .ce-hire-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(150px,190px);gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0}
@@ -55,6 +56,12 @@
     return (state.compLeaveCredits||[]).filter(c=>String(c.staff_id)===String(staffId));
   }
 
+  function ceIsPermanentHoliday(c){
+    if(!c||c.source_type!=='overtime_request')return false;
+    const source=(state.overtimeRows||[]).find(r=>String(r.id)===String(c.source_id));
+    return source?.request_type==='holiday_visit_comp'||c.source_label==='假日家訪換休';
+  }
+
   function ceDaysUntil(date){
     if(!date)return null;
     const a=new Date(ceToday()+'T00:00:00');
@@ -67,13 +74,13 @@
     const eligible=credits.filter(c=>String(c.earned_date)<=asOf&&(!c.expires_on||String(c.expires_on)>=asOf));
     const remaining=eligible.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
     const expired=credits
-      .filter(c=>c.expires_on&&String(c.expires_on)<asOf&&(Number(c.remaining_minutes)||0)>0)
+      .filter(c=>!ceIsPermanentHoliday(c)&&c.expires_on&&String(c.expires_on)<asOf&&(Number(c.remaining_minutes)||0)>0)
       .reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
     const missing=credits
-      .filter(c=>!c.expires_on&&(Number(c.remaining_minutes)||0)>0)
+      .filter(c=>!ceIsPermanentHoliday(c)&&!c.expires_on&&(Number(c.remaining_minutes)||0)>0)
       .reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
     const soon=credits.filter(c=>{
-      if(!c.expires_on||(Number(c.remaining_minutes)||0)<=0||String(c.earned_date)>asOf)return false;
+      if(ceIsPermanentHoliday(c)||!c.expires_on||(Number(c.remaining_minutes)||0)<=0||String(c.earned_date)>asOf)return false;
       const d=Math.round((new Date(String(c.expires_on)+'T00:00:00')-new Date(asOf+'T00:00:00'))/86400000);
       return d>=0&&d<=30;
     }).reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
@@ -110,6 +117,7 @@
     const rem=Number(c.remaining_minutes)||0;
     if(rem<=0)return {cls:'used',text:'已用完'};
     if(String(c.earned_date||'')>ceToday())return {cls:'future',text:'尚未取得'};
+    if(ceIsPermanentHoliday(c))return {cls:'permanent',text:'無到期限制'};
     if(!c.expires_on)return {cls:'missing',text:'待設定到職日'};
     const d=ceDaysUntil(c.expires_on);
     if(d<0)return {cls:'expired',text:'已到期，待結清'};
@@ -128,20 +136,22 @@
       .slice()
       .sort((a,b)=>String(a.earned_date).localeCompare(String(b.earned_date))||String(a.created_at).localeCompare(String(b.created_at)));
     const b=ceBalance(staffId);
-    const missingHire=!ceStaff(staffId)?.hire_date;
+    const hasOrdinaryCredit=credits.some(c=>!ceIsPermanentHoliday(c)&&(Number(c.remaining_minutes)||0)>0);
+    const missingHire=!ceStaff(staffId)?.hire_date&&hasOrdinaryCredit;
 
     const html=`<section id="ceExpiryPanel" class="ot-rule-card">
       <h3>換休期限與剩餘明細</h3>
-      <p>換休依取得先後順序使用；到期日以員工到職週年制的當期特休年度末日計算。未到取得日的換休會列示，但不計入目前可用餘額。</p>
-      ${missingHire?'<div class="ce-warn">目前尚未設定到職日，因此部分換休無法計算法定最終到期日。請由機構負責人或系統管理員完成設定。</div>':''}
-      ${b.soon>0?`<div class="ce-warn">未來30天內有 <strong>${escapeHTML(ceDuration(b.soon))}</strong> 換休即將到期，建議優先安排。</div>`:''}
-      ${b.expired>0?`<div class="ot-rule-highlight">已有 <strong>${escapeHTML(ceDuration(b.expired))}</strong> 到期未休，不再列入可用換休，請於薪資作業中辦理結清。</div>`:''}
+      <p>一般加班換休依到職週年制計算到期日；假日家訪換休無到期限制。使用換休時，系統會先扣除有期限的一般加班換休，再使用永久有效的假日家訪換休。</p>
+      ${missingHire?'<div class="ce-warn">目前尚未設定到職日，因此一般加班換休無法計算法定最終到期日。請由機構負責人或系統管理員完成設定。</div>':''}
+      ${b.soon>0?`<div class="ce-warn">未來30天內有 <strong>${escapeHTML(ceDuration(b.soon))}</strong> 一般加班換休即將到期，建議優先安排。</div>`:''}
+      ${b.expired>0?`<div class="ot-rule-highlight">已有 <strong>${escapeHTML(ceDuration(b.expired))}</strong> 一般加班換休到期未休，不再列入可用換休，請於薪資作業中辦理結清。</div>`:''}
       <div style="margin-top:12px">${credits.length
         ? `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>取得日期</th><th>來源</th><th>取得時數</th><th>剩餘</th><th>到期日</th><th>狀態</th></tr></thead><tbody>${credits.map(c=>{
             const s=ceStatus(c);
-            return `<tr><td>${ceDate(c.earned_date)}</td><td>${escapeHTML(c.source_label||'換休')}</td><td>${escapeHTML(ceDuration(c.earned_minutes))}</td><td><strong>${escapeHTML(ceDuration(c.remaining_minutes))}</strong></td><td>${c.expires_on?ceDate(c.expires_on):'待設定'}</td><td><span class="ce-chip ${s.cls}">${escapeHTML(s.text)}</span></td></tr>`;
+            const expiryText=ceIsPermanentHoliday(c)?'無到期限制':(c.expires_on?ceDate(c.expires_on):'待設定');
+            return `<tr><td>${ceDate(c.earned_date)}</td><td>${escapeHTML(c.source_label||'換休')}</td><td>${escapeHTML(ceDuration(c.earned_minutes))}</td><td><strong>${escapeHTML(ceDuration(c.remaining_minutes))}</strong></td><td>${escapeHTML(expiryText)}</td><td><span class="ce-chip ${s.cls}">${escapeHTML(s.text)}</span></td></tr>`;
           }).join('')}</tbody></table></div>`
-        : '<div class="ot-empty"><div class="icon">🕒</div><h3>尚無換休來源</h3><p>核准為換休的加班或假日家訪換休會自動建立來源。</p></div>'}</div>
+        : '<div class="ot-empty"><div class="icon">🕒</div><h3>尚無換休來源</h3><p>核准為換休的一般加班或假日家訪換休會自動建立來源。</p></div>'}</div>
     </section>`;
     main.insertAdjacentHTML('beforeend',html);
   }
@@ -158,14 +168,14 @@
     const [y,m]=month.split('-').map(Number);
     const end=isoDate(new Date(y,m,0));
     const rows=(state.compLeaveCredits||[])
-      .filter(c=>c.expires_on&&String(c.expires_on)>=start&&String(c.expires_on)<=end&&(Number(c.remaining_minutes)||0)>0);
+      .filter(c=>!ceIsPermanentHoliday(c)&&c.expires_on&&String(c.expires_on)>=start&&String(c.expires_on)<=end&&(Number(c.remaining_minutes)||0)>0);
     if(!rows.length)return;
 
     const total=rows.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
     const names=new Map((state.compLeaveExpiryStaff||[]).map(s=>[String(s.id),s.display_name]));
     const html=`<section id="cePayrollExpiryPanel" class="ot-rule-card">
-      <h3>本月到期換休待結清</h3>
-      <p>以下為本月到期仍未休完的換休來源；到期後會自動排除於可用換休餘額。</p>
+      <h3>本月一般加班換休到期結清</h3>
+      <p>以下為本月到期仍未休完的一般加班換休；到期後會自動排除於可用換休餘額，並依原加班日薪資基數與倍率順位折算加班費。假日家訪換休無到期限制，不列入本表。</p>
       <div class="ot-rule-highlight">本月到期未休合計：<strong>${escapeHTML(ceDuration(total))}</strong>。</div>
       <div style="margin-top:12px"><div class="ot-table-shell"><table class="ot-table"><thead><tr><th>員工</th><th>來源日期</th><th>來源</th><th>到期日</th><th>待結清時數</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${escapeHTML(names.get(String(c.staff_id))||'—')}</strong></td><td>${ceDate(c.earned_date)}</td><td>${escapeHTML(c.source_label||'換休')}</td><td>${ceDate(c.expires_on)}</td><td><span class="ot-amount">${escapeHTML(ceDuration(c.remaining_minutes))}</span></td></tr>`).join('')}</tbody></table></div></div>
     </section>`;
@@ -181,7 +191,7 @@
     btn.id='ceHireSettingsBtn';
     btn.className='btn';
     btn.textContent='📅 換休期限設定';
-    btn.title='設定員工到職日，以計算週年制換休到期日';
+    btn.title='設定員工到職日，以計算一般加班換休的週年制到期日';
     btn.addEventListener('click',ceOpenHireSettings);
     const anchor=document.getElementById('otCorrectionBtn')||reload;
     anchor.insertAdjacentElement('afterend',btn);
@@ -196,7 +206,7 @@
     const staff=(state.compLeaveExpiryStaff||[]).filter(s=>s.is_active!==false);
     openModal({
       title:'換休期限設定｜到職週年制',
-      html:`<div class="ot-rule-highlight" style="margin-top:0">系統依到職日計算每筆換休所屬特休週年年度末日，並以該日作為最終到期日。假日家訪換休採相同到期規則。</div>
+      html:`<div class="ot-rule-highlight" style="margin-top:0">系統依到職日計算一般加班換休所屬特休週年年度末日，並以該日作為最終到期日。假日家訪換休屬機構額外獎勵換休，無到期限制，不受此設定影響。</div>
       <div class="ce-hire-grid" style="margin-top:12px">${staff.map(s=>`<div class="ce-hire-row"><div><div class="ce-hire-name">${escapeHTML(s.display_name||'—')}</div><div class="ce-hire-role">${escapeHTML(ceRole(s.role))}</div></div><input type="date" data-ce-hire-id="${escapeHTML(String(s.id))}" data-ce-original="${escapeHTML(s.hire_date||'')}" value="${escapeHTML(s.hire_date||'')}"></div>`).join('')}</div>`,
       confirmText:'儲存到職日',
       onConfirm:ceSaveHireSettings,
@@ -224,7 +234,7 @@
       closeModal();
       state.compLeaveExpiryLoaded=false;
       navigate('overtime');
-      toast('到職日已更新，換休到期日將依最新資料重新載入','success');
+      toast('到職日已更新，一般加班換休到期日將依最新資料重新載入','success');
       return true;
     }catch(err){
       console.error(err);
