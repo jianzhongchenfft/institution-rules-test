@@ -730,6 +730,7 @@
           d._source=source;
           d.source_hash=await htmlSha256(file);
           d.file_name=file.name;
+          d._existing=await htmlLoadExistingSnapshot(c.id);
           htmlOpenExistingPlanPreview(c,d);
         }catch(err){
           status.textContent='解析失敗。';
@@ -749,6 +750,8 @@
       :'<span style="font-size:11px;color:#667085">未辨識到核定服務</span>';
     var html=[
       warn,
+      '<div class="import-section">變更預覽</div>',
+      htmlBuildImportDiff(d),
       '<div class="import-detail-grid">',
         '<div class="import-detail-cell"><label>個案</label><div>'+escapeHTML(c.case_no||'—')+'　'+escapeHTML(c.case_name||'')+'</div></div>',
         '<div class="import-detail-cell"><label>計畫日期</label><div>'+(planDate?rocDate(planDate+'T00:00:00'):'未辨識')+'</div></div>',
