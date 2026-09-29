@@ -1,7 +1,7 @@
     $('parseCaseHtml').addEventListener('click',async()=>{
       const caseNo=htmlNormalizeCaseNo($('htmlCaseNo').value); $('htmlCaseNo').value=caseNo; const file=$('htmlCaseFile').files[0]; const supervisor=me?state.profile.id:$('htmlSupervisor').value;
       const usageType=$('htmlUsageType').value, paymentMethod=$('htmlPaymentMethod').value;
-      if(!caseNo){toast('請輸入個案編號','warn');return;} if(!supervisor){toast('請選擇負責督導','warn');return;} if(!usageType){toast('請選擇使用類別','warn');return;} if(!file){toast('請選擇 HTML 檔案','warn');return;}
+      if(!caseNo){toast('請輸入個案編號','warn');return;} if(!supervisor){toast('請選擇負責督導','warn');return;} if(!usageType){toast('請選擇服務類別','warn');return;} if(!file){toast('請選擇 HTML 檔案','warn');return;}
       if(!/\.html?$/i.test(file.name)){toast('檔案格式必須是 HTML 或 HTM','warn');return;} if(file.size>10*1024*1024){toast('HTML 檔案不可超過 10 MB','warn');return;}
       const status=$('htmlParseStatus'); $('parseCaseHtml').disabled=true;
       try{status.textContent='正在讀取 HTML…'; const source=await file.text(); const parsed=htmlParseDocument(source); parsed.case_no=caseNo;parsed.supervisor_id=supervisor;parsed.service_usage_type=usageType;parsed.payment_method=paymentMethod;parsed.file_name=file.name;parsed.source_hash=await htmlSha256(file);parsed._file=file;parsed._source=source;status.textContent='解析完成，正在比對既有個案…'; await htmlResolveMatch(parsed); htmlOpenPreview(parsed);}
