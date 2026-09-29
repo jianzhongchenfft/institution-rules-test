@@ -273,7 +273,7 @@
     $('reloadCases').addEventListener('click',async()=>{await loadCaseVisitData();renderCaseVisitsPage();toast('已重新整理個案資料','success');});
     $('addCaseBtn').addEventListener('click',()=>{
       if(typeof window.openCaseCreateFlow==='function') window.openCaseCreateFlow();
-      else openCaseModal();
+      else toast('新增個案模組尚未載入，請重新整理頁面後再試。','error');
     });
 
     const list = $('caseList');
@@ -296,43 +296,6 @@
     }));
   }
 
-  function openCaseModal(){
-    const supervisors = state.caseStaff.filter(s=>s.can_supervise||s.role==='supervisor');
-    const defaultSupervisor = state.profile?.can_supervise ? state.profile.id : '';
-    openModal({title:'新增個案',confirmText:'建立個案',html:`
-      <div class="form-grid">
-        <div class="field"><label>個案姓名 *</label><input id="caseName" placeholder="請輸入個案姓名"></div>
-        <div class="field"><label>負責督導</label><select id="caseSupervisor"><option value="">尚未指派</option>${supervisors.map(s=>`<option value="${s.id}" ${s.id===defaultSupervisor?'selected':''}>${escapeHTML(s.display_name)}</option>`).join('')}</select></div>
-        <div class="field"><label>居服員</label><input id="caseWorker" placeholder="可稍後補填"></div>
-        <div class="field"><label>開案日</label><input id="caseOpenDate" type="date"></div>
-        <div class="field"><label>CMS 等級</label><input id="caseCms" placeholder="例如：4"></div>
-        <div class="field full"><label>備註</label><textarea id="caseNotes" placeholder="僅填必要的基本備註"></textarea></div>
-      </div>`,onConfirm:saveCase});
-  }
-
-  async function saveCase(){
-    const caseName=$('caseName').value.trim();
-    if(!caseName){toast('請輸入個案姓名','warn');return false;}
-    showLoading(true);
-    try{
-      const {error}=await db.from('care_cases').insert({
-        case_name:caseName,
-        supervisor_id:$('caseSupervisor').value||null,
-        care_worker_name:$('caseWorker').value.trim()||null,
-        open_date:$('caseOpenDate').value||null,
-        cms_level:$('caseCms').value.trim()||null,
-        notes:$('caseNotes').value.trim()||null,
-        created_by:state.user.id
-      });
-      if(error) throw error;
-      closeModal();
-      await loadCaseVisitData(true);
-      renderCaseVisitsPage();
-      toast('個案已建立','success');
-      return true;
-    }catch(err){toast('新增個案失敗：'+(err?.message||err),'error');return false;}
-    finally{showLoading(false);}
-  }
 
   function openCaseDetail(c){
     if(!c) return;
