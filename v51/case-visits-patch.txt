@@ -129,7 +129,7 @@
 
   function currentCaseScope(){
     let list = [...state.cases];
-    const filter = state.caseSupervisorFilter || (state.profile?.role==='supervisor'?'mine':'all');
+    const filter = state.caseSupervisorFilter || (state.profile?.can_supervise?'mine':'all');
     if(filter==='mine') list = list.filter(c=>c.supervisor_id===state.profile?.id);
     else if(filter!=='all') list = list.filter(c=>c.supervisor_id===filter);
     return list;
@@ -153,7 +153,7 @@
       state.cases = casesRes.data || [];
       state.caseVisits = visitsRes.data || [];
       state.caseServices = servicesRes.data || [];
-      if(!state.caseSupervisorFilter) state.caseSupervisorFilter = state.profile?.role==='supervisor' ? 'mine' : 'all';
+      if(!state.caseSupervisorFilter) state.caseSupervisorFilter = state.profile?.can_supervise ? 'mine' : 'all';
       state.caseDataLoaded = true;
     }catch(err){
       console.error(err);
@@ -200,7 +200,7 @@
 
   function renderCaseVisitsPage(){
     if(state.page!=='cases') return;
-    const supervisors = state.caseStaff.filter(s=>s.role==='supervisor');
+    const supervisors = state.caseStaff.filter(s=>s.can_supervise||s.role==='supervisor');
     const scope = currentCaseScope();
     const validServiceFilters=['all','active','suspended','closed'];
     if(!validServiceFilters.includes(state.caseStatusFilter)) state.caseStatusFilter='all';
@@ -235,7 +235,7 @@
       <div class="case-toolbar">
         <span class="case-filter-label">督導</span>
         <select id="caseSupervisorFilter">
-          ${state.profile?.role==='supervisor'?`<option value="mine" ${state.caseSupervisorFilter==='mine'?'selected':''}>我的個案</option>`:''}
+          ${state.profile?.can_supervise?`<option value="mine" ${state.caseSupervisorFilter==='mine'?'selected':''}>我的個案</option>`:''}
           <option value="all" ${state.caseSupervisorFilter==='all'?'selected':''}>全部個案</option>
           ${supervisors.map(s=>`<option value="${s.id}" ${state.caseSupervisorFilter===s.id?'selected':''}>${escapeHTML(s.display_name)}</option>`).join('')}
         </select>
@@ -273,8 +273,8 @@
   }
 
   function openCaseModal(){
-    const supervisors = state.caseStaff.filter(s=>s.role==='supervisor');
-    const defaultSupervisor = state.profile?.role==='supervisor' ? state.profile.id : '';
+    const supervisors = state.caseStaff.filter(s=>s.can_supervise||s.role==='supervisor');
+    const defaultSupervisor = state.profile?.can_supervise ? state.profile.id : '';
     openModal({title:'新增個案',confirmText:'建立個案',html:`
       <div class="form-grid">
         <div class="field"><label>個案姓名 *</label><input id="caseName" placeholder="請輸入個案姓名"></div>
