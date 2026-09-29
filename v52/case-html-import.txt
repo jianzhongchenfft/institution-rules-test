@@ -476,7 +476,7 @@
     }
     if(message) toast(message,type||'success');
     closeModal();
-    await loadCaseVisitData(true);
+    await htmlGetCaseVisitsApi().loadCaseVisitData(true);
     navigate('cases');
   }
 
@@ -818,6 +818,11 @@
   }
 
   var htmlCaseDetailState={caseId:null,tab:'overview',selectedPlanId:null,data:null};
+  function htmlGetCaseVisitsApi(){
+    var api=window.caseVisitsApi;
+    if(!api)throw new Error('個案訪視模組尚未載入，請重新整理頁面後再試。');
+    return api;
+  }
 
   function htmlCaseServiceStatus(c){
     var key=c&&c.service_status?c.service_status:'active';
@@ -873,7 +878,7 @@
     });
     (data.visits||[]).forEach(function(v){
       var d=(v.visit_date||'1970-01-01')+'T12:00:00';
-      items.push({date:d,title:caseTypeLabel(v.visit_type),text:v.summary||v.follow_up_item||'訪視紀錄',sort:new Date(d).getTime()});
+      items.push({date:d,title:htmlGetCaseVisitsApi().caseTypeLabel(v.visit_type),text:v.summary||v.follow_up_item||'訪視紀錄',sort:new Date(d).getTime()});
     });
     return items.sort(function(a,b){return b.sort-a.sort;});
   }
@@ -883,8 +888,8 @@
     var currentServices=data.services.filter(function(x){return x.is_current;});
     var currentBudgets=data.budgets.filter(function(x){return x.is_current;});
     var latest=data.visits[0]||null;
-    var pending=pendingFollowUpsFor(c.id);
-    var visitStatus=caseStatusInfo(c);
+    var pending=htmlGetCaseVisitsApi().pendingFollowUpsFor(c.id);
+    var visitStatus=htmlGetCaseVisitsApi().caseStatusInfo(c);
     var serviceStatus=htmlCaseServiceStatus(c);
     var contact=data.contacts.find(function(x){return x.is_primary_contact;})||data.contacts[0]||null;
     var serviceText=currentServices.length?currentServices.map(function(x){return x.service_code+(x.approved_quantity!=null?' ×'+x.approved_quantity:'');}).join('、'):'—';
@@ -893,7 +898,7 @@
       '<div class="case-overview-grid">',
         '<div class="case-overview-card"><label>服務狀態</label><strong>'+escapeHTML(serviceStatus.text)+'</strong><small>服務類別：'+escapeHTML(c.service_usage_type||'—')+'</small></div>',
         '<div class="case-overview-card"><label>CMS</label><strong>'+escapeHTML(c.cms_level||'—')+'</strong><small>目前照管平台計畫：'+escapeHTML(currentPlan?htmlFormatPlanDate(currentPlan.plan_date):'尚無')+'</small></div>',
-        '<div class="case-overview-card"><label>負責督導</label><strong>'+escapeHTML(caseStaffName(c.supervisor_id))+'</strong><small>'+escapeHTML(c.a_unit_name||'A單位未設定')+'</small></div>',
+        '<div class="case-overview-card"><label>負責督導</label><strong>'+escapeHTML(htmlGetCaseVisitsApi().caseStaffName(c.supervisor_id))+'</strong><small>'+escapeHTML(c.a_unit_name||'A單位未設定')+'</small></div>',
         '<div class="case-overview-card"><label>訪視／追蹤</label><strong>'+escapeHTML(visitStatus.text)+'</strong><small>待追蹤 '+pending.length+' 項</small></div>',
       '</div>',
       '<div class="case-panel-card"><div class="case-panel-head"><strong>目前核定服務</strong><button class="btn sm" data-case-tab-jump="services">查看服務核定</button></div>',
@@ -926,7 +931,7 @@
           htmlCaseField('個案編號',c.case_no),htmlCaseField('姓名',c.case_name),htmlCaseField('身分證字號',c.national_id),
           htmlCaseField('出生日期',c.birth_date?rocDate(c.birth_date+'T00:00:00'):'—'),htmlCaseField('性別',c.gender),htmlCaseField('CMS',c.cms_level),
           htmlCaseField('電話',c.phone),htmlCaseField('服務狀態',status.text),htmlCaseField('服務類別',c.service_usage_type),
-          htmlCaseField('繳款方式',c.payment_method||'未設定'),htmlCaseField('負責督導',caseStaffName(c.supervisor_id)),htmlCaseField('身分類別／長照資格',c.identity_type),
+          htmlCaseField('繳款方式',c.payment_method||'未設定'),htmlCaseField('負責督導',htmlGetCaseVisitsApi().caseStaffName(c.supervisor_id)),htmlCaseField('身分類別／長照資格',c.identity_type),
           htmlCaseField('地址',c.address,true),htmlCaseField('A單位',c.a_unit_name),htmlCaseField('A個管',c.case_manager_name),htmlCaseField('A個管電話',c.case_manager_phone),
           htmlCaseField('照專／評估人員',c.assessor_name),htmlCaseField('備註',c.notes,true),
         '</div>',
@@ -971,10 +976,10 @@
   }
 
   function htmlRenderVisitsTab(data){
-    var c=data.c,pending=pendingFollowUpsFor(c.id);
+    var c=data.c,pending=htmlGetCaseVisitsApi().pendingFollowUpsFor(c.id);
     var rows=data.visits.length?data.visits.map(function(v){
-      var resolved=isFollowUpResolved(v.id);
-      return '<div class="visit-item"><div class="visit-item-top"><div><strong>'+rocDate(v.visit_date+'T00:00:00')+'　'+escapeHTML(caseTypeLabel(v.visit_type))+'</strong><div class="visit-item-sub">訪視人員：'+escapeHTML(caseStaffName(v.visitor_staff_id))+(v.contact_person?'　聯絡／在場：'+escapeHTML(v.contact_person):'')+'</div></div>'+(v.follow_up_needed?'<span class="case-status '+(resolved?'normal':'followup')+'">'+(resolved?'已追蹤':'待追蹤')+'</span>':'')+'</div>'+(v.summary?'<div class="visit-summary">'+escapeHTML(v.summary)+'</div>':'')+(v.follow_up_needed?'<div class="followup-box">追蹤事項：'+escapeHTML(v.follow_up_item||'—')+'<br>預計追蹤：'+(v.follow_up_date?rocDate(v.follow_up_date+'T00:00:00'):'未設定')+'</div>':'')+'</div>';
+      var resolved=htmlGetCaseVisitsApi().isFollowUpResolved(v.id);
+      return '<div class="visit-item"><div class="visit-item-top"><div><strong>'+rocDate(v.visit_date+'T00:00:00')+'　'+escapeHTML(htmlGetCaseVisitsApi().caseTypeLabel(v.visit_type))+'</strong><div class="visit-item-sub">訪視人員：'+escapeHTML(htmlGetCaseVisitsApi().caseStaffName(v.visitor_staff_id))+(v.contact_person?'　聯絡／在場：'+escapeHTML(v.contact_person):'')+'</div></div>'+(v.follow_up_needed?'<span class="case-status '+(resolved?'normal':'followup')+'">'+(resolved?'已追蹤':'待追蹤')+'</span>':'')+'</div>'+(v.summary?'<div class="visit-summary">'+escapeHTML(v.summary)+'</div>':'')+(v.follow_up_needed?'<div class="followup-box">追蹤事項：'+escapeHTML(v.follow_up_item||'—')+'<br>預計追蹤：'+(v.follow_up_date?rocDate(v.follow_up_date+'T00:00:00'):'未設定')+'</div>':'')+'</div>';
     }).join(''):htmlCaseEmpty('尚無家訪／電訪紀錄');
     return [
       '<div class="case-panel-card"><div class="case-panel-head"><div><strong>家訪／電訪</strong><div class="case-panel-note">待追蹤 '+pending.length+' 項</div></div><div class="section-actions">'+(htmlCanEditCase(c)?'<button class="btn sm" data-add-visit="home">＋ 新增家訪</button><button class="btn sm primary" data-add-visit="phone">＋ 新增電訪</button>':'')+'</div></div>',
@@ -1019,7 +1024,7 @@
     var upload=$('caseUploadPlan');if(upload)upload.addEventListener('click',function(){htmlOpenExistingPlanUpload(data.c.id);});
     document.querySelectorAll('[data-plan-select]').forEach(function(btn){btn.addEventListener('click',function(){htmlCaseDetailState.selectedPlanId=btn.dataset.planSelect;htmlRenderCaseDetailPanel();});});
     document.querySelectorAll('[data-edit-plan]').forEach(function(btn){btn.addEventListener('click',function(){htmlOpenPlanEdit(btn.dataset.editPlan);});});
-    document.querySelectorAll('[data-add-visit]').forEach(function(btn){btn.addEventListener('click',function(){openVisitModal(data.c);setTimeout(function(){var sel=$('visitType');if(sel)sel.value=btn.dataset.addVisit;},0);});});
+    document.querySelectorAll('[data-add-visit]').forEach(function(btn){btn.addEventListener('click',function(){htmlGetCaseVisitsApi().openVisitModal(data.c);setTimeout(function(){var sel=$('visitType');if(sel)sel.value=btn.dataset.addVisit;},0);});});
     document.querySelectorAll('[data-document-index]').forEach(function(btn){btn.addEventListener('click',function(){var x=data.imports[Number(btn.dataset.documentIndex)];if(x)htmlViewOriginal(x.storage_path,x.file_name);});});
   }
 
@@ -1041,7 +1046,7 @@
     if(!refresh)$('content').innerHTML='<div class="empty compact"><div class="icon">👤</div><h3>正在載入個案資料</h3><p>請稍候。</p></div>';
     showLoading(true);
     try{
-      await loadCaseVisitData(true);
+      await htmlGetCaseVisitsApi().loadCaseVisitData(true);
       var data=await htmlLoadCaseDetailData(caseId);
       htmlCaseDetailState.data=data;
       var c=data.c,status=htmlCaseServiceStatus(c);
@@ -1056,7 +1061,7 @@
               '<span class="case-meta-chip primary">'+escapeHTML(c.case_no||'未編號')+'</span>',
               '<span class="case-meta-chip">'+escapeHTML(status.text)+'</span>',
               '<span class="case-meta-chip">CMS '+escapeHTML(c.cms_level||'—')+'</span>',
-              '<span class="case-meta-chip">督導 '+escapeHTML(caseStaffName(c.supervisor_id))+'</span>',
+              '<span class="case-meta-chip">督導 '+escapeHTML(htmlGetCaseVisitsApi().caseStaffName(c.supervisor_id))+'</span>',
               '<span class="case-meta-chip">'+escapeHTML(c.service_usage_type||'服務類別未設定')+'</span>',
             '</div></div></div>',
             '<div class="case-page-actions">'+(htmlCanEditCase(c)?'<button id="caseHeaderEdit" class="btn">編輯個案</button><button id="caseHeaderUpload" class="btn primary">＋ 上傳照管平台照顧計畫</button>':'')+'</div>',
