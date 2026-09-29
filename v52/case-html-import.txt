@@ -630,11 +630,13 @@
     try{
       var results=await Promise.all([
         db.from('care_plans').select('*').eq('id',planId).maybeSingle(),
-        db.from('case_approved_services').select('*').eq('care_plan_id',planId).order('service_group').order('service_code')
+        db.from('case_approved_services').select('*').eq('care_plan_id',planId).order('service_group').order('service_code'),
+        db.from('service_budgets').select('*').eq('care_plan_id',planId).order('category')
       ]);
-      var pRes=results[0], sRes=results[1];
+      var pRes=results[0], sRes=results[1], bRes=results[2];
       if(pRes.error)throw pRes.error;
       if(sRes.error)throw sRes.error;
+      if(bRes.error)throw bRes.error;
       var p=pRes.data;
       if(!p)return;
       var sections=Object.assign({},p.sections||{});
@@ -654,7 +656,9 @@
           sectionHtml,
         '</div>',
         '<div class="import-section">此版本核定服務</div>',
-        htmlServiceEditor(sRes.data||[])
+        htmlServiceEditor(sRes.data||[]),
+        '<div class="import-section">此版本額度資料</div>',
+        htmlBudgetEditor(bRes.data||[])
       ].join('');
 
       openModal({title:'編輯照管平台照顧計畫版本',confirmText:'儲存版本',large:true,html:html,onConfirm:async function(){
@@ -669,7 +673,8 @@
           visit_with:$('editVisitWith').value.trim(),
           sections:sec,
           raw_plan_text:raw,
-          services:htmlReadServices()
+          services:htmlReadServices(),
+          budgets:htmlReadBudgets()
         };
         showLoading(true);
         try{
@@ -682,6 +687,7 @@
         }finally{showLoading(false);}
       }});
       htmlBindServiceEditControls();
+      htmlBindBudgetEditControls();
     }catch(err){
       toast('讀取照管平台照顧計畫失敗：'+(err&&err.message?err.message:err),'error');
     }finally{showLoading(false);}
