@@ -60,6 +60,8 @@
       <div class="form-grid">
         <div class="field"><label>個案編號 *</label><input id="htmlCaseNo" placeholder="例如：115C00001"></div>
         <div class="field"><label>負責督導 *</label><select id="htmlSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions('')}</select></div>
+        <div class="field"><label>使用類別 *</label><select id="htmlUsageType"><option value="">請選擇</option><option value="居家">居家</option><option value="喘息">喘息</option><option value="居家+喘息">居家+喘息</option></select></div>
+        <div class="field"><label>繳款方式</label><select id="htmlPaymentMethod"><option value="">未設定</option><option value="銀行匯款">銀行匯款</option><option value="超商繳款">超商繳款</option><option value="現金繳費">現金繳費</option><option value="不收費">不收費</option></select><div class="help">非必填</div></div>
         <div class="field full"><label>照管平台 HTML *</label><div class="file-drop case-html-file-drop"><input id="htmlCaseFile" type="file" accept=".html,.htm,text/html,application/xhtml+xml"><div class="help">僅接受 HTML／HTM，單檔上限 10 MB。</div></div></div>
         <div class="field full"><button id="parseCaseHtml" class="btn primary" style="width:100%">解析 HTML 並預覽</button></div>
       </div><div id="htmlParseStatus" class="html-import-status">尚未開始解析。</div>`});
