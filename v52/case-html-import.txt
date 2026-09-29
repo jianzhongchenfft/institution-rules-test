@@ -25,8 +25,8 @@
     .approved-chip-wrap{display:flex;gap:6px;flex-wrap:wrap}.approved-chip{display:inline-flex;border-radius:999px;padding:5px 8px;background:#fff3ee;color:#8b5746;font-size:10.5px;font-weight:900;border:1px solid #f0d5ca}
     .import-history{display:grid;gap:7px}.import-history-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff}.import-history-row small{display:block;color:#667085;margin-top:3px}
     .plan-version-list{display:grid;gap:7px}.plan-version-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}.plan-version-row.current{background:#fff8f5;border-color:#efcabc}.plan-version-main{min-width:0}.plan-version-main strong{font-size:12px}.plan-version-main small{display:block;color:#667085;margin-top:3px;line-height:1.5}.plan-current-badge{display:inline-flex;margin-left:6px;border-radius:999px;padding:3px 7px;background:#eef7f1;color:#237a4b;font-size:9.5px;font-weight:900}.section-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-    @media(max-width:900px){.service-row{grid-template-columns:1fr 1fr}.service-row .wide{grid-column:1/-1}.import-detail-grid{grid-template-columns:1fr 1fr}}
-    @media(max-width:650px){.import-choice,.import-preview-grid{grid-template-columns:1fr}.contact-row{grid-template-columns:1fr 1fr}.import-detail-grid{grid-template-columns:1fr}.service-row{grid-template-columns:1fr 1fr}}
+    @media(max-width:900px){.service-row,.budget-row{grid-template-columns:1fr 1fr}.service-row .wide{grid-column:1/-1}.import-detail-grid{grid-template-columns:1fr 1fr}.diff-row{grid-template-columns:120px 1fr 24px 1fr}}
+    @media(max-width:650px){.import-choice,.import-preview-grid{grid-template-columns:1fr}.contact-row{grid-template-columns:1fr 1fr}.import-detail-grid{grid-template-columns:1fr}.service-row,.budget-row{grid-template-columns:1fr 1fr}.diff-row{grid-template-columns:1fr}.diff-arrow{display:none}}
   `;
   document.head.appendChild(caseHtmlStyle);
 
@@ -376,7 +376,7 @@
     if(oldDate&&newDate&&newDate<oldDate)note='<div class="import-warning">本次照管平台照顧計畫日期早於目前使用版本。確認匯入後會保存為歷史版本，不會取代目前使用版本。</div>';
     else if(oldDate&&newDate&&newDate>oldDate)note='<div class="html-import-status" style="margin-bottom:8px">本次照管平台照顧計畫日期較新；確認匯入後將成為目前使用版本。</div>';
     if(!rows.length)return note+'<div class="diff-empty">與目前資料相比，未偵測到主要欄位差異。</div>';
-    return note+'<div class="import-diff">'+rows.map(function(r){return '<div class="diff-row"><div class="diff-label">'+escapeHTML(r.label)+'</div><div class="diff-value">'+escapeHTML(r.oldValue)+'</div><div class="diff-arrow">→</div><div class="diff-value">'+escapeHTML(r.newValue)+'</div></div>';}).join('')+'</div>';
+    return note+'<div class="html-import-status" style="margin:0 0 8px">左側為目前使用資料，右側為本次 HTML 辨識資料。</div><div class="import-diff">'+rows.map(function(r){return '<div class="diff-row"><div class="diff-label">'+escapeHTML(r.label)+'</div><div class="diff-value">'+escapeHTML(r.oldValue)+'</div><div class="diff-arrow">→</div><div class="diff-value">'+escapeHTML(r.newValue)+'</div></div>';}).join('')+'</div>';
   }
   function htmlPlanPreview(plan){const entries=Object.entries(plan?.sections||{});return `<div class="html-plan-preview">${entries.length?entries.map(([k,v])=>`<details><summary>${escapeHTML(k)}</summary><pre>${escapeHTML(v)}</pre></details>`).join(''):'<div class="html-import-status">未辨識到照管平台照顧計畫文字區塊。</div>'}</div>`;}
   function htmlOpenPreview(d){
