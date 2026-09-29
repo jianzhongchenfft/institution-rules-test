@@ -166,6 +166,8 @@
   const baseNavigateForCases = navigate;
   navigate = function(id){
     if(id!=='cases') return baseNavigateForCases(id);
+    window.currentCaseDetailId=null;
+    window.currentCaseDetailTab=null;
     const m = modules.find(x=>x.id==='cases') || modules[0];
     state.page = 'cases';
     renderNav();
@@ -292,32 +294,16 @@
     list.querySelectorAll('[data-case-id]').forEach(btn=>btn.addEventListener('click',()=>{
       const c=state.cases.find(x=>x.id===btn.dataset.caseId);
       openCaseDetail(c);
-      if(c && typeof window.augmentCaseDetail==='function') setTimeout(()=>window.augmentCaseDetail(c.id),80);
     }));
   }
 
 
   function openCaseDetail(c){
-    if(!c) return;
-    const visits = visitListFor(c.id);
-    const pending = pendingFollowUpsFor(c.id);
-    const status = caseStatusInfo(c);
-    const html = `
-      <div class="case-detail-grid">
-        <div class="case-detail-item"><div class="case-detail-label">負責督導</div><div class="case-detail-value">${escapeHTML(caseStaffName(c.supervisor_id))}</div></div>
-        <div class="case-detail-item"><div class="case-detail-label">居服員</div><div class="case-detail-value">${escapeHTML(c.care_worker_name||'—')}</div></div>
-        <div class="case-detail-item"><div class="case-detail-label">開案日</div><div class="case-detail-value">${c.open_date?rocDate(c.open_date+'T00:00:00'):'—'}</div></div>
-        <div class="case-detail-item"><div class="case-detail-label">CMS</div><div class="case-detail-value">${escapeHTML(c.cms_level||'—')}</div></div>
-      </div>
-      <div class="case-section-title"><strong>訪視歷程</strong><button id="addVisitFromDetail" class="btn sm primary">＋ 新增訪視紀錄</button></div>
-      ${pending.length?`<div class="prior-followup"><strong>目前待追蹤 ${pending.length} 項</strong><span>${pending.map(v=>`${v.follow_up_date?rocDate(v.follow_up_date+'T00:00:00'):'未排日期'}｜${escapeHTML(v.follow_up_item||'未填內容')}`).join('<br>')}</span></div>`:''}
-      <div class="visit-history">${visits.length?visits.map(v=>{
-        const assisted = c.supervisor_id && v.visitor_staff_id!==c.supervisor_id;
-        const resolvedByLater = isFollowUpResolved(v.id);
-        return `<div class="visit-item"><div class="visit-item-top"><div><strong>${rocDate(v.visit_date+'T00:00:00')}　${caseTypeLabel(v.visit_type)}</strong><div class="visit-item-sub">訪視人員：${escapeHTML(caseStaffName(v.visitor_staff_id))}${assisted?'（協助訪視）':''}${v.contact_person?`　聯絡／在場：${escapeHTML(v.contact_person)}`:''}</div></div>${v.follow_up_needed?`<span class="case-status ${resolvedByLater?'normal':'followup'}">${resolvedByLater?'已追蹤':'待追蹤'}</span>`:''}</div>${v.summary?`<div class="visit-summary">${escapeHTML(v.summary)}</div>`:''}${v.follow_up_needed?`<div class="followup-box">追蹤事項：${escapeHTML(v.follow_up_item||'—')}<br>預計追蹤：${v.follow_up_date?rocDate(v.follow_up_date+'T00:00:00'):'未設定'}${resolvedByLater?'<br>後續已於下一筆紀錄完成追蹤。':''}</div>`:''}${v.previous_follow_up_result?`<div class="visit-item-sub" style="margin-top:8px">前次追蹤結果：${resultLabel(v.previous_follow_up_result)}</div>`:''}</div>`;
-      }).join(''):'<div class="empty compact"><h3>尚無訪視紀錄</h3><p>可新增第一筆家訪或電訪紀錄。</p></div>'}</div>`;
-    openModal({title:`${c.case_name}｜${status.text}`,html,large:true,showConfirm:false});
-    $('addVisitFromDetail')?.addEventListener('click',()=>openVisitModal(c));
+    if(!c)return;
+    if(typeof window.openCaseDetailPage==='function'){
+      return window.openCaseDetailPage(c.id,'overview');
+    }
+    toast('個案詳細頁模組尚未載入，請重新整理頁面後再試。','error');
   }
 
   function openVisitModal(c){
@@ -412,8 +398,13 @@
       if(error) throw error;
       closeModal();
       await loadCaseVisitData(true);
-      renderCaseVisitsPage();
-      toast('訪視紀錄已儲存','success');
+      if(window.currentCaseDetailId===c.id && typeof window.openCaseDetailPage==='function'){
+        toast('訪視紀錄已儲存','success');
+        await window.openCaseDetailPage(c.id,'visits',true);
+      }else{
+        renderCaseVisitsPage();
+        toast('訪視紀錄已儲存','success');
+      }
       return true;
     }catch(err){toast('儲存訪視紀錄失敗：'+(err?.message||err),'error');return false;}
     finally{showLoading(false);}
