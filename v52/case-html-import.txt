@@ -208,9 +208,15 @@
     let isIndigenous=null;
     if(indigenousRaw){isIndigenous=/^(?:是|1\.?是)$/i.test(htmlCleanText(indigenousRaw))?true:/^(?:否|2\.?否)$/i.test(htmlCleanText(indigenousRaw))?false:null;}
     const indigenousGroup=htmlFindPair(pairs,['原住民族別']);
-    const welfareIdentity=htmlFindPair(pairs,['長照福利身份','長照福利身分']);
-    const copayMatch=allText.match(/個案部分負擔(?:比例)?(?:為|[：:])?\s*([0-9]+(?:\.[0-9]+)?)\s*%/) || allText.match(/部分負擔(?:比例)?(?:為|[：:])?\s*([0-9]+(?:\.[0-9]+)?)\s*%/);
-    const copayRate=copayMatch?Number(copayMatch[1]):null;
+    const welfareIdentityRaw=htmlFindPair(pairs,['長照福利身份','長照福利身分']);
+    let welfareIdentity=welfareIdentityRaw, copayRate=null;
+    if(/第一類|低收入戶|低收/.test(welfareIdentityRaw)){welfareIdentity='低收入戶';copayRate=0;}
+    else if(/第二類|中低收入戶|中低收/.test(welfareIdentityRaw)){welfareIdentity='中低收入戶';copayRate=5;}
+    else if(/第三類|一般戶/.test(welfareIdentityRaw)){welfareIdentity='一般戶';copayRate=16;}
+    if(copayRate===null){
+      const copayMatch=allText.match(/個案部分負擔(?:比例)?(?:為|[：:])?\s*([0-9]+(?:\.[0-9]+)?)\s*%/) || allText.match(/部分負擔(?:比例)?(?:為|[：:])?\s*([0-9]+(?:\.[0-9]+)?)\s*%/);
+      copayRate=copayMatch?Number(copayMatch[1]):null;
+    }
     let livesAlone=null; const living=htmlFindPair(pairs,['目前居住狀況','居住狀況','居住型態']); if(living){if(/獨居/.test(living))livesAlone=true;else if(/同住|與.+同住/.test(living))livesAlone=false;}
     const carePlan=htmlParseCarePlan(doc,allText);
     const services=htmlParseServices(doc); const budgets=htmlParseBudgets(doc,services);
