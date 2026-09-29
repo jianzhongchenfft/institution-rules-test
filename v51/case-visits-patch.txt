@@ -128,7 +128,7 @@
   }
 
   function currentCaseScope(){
-    let list = state.cases.filter(c=>c.service_status!=='closed');
+    let list = [...state.cases];
     const filter = state.caseSupervisorFilter || (state.profile?.role==='supervisor'?'mine':'all');
     if(filter==='mine') list = list.filter(c=>c.supervisor_id===state.profile?.id);
     else if(filter!=='all') list = list.filter(c=>c.supervisor_id===filter);
