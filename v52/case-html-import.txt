@@ -907,7 +907,7 @@
       '</div>',
       '<div class="case-overview-grid">',
         '<div class="case-panel-card" style="grid-column:span 2"><div class="case-panel-head"><strong>最近訪視</strong><button class="btn sm" data-case-tab-jump="visits">查看家訪／電訪</button></div>',
-          latest?'<div><strong>'+rocDate(latest.visit_date+'T00:00:00')+'　'+escapeHTML(caseTypeLabel(latest.visit_type))+'</strong><div class="case-panel-note" style="margin-top:6px">'+escapeHTML(latest.summary||'未填摘要')+'</div></div>':htmlCaseEmpty('尚無訪視紀錄'),
+          latest?'<div><strong>'+rocDate(latest.visit_date+'T00:00:00')+'　'+escapeHTML(htmlGetCaseVisitsApi().caseTypeLabel(latest.visit_type))+'</strong><div class="case-panel-note" style="margin-top:6px">'+escapeHTML(latest.summary||'未填摘要')+'</div></div>':htmlCaseEmpty('尚無訪視紀錄'),
         '</div>',
         '<div class="case-panel-card" style="grid-column:span 2"><div class="case-panel-head"><strong>主要聯絡資訊</strong><button class="btn sm" data-case-tab-jump="basic">查看基本資料</button></div>',
           contact?'<div><strong>'+escapeHTML(contact.contact_name)+(contact.relationship?'・'+escapeHTML(contact.relationship):'')+'</strong><div class="case-panel-note" style="margin-top:6px">'+escapeHTML(contact.phone||'未填電話')+(contact.is_primary_caregiver?'｜主要照顧者':'')+'</div></div>':htmlCaseEmpty('尚無聯絡人資料'),
