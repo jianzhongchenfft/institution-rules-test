@@ -10,18 +10,22 @@
     nationalId=(nationalId.match(/[A-Z]\d{9}/i)||[])[0]||nationalId;
     const birth=htmlFindPair(pairs,['個案生日','出生日期']);
     const phone=(htmlFindPair(pairs,['個案電話']).match(/0\d[\d\-\s]{7,14}/)||[])[0]||'';
-    let gender=htmlFindPair(pairs,['個案性別']).replace(/^\d+\.?\s*/,''); if(!/^(男|女)$/.test(gender))gender='';
-    const address=htmlFindPair(pairs,['居住地址','通訊地址','現居地址','地址']);
+    let gender=(pairs.find(x=>x.label==='性別'||x.label==='個案性別')?.value||'').replace(/^\d+\.?\s*/,''); if(!/^(男|女)$/.test(gender))gender='';
+    const address=htmlFindPair(pairs,['居住(通訊)地址','居住地址','通訊地址','現居地址']);
     let cms=(allText.match(/CMS\s*(?:第)?\s*([1-8])\s*級/i)||[])[1]||htmlFindPair(pairs,['CMS等級','失能等級']).match(/[1-8]/)?.[0]||'';
     let aUnit=htmlFindPair(pairs,['A單位名稱']);
     let manager=htmlFindPair(pairs,['A個管姓名']);
-    let managerPhone=(htmlFindPair(pairs,['聯絡電話']).match(/0\d[\d#\-\s]{7,20}/)||[])[0]||'';
+    const managerTh=[...doc.querySelectorAll('th')].find(x=>htmlCleanText(x.textContent).includes('A個管姓名'));
+    const managerTable=managerTh?.closest('table');
+    const managerPhoneTh=managerTable?[...managerTable.querySelectorAll('th')].find(x=>htmlCleanText(x.textContent).includes('聯絡電話')):null;
+    const managerPhoneCell=managerPhoneTh?.nextElementSibling?.tagName==='TD'?managerPhoneTh.nextElementSibling:managerPhoneTh?.parentElement?.querySelector('td');
+    let managerPhone=(htmlCleanText(managerPhoneCell?.textContent||'').match(/0\d[\d#\-\s]{7,20}/)||[])[0]||'';
     let assessor=htmlFindPair(pairs,['承辦人']);
     const topAssessor=(allText.match(/評估照專[：:]\s*([^\n]+)/)||[])[1]; if(topAssessor)assessor=htmlCleanText(topAssessor);
     const assessment=htmlRocToIso(htmlFindPair(pairs,['處理時間','評估日期']));
     const approval=htmlRocToIso(htmlFindPair(pairs,['近一次照顧計畫送審日期','審核日期']));
     const identityType=htmlFindPair(pairs,['長照資格','補助身分','身分類別']);
-    let livesAlone=null; const living=htmlFindPair(pairs,['居住狀況','居住型態']); if(living){if(/獨居/.test(living))livesAlone=true;else if(/同住|與.+同住/.test(living))livesAlone=false;}
+    let livesAlone=null; const living=htmlFindPair(pairs,['目前居住狀況','居住狀況','居住型態']); if(living){if(/獨居/.test(living))livesAlone=true;else if(/同住|與.+同住/.test(living))livesAlone=false;}
     const carePlan=htmlParseCarePlan(doc,allText);
     const services=htmlParseServices(doc); const budgets=htmlParseBudgets(doc,services);
     const contacts=htmlParseContacts(doc,pairs,carePlan.raw_plan_text||allText);
