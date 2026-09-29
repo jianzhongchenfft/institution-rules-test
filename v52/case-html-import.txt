@@ -7,8 +7,8 @@
     .html-import-note{padding:11px 12px;border:1px solid #f0ded7;background:#fff8f5;border-radius:10px;font-size:11.5px;line-height:1.65;color:#765548;margin-bottom:12px}
     .html-import-status{margin-top:10px;padding:10px 12px;border-radius:9px;background:#f8fafc;border:1px solid var(--line);font-size:11.5px;color:#475467;white-space:pre-wrap}
     .case-html-file-drop{padding:10px 12px 12px!important;overflow:visible!important}
-    #htmlCaseFile{display:block;width:100%;box-sizing:border-box;min-height:48px;padding:7px 8px 9px;margin:0;line-height:1.45;overflow:visible}
-    #htmlCaseFile::file-selector-button{margin:0 12px 0 0;padding:7px 12px;line-height:1.25;cursor:pointer}
+    #htmlCaseFile,#planVersionFile{display:block;width:100%;box-sizing:border-box;min-height:48px;padding:7px 8px 9px;margin:0;line-height:1.45;overflow:visible}
+    #htmlCaseFile::file-selector-button,#planVersionFile::file-selector-button{margin:0 12px 0 0;padding:7px 12px;line-height:1.25;cursor:pointer}
     .import-section{font-size:12px;font-weight:900;color:#8b5746;margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
     .import-section:first-child{margin-top:0;padding-top:0;border-top:0}
     .import-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -23,6 +23,7 @@
     .import-detail-block{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.import-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.import-detail-cell{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fafcfb}.import-detail-cell label{display:block;font-size:9.5px;color:#667085;font-weight:900;margin-bottom:4px}.import-detail-cell div{font-size:12px;font-weight:800;color:#344054;word-break:break-word}
     .approved-chip-wrap{display:flex;gap:6px;flex-wrap:wrap}.approved-chip{display:inline-flex;border-radius:999px;padding:5px 8px;background:#fff3ee;color:#8b5746;font-size:10.5px;font-weight:900;border:1px solid #f0d5ca}
     .import-history{display:grid;gap:7px}.import-history-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff}.import-history-row small{display:block;color:#667085;margin-top:3px}
+    .plan-version-list{display:grid;gap:7px}.plan-version-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}.plan-version-row.current{background:#fff8f5;border-color:#efcabc}.plan-version-main{min-width:0}.plan-version-main strong{font-size:12px}.plan-version-main small{display:block;color:#667085;margin-top:3px;line-height:1.5}.plan-current-badge{display:inline-flex;margin-left:6px;border-radius:999px;padding:3px 7px;background:#eef7f1;color:#237a4b;font-size:9.5px;font-weight:900}.section-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
     @media(max-width:900px){.service-row{grid-template-columns:1fr 1fr}.service-row .wide{grid-column:1/-1}.import-detail-grid{grid-template-columns:1fr 1fr}}
     @media(max-width:650px){.import-choice,.import-preview-grid{grid-template-columns:1fr}.contact-row{grid-template-columns:1fr 1fr}.import-detail-grid{grid-template-columns:1fr}.service-row{grid-template-columns:1fr 1fr}}
   `;
@@ -292,7 +293,7 @@
       if(d.lives_alone!==null)payload.lives_alone=d.lives_alone;
       const r=await db.rpc('import_case_html_data',{payload}); if(r.error)throw r.error;
       if(r.data?.action==='duplicate'){await db.storage.from(CASE_HTML_BUCKET).remove([path]);closeModal();toast('這份 HTML 已經匯入過，未重複建立資料。','warn');navigate('cases');return true;}
-      closeModal();toast(r.data?.action==='updated'?'既有個案已更新':'個案已建立','success');navigate('cases');return true;
+      closeModal();toast(r.data?.action==='updated'?(r.data?.care_plan_id&&!r.data?.plan_is_current?'既有個案已更新；本次照顧計畫已保存為歷史版本':'既有個案已更新'):'個案已建立','success');navigate('cases');return true;
     }catch(err){if(path)try{await db.storage.from(CASE_HTML_BUCKET).remove([path]);}catch(_){ }console.error(err);toast('HTML 匯入失敗：'+(err?.message||err),'error');return false;}finally{showLoading(false);}
   }
   function htmlOpenManualModal(){
@@ -306,25 +307,286 @@
   async function htmlViewOriginal(path,fileName){
     showLoading(true);try{const r=await db.storage.from(CASE_HTML_BUCKET).download(path);if(r.error)throw r.error;const text=await r.data.text();const blob=new Blob([text],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(err){toast('讀取原始 HTML 失敗：'+(err?.message||err),'error');}finally{showLoading(false);}
   }
+
+  function htmlCanEditCase(c){
+    const role=state.profile?.role;
+    return ['business_manager','organization_manager','admin'].includes(role) || (role==='supervisor' && c?.supervisor_id===state.profile?.id);
+  }
+
+  async function htmlRefreshOpenCase(caseId){
+    closeModal();
+    await loadCaseVisitData(true);
+    const c=state.cases.find(x=>x.id===caseId);
+    if(c){
+      openCaseDetail(c);
+      setTimeout(()=>htmlAugmentCaseDetail(caseId),80);
+    }else{
+      navigate('cases');
+    }
+  }
+
+  function htmlBindContactEditControls(){
+    const bindDelete=()=>document.querySelectorAll('[data-del-contact]').forEach(b=>{
+      if(b.dataset.bound)return;
+      b.dataset.bound='1';
+      b.addEventListener('click',()=>b.closest('[data-contact-row]')?.remove());
+    });
+    $('htmlAddContact')?.addEventListener('click',()=>{
+      $('htmlContactEditor')?.insertAdjacentHTML('beforeend',htmlContactRow({}));
+      bindDelete();
+    });
+    bindDelete();
+  }
+
+  function htmlBindServiceEditControls(){
+    document.querySelectorAll('[data-del-service]').forEach(b=>{
+      if(b.dataset.bound)return;
+      b.dataset.bound='1';
+      b.addEventListener('click',()=>b.closest('[data-service-row]')?.remove());
+    });
+    $('htmlAddService')?.addEventListener('click',()=>{
+      $('htmlServiceEditor')?.insertAdjacentHTML('beforeend',
+        `<div class="service-row" data-service-row><div class="mini-field"><label>類別</label><input data-svc-group></div><div class="mini-field"><label>服務碼</label><input data-svc-code></div><div class="mini-field wide"><label>服務名稱</label><input data-svc-name></div><div class="mini-field"><label>核定量</label><input data-svc-qty type="number" step="0.01"></div><div class="mini-field"><label>單價</label><input data-svc-price type="number" step="0.01"></div><div class="mini-field"><label>小計</label><input data-svc-subtotal type="number" step="0.01"></div><button class="btn sm" type="button" data-del-service>刪除</button></div>`
+      );
+      htmlBindServiceEditControls();
+    });
+  }
+
+  async function htmlOpenCaseEdit(caseId){
+    showLoading(true);
+    try{
+      const [cRes,ctRes]=await Promise.all([
+        db.from('care_cases').select('*').eq('id',caseId).maybeSingle(),
+        db.from('case_contacts').select('*').eq('case_id',caseId).order('is_primary_contact',{ascending:false}).order('created_at')
+      ]);
+      if(cRes.error)throw cRes.error;if(ctRes.error)throw ctRes.error;
+      const c=cRes.data;if(!c)return;
+      const lockSupervisor=state.profile?.role==='supervisor';
+      openModal({title:'編輯個案資料',confirmText:'儲存',large:true,html:`
+        <div class="import-section">機構管理資料</div>
+        <div class="import-preview-grid">
+          <div class="field"><label>個案編號 *</label><input id="editCaseNo" value="${escapeHTML(c.case_no||'')"></div>
+          <div class="field"><label>負責督導 *</label><select id="editSupervisor" ${lockSupervisor?'disabled':''>${htmlSupervisorOptions(c.supervisor_id||'')</select></div>
+          <div class="field"><label>服務類別 *</label><select id="editUsage"><option value="">請選擇</option><option value="居家" ${c.service_usage_type==='居家'?'selected':''>居家</option><option value="喘息" ${c.service_usage_type==='喘息'?'selected':''>喘息</option><option value="居家+喘息" ${c.service_usage_type==='居家+喘息'?'selected':''>居家+喘息</option></select></div>
+          <div class="field"><label>繳款方式</label><select id="editPayment"><option value="">未設定</option><option value="銀行匯款" ${c.payment_method==='銀行匯款'?'selected':''>銀行匯款</option><option value="超商繳款" ${c.payment_method==='超商繳款'?'selected':''>超商繳款</option><option value="現金繳費" ${c.payment_method==='現金繳費'?'selected':''>現金繳費</option><option value="不收費" ${c.payment_method==='不收費'?'selected':''>不收費</option></select></div>
+          <div class="field"><label>服務狀態</label><select id="editStatus"><option value="active" ${(c.service_status||'active')==='active'?'selected':''>服務中</option><option value="suspended" ${c.service_status==='suspended'?'selected':''>暫停</option><option value="closed" ${c.service_status==='closed'?'selected':''>已結案</option></select></div>
+        </div>
+        <div class="import-section">基本資料</div>
+        <div class="import-preview-grid">
+          <div class="field"><label>姓名 *</label><input id="editName" value="${escapeHTML(c.case_name||'')"></div>
+          <div class="field"><label>身分證字號</label><input id="editNational" value="${escapeHTML(c.national_id||'')"></div>
+          <div class="field"><label>出生日期</label><input id="editBirth" type="date" value="${escapeHTML(c.birth_date||'')"></div>
+          <div class="field"><label>性別</label><select id="editGender"><option value=""></option><option value="男" ${c.gender==='男'?'selected':''>男</option><option value="女" ${c.gender==='女'?'selected':''>女</option></select></div>
+          <div class="field"><label>電話</label><input id="editPhone" value="${escapeHTML(c.phone||'')"></div>
+          <div class="field"><label>CMS</label><input id="editCms" value="${escapeHTML(c.cms_level||'')"></div>
+          <div class="field full"><label>地址</label><input id="editAddress" value="${escapeHTML(c.address||'')"></div>
+          <div class="field"><label>身分類別／長照資格</label><input id="editIdentity" value="${escapeHTML(c.identity_type||'')"></div>
+          <div class="field"><label>A單位</label><input id="editAUnit" value="${escapeHTML(c.a_unit_name||'')"></div>
+          <div class="field"><label>A個管</label><input id="editManager" value="${escapeHTML(c.case_manager_name||'')"></div>
+          <div class="field"><label>A個管電話</label><input id="editManagerPhone" value="${escapeHTML(c.case_manager_phone||'')"></div>
+          <div class="field"><label>照專／評估人員</label><input id="editAssessor" value="${escapeHTML(c.assessor_name||'')"></div>
+          <div class="field full"><label>備註</label><textarea id="editNotes">${escapeHTML(c.notes||'')</textarea></div>
+        </div>
+        <div class="import-section">聯絡人／照顧者</div>
+        ${htmlContactsEditor(ctRes.data||[])
+      `,onConfirm:async()=>{
+        const caseNo=htmlNormalizeCaseNo($('editCaseNo').value);$('editCaseNo').value=caseNo;
+        const payload={
+          case_id:caseId,case_no:caseNo,case_name:$('editName').value.trim(),
+          supervisor_id:lockSupervisor?c.supervisor_id:$('editSupervisor').value,
+          service_usage_type:$('editUsage').value,payment_method:$('editPayment').value,
+          service_status:$('editStatus').value,national_id:$('editNational').value.trim().toUpperCase(),
+          birth_date:$('editBirth').value,gender:$('editGender').value,address:$('editAddress').value.trim(),
+          phone:$('editPhone').value.trim(),cms_level:$('editCms').value.trim(),
+          identity_type:$('editIdentity').value.trim(),a_unit_name:$('editAUnit').value.trim(),
+          case_manager_name:$('editManager').value.trim(),case_manager_phone:$('editManagerPhone').value.trim(),
+          assessor_name:$('editAssessor').value.trim(),notes:$('editNotes').value.trim(),
+          contacts:htmlReadContacts()
+        };
+        if(!payload.case_no||!payload.case_name||!payload.supervisor_id||!payload.service_usage_type){toast('個案編號、姓名、負責督導與服務類別為必填','warn');return false;}
+        showLoading(true);
+        try{
+          const r=await db.rpc('update_case_profile',{payload});if(r.error)throw r.error;
+          toast('個案資料已更新','success');await htmlRefreshOpenCase(caseId);return true;
+        }catch(err){toast('更新個案失敗：'+(err?.message||err),'error');return false;}
+        finally{showLoading(false);}
+      }});
+      htmlBindCaseNoInput('editCaseNo');
+      htmlBindContactEditControls();
+    }catch(err){toast('讀取個案資料失敗：'+(err?.message||err),'error');}
+    finally{showLoading(false);}
+  }
+
+  async function htmlOpenPlanEdit(planId){
+    showLoading(true);
+    try{
+      const [pRes,sRes]=await Promise.all([
+        db.from('care_plans').select('*').eq('id',planId).maybeSingle(),
+        db.from('case_approved_services').select('*').eq('care_plan_id',planId).order('service_group').order('service_code')
+      ]);
+      if(pRes.error)throw pRes.error;if(sRes.error)throw sRes.error;
+      const p=pRes.data;if(!p)return;
+      const sections={...(p.sections||{})};
+      if(!Object.keys(sections).length){['計畫簡述','計畫目標','計畫執行規劃','其他備註'].forEach(k=>sections[k]='');}
+      const sectionHtml=Object.entries(sections).map(([k,v])=>`<div class="field full"><label>${escapeHTML(k)</label><textarea data-plan-section-key="${escapeHTML(k)" style="min-height:110px">${escapeHTML(v||'')</textarea></div>`).join('');
+      openModal({title:'編輯照顧計畫版本',confirmText:'儲存版本',large:true,html:`
+        <div class="html-import-note">修改的是系統整理後的照顧計畫版本；原始 HTML 來源檔不會被更動。若修改「計畫日期」，系統會重新判斷哪一版是目前最新版本。</div>
+        <div class="import-preview-grid">
+          <div class="field"><label>計畫日期</label><input id="editPlanDate" type="date" value="${escapeHTML(p.plan_date||'')"></div>
+          <div class="field"><label>偕同訪視者</label><input id="editVisitWith" value="${escapeHTML(p.visit_with||'')"></div>
+          <div class="field"><label>電聯日期</label><input id="editPhoneDate" type="date" value="${escapeHTML(p.phone_contact_date||'')"></div>
+          <div class="field"><label>家訪日期</label><input id="editHomeDate" type="date" value="${escapeHTML(p.home_visit_date||'')"></div>
+          ${sectionHtml
+        </div>
+        <div class="import-section">此版本核定服務</div>
+        ${htmlServiceEditor(sRes.data||[])
+      `,onConfirm:async()=>{
+        const sec={};
+        document.querySelectorAll('[data-plan-section-key]').forEach(el=>{sec[el.dataset.planSectionKey]=el.value.trim();});
+        const raw=Object.entries(sec).filter(([,v])=>v).map(([k,v])=>k+'\n'+v).join('\n\n');
+        const payload={
+          plan_id:planId,plan_date:$('editPlanDate').value,phone_contact_date:$('editPhoneDate').value,
+          home_visit_date:$('editHomeDate').value,visit_with:$('editVisitWith').value.trim(),
+          sections:sec,raw_plan_text:raw,services:htmlReadServices()
+        };
+        showLoading(true);
+        try{
+          const r=await db.rpc('update_care_plan_version',{payload});if(r.error)throw r.error;
+          toast(r.data?.is_current?'照顧計畫已更新，這一版目前為最新版本':'照顧計畫版本已更新','success');
+          await htmlRefreshOpenCase(p.case_id);return true;
+        }catch(err){toast('更新照顧計畫失敗：'+(err?.message||err),'error');return false;}
+        finally{showLoading(false);}
+      }});
+      htmlBindServiceEditControls();
+    }catch(err){toast('讀取照顧計畫失敗：'+(err?.message||err),'error');}
+    finally{showLoading(false);}
+  }
+
+  async function htmlOpenExistingPlanUpload(caseId){
+    showLoading(true);
+    try{
+      const r=await db.from('care_cases').select('*').eq('id',caseId).maybeSingle();
+      if(r.error)throw r.error;const c=r.data;if(!c)return;
+      if(!c.service_usage_type){toast('請先編輯個案並設定服務類別，再上傳照顧計畫版本。','warn');return;}
+      openModal({title:'上傳照顧計畫版本',showConfirm:false,large:true,html:`
+        <div class="html-import-note">個案：<strong>${escapeHTML(c.case_no||'—')　${escapeHTML(c.case_name||'')</strong><br>可依實際需要補上傳新、舊版本。系統會以「計畫日期」排序，不以你上傳的先後順序判斷最新版本。</div>
+        <div class="field"><label>照顧計畫 HTML *</label><div class="file-drop case-html-file-drop"><input id="planVersionFile" type="file" accept=".html,.htm,text/html,application/xhtml+xml"><div class="help">僅接受 HTML／HTM，單檔上限 10 MB。</div></div></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px"><button id="parsePlanVersion" class="btn primary" type="button">解析並預覽</button></div>
+        <div id="planVersionStatus" class="html-import-status">尚未開始解析。</div>
+      `});
+      $('parsePlanVersion').addEventListener('click',async()=>{
+        const file=$('planVersionFile').files[0];if(!file){toast('請選擇 HTML 檔案','warn');return;}
+        if(!/\.html?$/i.test(file.name)){toast('檔案格式必須是 HTML 或 HTM','warn');return;}
+        if(file.size>10*1024*1024){toast('HTML 檔案不可超過 10 MB','warn');return;}
+        const status=$('planVersionStatus');
+        try{
+          status.textContent='正在解析 HTML…';
+          const source=await file.text();const d=htmlParseDocument(source);
+          if(c.national_id&&d.national_id&&c.national_id.toUpperCase()!==d.national_id.toUpperCase()){
+            status.textContent='身分證字號與目前個案不一致，已停止匯入。';toast('此 HTML 似乎不是這位個案的資料','error');return;
+          }
+          d._file=file;d._source=source;d.source_hash=await htmlSha256(file);d.file_name=file.name;
+          htmlOpenExistingPlanPreview(c,d);
+        }catch(err){status.textContent='解析失敗。';toast('HTML 解析失敗：'+(err?.message||err),'error');}
+      });
+    }catch(err){toast('讀取個案資料失敗：'+(err?.message||err),'error');}
+    finally{showLoading(false);}
+  }
+
+  function htmlOpenExistingPlanPreview(c,d){
+    const noDate=!d.care_plan?.plan_date;
+    openModal({title:'確認照顧計畫版本',confirmText:'確認上傳',large:true,html:`
+      ${noDate?'<div class="import-warning">這份 HTML 未辨識到計畫日期；若個案已有含日期的版本，本次上傳不會取代目前版本。</div>':''
+      <div class="import-detail-grid">
+        <div class="import-detail-cell"><label>個案</label><div>${escapeHTML(c.case_no||'—')　${escapeHTML(c.case_name||'')</div></div>
+        <div class="import-detail-cell"><label>計畫日期</label><div>${d.care_plan?.plan_date?rocDate(d.care_plan.plan_date+'T00:00:00'):'未辨識'</div></div>
+        <div class="import-detail-cell"><label>辨識服務數</label><div>${(d.services||[]).length 項</div></div>
+      </div>
+      <div class="import-section">核定服務</div><div class="approved-chip-wrap">${(d.services||[]).length?d.services.map(x=>`<span class="approved-chip">${escapeHTML(x.service_code)${x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):''</span>`).join(''):'<span style="font-size:11px;color:#667085">未辨識到核定服務</span>'</div>
+      <div class="import-section">照顧計畫內容</div>${htmlPlanPreview(d.care_plan)
+    `,onConfirm:()=>htmlSaveExistingPlanVersion(c,d)});
+  }
+
+  async function htmlSaveExistingPlanVersion(c,d){
+    const file=d._file;let path='';showLoading(true);
+    try{
+      const safeNo=htmlNormalizeCaseNo(c.case_no||c.id);const ext=/\.htm$/i.test(file.name)?'htm':'html';
+      path=`${safeNo/plans/${Date.now()-${crypto.randomUUID().${ext`;
+      const up=await db.storage.from(CASE_HTML_BUCKET).upload(path,file,{contentType:'text/html',upsert:false});if(up.error)throw up.error;
+      const payload={
+        case_no:c.case_no,case_name:d.case_name||c.case_name,national_id:d.national_id||c.national_id||'',
+        birth_date:d.birth_date||c.birth_date||'',gender:d.gender||c.gender||'',address:d.address||c.address||'',
+        phone:d.phone||c.phone||'',cms_level:d.cms_level||c.cms_level||'',identity_type:d.identity_type||c.identity_type||'',
+        assessment_date:d.assessment_date||'',plan_approval_date:d.plan_approval_date||'',
+        a_unit_name:d.a_unit_name||c.a_unit_name||'',case_manager_name:d.case_manager_name||c.case_manager_name||'',
+        case_manager_phone:d.case_manager_phone||c.case_manager_phone||'',assessor_name:d.assessor_name||c.assessor_name||'',
+        supervisor_id:c.supervisor_id,service_usage_type:c.service_usage_type,payment_method:c.payment_method||'',
+        contacts:d.contacts||[],services:d.services||[],budgets:d.budgets||[],care_plan:d.care_plan||{},
+        source_ca110_id:d.source_ca110_id||'',source_hash:d.source_hash||'',file_name:file.name,storage_path:path,
+        warnings:d.warnings||[],match_case_id:c.id
+      };
+      if(d.lives_alone!==null)payload.lives_alone=d.lives_alone;
+      const r=await db.rpc('import_case_html_data',{payload});if(r.error)throw r.error;
+      if(r.data?.action==='duplicate'){
+        await db.storage.from(CASE_HTML_BUCKET).remove([path]);toast('這份 HTML 已經上傳過，未重複建立版本。','warn');
+      }else{
+        toast(r.data?.plan_is_current?'照顧計畫已上傳，系統判定此版為目前最新版本':'照顧計畫已上傳並保存為歷史版本，目前最新版本不變','success');
+      }
+      await htmlRefreshOpenCase(c.id);return true;
+    }catch(err){
+      if(path)try{await db.storage.from(CASE_HTML_BUCKET).remove([path]);}catch(_){}
+      toast('上傳照顧計畫失敗：'+(err?.message||err),'error');return false;
+    }finally{showLoading(false);}
+  }
+
+  function htmlAddCaseDetailControls(block,c,plans,imports){
+    const canEdit=htmlCanEditCase(c);
+    const basicTitle=[...block.querySelectorAll('.case-section-title')].find(x=>x.textContent.includes('基本資料'));
+    if(basicTitle&&canEdit){
+      const btn=document.createElement('button');btn.className='btn sm';btn.textContent='編輯個案';
+      btn.addEventListener('click',()=>htmlOpenCaseEdit(c.id));basicTitle.append(btn);
+    }
+    const currentTitle=[...block.querySelectorAll('.case-section-title')].find(x=>x.textContent.includes('目前照顧計畫'));
+    if(!currentTitle)return;
+    const title=document.createElement('div');title.className='case-section-title';
+    title.innerHTML=`<strong>照顧計畫版本</strong><div class="section-actions">${canEdit?'<button class="btn sm primary" id="uploadPlanVersion">＋ 上傳照顧計畫 HTML</button>':''</div>`;
+    const list=document.createElement('div');list.className='plan-version-list';
+    const importMap=new Map((imports||[]).map(x=>[x.id,x]));
+    list.innerHTML=(plans||[]).length?(plans||[]).map(p=>{
+      const src=importMap.get(p.source_import_id);
+      const date=p.plan_date?rocDate(p.plan_date+'T00:00:00'):'日期未辨識';
+      return `<div class="plan-version-row ${p.is_current?'current':''"><div class="plan-version-main"><strong>${date${p.is_current?'<span class="plan-current-badge">目前使用</span>':''</strong><small>${src?.file_name?'來源：'+escapeHTML(src.file_name):'系統版本'${p.updated_at?'｜更新：'+rocDate(p.updated_at):''</small></div><div class="section-actions">${canEdit?`<button class="btn sm" data-edit-plan="${p.id">編輯</button>`:''</div></div>`;
+    }).join(''):'<div class="html-import-status">尚無照顧計畫版本。</div>';
+    currentTitle.before(title,list);
+    title.querySelector('#uploadPlanVersion')?.addEventListener('click',()=>htmlOpenExistingPlanUpload(c.id));
+    list.querySelectorAll('[data-edit-plan]').forEach(btn=>btn.addEventListener('click',()=>htmlOpenPlanEdit(btn.dataset.editPlan)));
+  }
+
   async function htmlAugmentCaseDetail(caseId){
     try{
       const [cRes,ctRes,svRes,plRes,bdRes,imRes]=await Promise.all([
         db.from('care_cases').select('*').eq('id',caseId).maybeSingle(),
         db.from('case_contacts').select('*').eq('case_id',caseId).order('is_primary_contact',{ascending:false}).order('created_at'),
         db.from('case_approved_services').select('*').eq('case_id',caseId).eq('is_current',true).order('service_group').order('service_code'),
-        db.from('care_plans').select('*').eq('case_id',caseId).order('created_at',{ascending:false}),
+        db.from('care_plans').select('*').eq('case_id',caseId).order('plan_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}),
         db.from('service_budgets').select('*').eq('case_id',caseId).eq('is_current',true).order('category'),
-        db.from('case_imports').select('id,file_name,storage_path,imported_at,import_type,detected_plan_date').eq('case_id',caseId).order('imported_at',{ascending:false}).limit(10)
-      ]); const err=cRes.error||ctRes.error||svRes.error||plRes.error||bdRes.error||imRes.error;if(err)throw err;const c=cRes.data;if(!c)return;
-      const body=document.querySelector('#modalRoot .modal-body'); if(!body||body.querySelector('.import-detail-block'))return;
-      const contacts=ctRes.data||[],services=svRes.data||[],plans=plRes.data||[],budgets=bdRes.data||[],imports=imRes.data||[]; const plan=plans.find(x=>x.is_current)||plans[0];
+        db.from('case_imports').select('id,file_name,storage_path,imported_at,import_type,detected_plan_date').eq('case_id',caseId).order('imported_at',{ascending:false})
+      ]);
+      const err=cRes.error||ctRes.error||svRes.error||plRes.error||bdRes.error||imRes.error;if(err)throw err;
+      const c=cRes.data;if(!c)return;
+      const body=document.querySelector('#modalRoot .modal-body');if(!body||body.querySelector('.import-detail-block'))return;
+      const contacts=ctRes.data||[],services=svRes.data||[],plans=plRes.data||[],budgets=bdRes.data||[],imports=imRes.data||[];
+      const plan=plans.find(x=>x.is_current)||plans[0];
       const block=document.createElement('div');block.className='import-detail-block';block.innerHTML=`
-        <div class="case-section-title"><strong>基本資料</strong></div><div class="import-detail-grid"><div class="import-detail-cell"><label>個案編號</label><div>${escapeHTML(c.case_no||'—')}</div></div><div class="import-detail-cell"><label>身分證字號</label><div>${escapeHTML(c.national_id||'—')}</div></div><div class="import-detail-cell"><label>出生日期</label><div>${c.birth_date?rocDate(c.birth_date+'T00:00:00'):'—'}</div></div><div class="import-detail-cell"><label>性別</label><div>${escapeHTML(c.gender||'—')}</div></div><div class="import-detail-cell"><label>電話</label><div>${escapeHTML(c.phone||'—')}</div></div><div class="import-detail-cell"><label>CMS</label><div>${escapeHTML(c.cms_level||'—')}</div></div><div class="import-detail-cell" style="grid-column:1/-1"><label>地址</label><div>${escapeHTML(c.address||'—')}</div></div><div class="import-detail-cell"><label>A單位</label><div>${escapeHTML(c.a_unit_name||'—')}</div></div><div class="import-detail-cell"><label>A個管</label><div>${escapeHTML(c.case_manager_name||'—')}</div></div><div class="import-detail-cell"><label>A個管電話</label><div>${escapeHTML(c.case_manager_phone||'—')}</div></div><div class="import-detail-cell"><label>服務類別</label><div>${escapeHTML(c.service_usage_type||'—')}</div></div><div class="import-detail-cell"><label>繳款方式</label><div>${escapeHTML(c.payment_method||'未設定')}</div></div></div>
-        <div class="case-section-title"><strong>聯絡人／照顧者</strong></div><div class="approved-chip-wrap">${contacts.length?contacts.map(x=>`<span class="approved-chip">${escapeHTML(x.contact_name)}${x.relationship?'・'+escapeHTML(x.relationship):''}${x.is_primary_contact?'・主要聯絡人':''}${x.is_primary_caregiver?'・主要照顧者':''}${x.is_secondary_caregiver?'・次要照顧者':''}</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無聯絡人資料</span>'}</div>
-        <div class="case-section-title"><strong>目前核定服務</strong></div><div class="approved-chip-wrap">${services.length?services.map(x=>`<span class="approved-chip">${escapeHTML(x.service_code)}${x.service_name?' '+escapeHTML(x.service_name):''}${x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):''}</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無核定服務資料</span>'}</div>${budgets.length?`<div class="html-import-status" style="margin-top:8px">${budgets.map(x=>`${escapeHTML(x.category)}：額度 ${x.benefit_limit??'—'}｜擬定 ${x.planned_total??'—'}｜剩餘 ${x.remaining_amount??'—'}`).join('\n')}</div>`:''}
-        <div class="case-section-title"><strong>目前照顧計畫</strong></div>${plan?htmlPlanPreview({sections:plan.sections||{}}):'<div class="html-import-status">尚無照顧計畫。</div>'}
-        <div class="case-section-title"><strong>HTML 匯入紀錄</strong></div><div class="import-history">${imports.length?imports.map((x,i)=>`<div class="import-history-row"><div><strong>${escapeHTML(x.file_name)}</strong><small>${rocDate(x.imported_at)}・${x.import_type==='new_case'?'建立個案':'更新個案'}</small></div><button class="btn sm" data-view-import="${i}">查看原始 HTML</button></div>`).join(''):'<div class="html-import-status">此個案尚無 HTML 匯入紀錄。</div>'}</div>`;
-      body.prepend(block); block.querySelectorAll('[data-view-import]').forEach(btn=>btn.addEventListener('click',()=>{const x=imports[Number(btn.dataset.viewImport)];if(x)htmlViewOriginal(x.storage_path,x.file_name);}));
+        <div class="case-section-title"><strong>基本資料</strong></div><div class="import-detail-grid"><div class="import-detail-cell"><label>個案編號</label><div>${escapeHTML(c.case_no||'—')</div></div><div class="import-detail-cell"><label>身分證字號</label><div>${escapeHTML(c.national_id||'—')</div></div><div class="import-detail-cell"><label>出生日期</label><div>${c.birth_date?rocDate(c.birth_date+'T00:00:00'):'—'</div></div><div class="import-detail-cell"><label>性別</label><div>${escapeHTML(c.gender||'—')</div></div><div class="import-detail-cell"><label>電話</label><div>${escapeHTML(c.phone||'—')</div></div><div class="import-detail-cell"><label>CMS</label><div>${escapeHTML(c.cms_level||'—')</div></div><div class="import-detail-cell" style="grid-column:1/-1"><label>地址</label><div>${escapeHTML(c.address||'—')</div></div><div class="import-detail-cell"><label>A單位</label><div>${escapeHTML(c.a_unit_name||'—')</div></div><div class="import-detail-cell"><label>A個管</label><div>${escapeHTML(c.case_manager_name||'—')</div></div><div class="import-detail-cell"><label>A個管電話</label><div>${escapeHTML(c.case_manager_phone||'—')</div></div><div class="import-detail-cell"><label>服務類別</label><div>${escapeHTML(c.service_usage_type||'—')</div></div><div class="import-detail-cell"><label>繳款方式</label><div>${escapeHTML(c.payment_method||'未設定')</div></div></div>
+        <div class="case-section-title"><strong>聯絡人／照顧者</strong></div><div class="approved-chip-wrap">${contacts.length?contacts.map(x=>`<span class="approved-chip">${escapeHTML(x.contact_name)${x.relationship?'・'+escapeHTML(x.relationship):''${x.is_primary_contact?'・主要聯絡人':''${x.is_primary_caregiver?'・主要照顧者':''${x.is_secondary_caregiver?'・次要照顧者':''</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無聯絡人資料</span>'</div>
+        <div class="case-section-title"><strong>目前核定服務</strong></div><div class="approved-chip-wrap">${services.length?services.map(x=>`<span class="approved-chip">${escapeHTML(x.service_code)${x.service_name?' '+escapeHTML(x.service_name):''${x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):''</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無核定服務資料</span>'</div>${budgets.length?`<div class="html-import-status" style="margin-top:8px">${budgets.map(x=>`${escapeHTML(x.category)：額度 ${x.benefit_limit??'—'｜擬定 ${x.planned_total??'—'｜剩餘 ${x.remaining_amount??'—'`).join('\n')</div>`:''
+        <div class="case-section-title"><strong>目前照顧計畫</strong></div>${plan?htmlPlanPreview({sections:plan.sections||{}}):'<div class="html-import-status">尚無照顧計畫。</div>'
+        <div class="case-section-title"><strong>HTML 匯入紀錄</strong></div><div class="import-history">${imports.length?imports.map((x,i)=>`<div class="import-history-row"><div><strong>${escapeHTML(x.file_name)</strong><small>${rocDate(x.imported_at)・${x.import_type==='new_case'?'建立個案':'更新個案'</small></div><button class="btn sm" data-view-import="${i">查看原始 HTML</button></div>`).join(''):'<div class="html-import-status">此個案尚無 HTML 匯入紀錄。</div>'</div>
+      `;
+      body.prepend(block);
+      block.querySelectorAll('[data-view-import]').forEach(btn=>btn.addEventListener('click',()=>{const x=imports[Number(btn.dataset.viewImport)];if(x)htmlViewOriginal(x.storage_path,x.file_name);}));
+      htmlAddCaseDetailControls(block,c,plans,imports);
     }catch(err){console.error('讀取 HTML 個案資料失敗',err);}
   }
 
