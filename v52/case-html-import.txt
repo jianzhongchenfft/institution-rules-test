@@ -248,6 +248,15 @@
     const sync=()=>{copay.value=htmlCopayForWelfareIdentity(identity.value);};
     identity.addEventListener('change',sync); sync();
   }
+  function htmlBindIndigenousGroup(statusId,groupId){
+    const status=$(statusId),group=$(groupId); if(!status||!group)return;
+    const sync=()=>{
+      const enabled=status.value==='true';
+      group.disabled=!enabled;
+      if(status.value==='false')group.value='';
+    };
+    status.addEventListener('change',sync); sync();
+  }
   function htmlBindCaseNoInput(id){
     const input=$(id); if(!input)return;
     input.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Tab'&&false)e.preventDefault();});
@@ -453,6 +462,7 @@
     htmlBindServiceEditControls();
     htmlBindBudgetEditControls();
     htmlBindWelfareCopay('hiWelfareIdentity','hiCopayRate');
+    htmlBindIndigenousGroup('hiIndigenous','hiIndigenousGroup');
     const potentialSelect=$('hiPotentialMatch');
     if(potentialSelect){
       potentialSelect.addEventListener('change',async function(e){
@@ -498,6 +508,7 @@
     }});
     htmlBindCaseNoInput('hmCaseNo');
     htmlBindWelfareCopay('hmWelfareIdentity','hmCopayRate');
+    htmlBindIndigenousGroup('hmIndigenous','hmIndigenousGroup');
   }
   async function htmlViewOriginal(path,fileName){
     showLoading(true);try{const r=await db.storage.from(CASE_HTML_BUCKET).download(path);if(r.error)throw r.error;const text=await r.data.text();const blob=new Blob([text],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(err){toast('讀取原始 HTML 失敗：'+(err?.message||err),'error');}finally{showLoading(false);}
@@ -659,6 +670,7 @@
       }});
       htmlBindCaseNoInput('editCaseNo');
       htmlBindWelfareCopay('editWelfareIdentity','editCopayRate');
+      htmlBindIndigenousGroup('editIndigenous','editIndigenousGroup');
       htmlBindContactEditControls();
     }catch(err){
       toast('讀取個案資料失敗：'+(err&&err.message?err.message:err),'error');
