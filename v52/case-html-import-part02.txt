@@ -1,0 +1,53 @@
+        if(cells[i].tagName!=='TH')continue;
+        let td=null; for(let j=i+1;j<cells.length;j++){if(cells[j].tagName==='TH')break;if(cells[j].tagName==='TD'){td=cells[j];break;}}
+        if(td)pairs.push({label:htmlCleanText(cells[i].textContent).replace(/^＊/,'').trim(),value:htmlCleanText(td.textContent)});
+      }
+    });
+    return pairs;
+  }
+  function htmlFindPair(pairs, labels){
+    for(const target of labels){
+      const exact=pairs.find(x=>x.label===target); if(exact?.value)return exact.value;
+      const fuzzy=pairs.find(x=>x.label.includes(target)); if(fuzzy?.value)return fuzzy.value;
+    }
+    return '';
+  }
+  function htmlLabeledBlock(doc,label){
+    const th=[...doc.querySelectorAll('th')].find(x=>htmlCleanText(x.textContent).includes(label));
+    if(!th)return '';
+    const td=th.nextElementSibling?.tagName==='TD'?th.nextElementSibling:th.parentElement?.querySelector('td');
+    return htmlCleanText(td?.textContent||'');
+  }
+  function htmlSectionText(text, startLabel, nextLabels=[]){
+    const start=text.indexOf(startLabel); if(start<0)return '';
+    let end=text.length;
+    nextLabels.forEach(l=>{const i=text.indexOf(l,start+startLabel.length);if(i>=0&&i<end)end=i;});
+    return htmlCleanText(text.slice(start+startLabel.length,end)).replace(/^\s*[：:]\s*/,'');
+  }
+  function htmlFullContactName(raw, role){
+    const re=role==='primary'
+      ?/(?:主要照顧者|案妻為主要照顧者)[：:]?\s*([^\n。]+)/
+      :/(?:次要照顧者)[：:]?\s*([^\n。]+)/;
+    const m=raw.match(re); if(!m)return '';
+    const line=m[1];
+    const n=line.match(/[-－]\s*([^\(（\s，,]+)\s*[\(（]/) || line.match(/^([^\(（，,]+)\s*[\(（]/);
+    return htmlCleanText(n?.[1]||'').replace(/^案(?:妻|夫|女|子|妹|兄|姐|弟)[-－]?/,'');
+  }
+  function htmlParseContacts(doc,pairs,raw){
+    const contacts=[];
+    let pName=htmlFullContactName(raw,'primary') || htmlFindPair(pairs,['B1a.主要照顧者姓名','主要照顧者姓名']);
+    let pRel=htmlFindPair(pairs,['B1b.與個案之關係','主要照顧者與個案之關係']);
+    let pPhone='';
+    const mainLabel=[...doc.querySelectorAll('th')].find(x=>htmlCleanText(x.textContent).includes('主要照顧者姓名'));
+    if(mainLabel){
+      let tr=mainLabel.closest('tr'); for(let k=0;k<5&&tr;k++,tr=tr.nextElementSibling){const t=htmlCleanText(tr.textContent);const m=t.match(/手機\s*(0\d[\d\-\s]{7,14})/);if(m){pPhone=htmlCleanText(m[1]).replace(/\s/g,'');break;}}
+    }
+    if(pName)contacts.push({contact_name:pName,relationship:pRel.replace(/^\d+\.?\s*/,''),phone:pPhone,is_primary_contact:/主要聯絡人[^\n。]*?主要照顧者|主要照顧者[^\n。]*?主要聯絡人/.test(raw),is_primary_caregiver:true,is_secondary_caregiver:false,notes:''});
+
+    let sName=htmlFullContactName(raw,'secondary') || htmlFindPair(pairs,['B4.次要照顧者姓名','次要照顧者姓名']);
+    let sRel=htmlFindPair(pairs,['B5.次要照顧者與個案之關係','次要照顧者與個案之關係']);
+    let sPhone='';
+    const secLabel=[...doc.querySelectorAll('th')].find(x=>htmlCleanText(x.textContent).includes('次要照顧者姓名'));
+    if(secLabel){
+      let tr=secLabel.closest('tr'); for(let k=0;k<5&&tr;k++,tr=tr.nextElementSibling){const t=htmlCleanText(tr.textContent);const m=t.match(/次要照顧者手機\s*(0\d[\d\-\s]{7,14})/);if(m){sPhone=htmlCleanText(m[1]).replace(/\s/g,'');break;}}
+    }
