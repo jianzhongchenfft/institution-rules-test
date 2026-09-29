@@ -35,9 +35,18 @@
   async function htmlSha256(file){
     const b=await file.arrayBuffer(); const h=await crypto.subtle.digest('SHA-256',b); return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('');
   }
+  function htmlNormalizeCaseNo(value=''){
+    return String(value||'').replace(/\s+/g,'').toUpperCase();
+  }
+  function htmlBindCaseNoInput(id){
+    const input=$(id); if(!input)return;
+    input.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Tab'&&false)e.preventDefault();});
+    input.addEventListener('input',()=>{const next=htmlNormalizeCaseNo(input.value);if(input.value!==next)input.value=next;});
+    input.value=htmlNormalizeCaseNo(input.value);
+  }
   function htmlSupervisorOptions(selected=''){
-    const supervisors=(state.caseStaff||[]).filter(s=>s.role==='supervisor');
-    const actual=state.profile?.role==='supervisor'?state.profile.id:selected;
+    const supervisors=(state.caseStaff||[]).filter(s=>s.can_supervise||s.role==='supervisor');
+    const actual=selected || (state.profile?.can_supervise ? state.profile.id : '');
     return `<option value="">請選擇</option>${supervisors.map(s=>`<option value="${s.id}" ${actual===s.id?'selected':''}>${escapeHTML(s.display_name)}</option>`).join('')}`;
   }
   function htmlOpenChoice(){
@@ -49,8 +58,9 @@
     openModal({title:'從照管平台 HTML 匯入個案',showConfirm:false,large:true,html:`
       <div class="html-import-note">請上傳「照顧服務管理資訊平臺」下載的 HTML／HTM 檔。解析只讀取檔案內容，不執行檔案中的 JavaScript。個案編號為機構系統編號，需由匯入人手動輸入。</div>
       <div class="form-grid">
-        <div class="field"><label>個案編號 *</label><input id="htmlCaseNo" placeholder="例如：115C05008"></div>
+        <div class="field"><label>個案編號 *</label><input id="htmlCaseNo" placeholder="例如：115C00001"></div>
         <div class="field"><label>負責督導 *</label><select id="htmlSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions('')}</select></div>
-        <div class="field full"><label>照管平台 HTML *</label><div class="file-drop"><input id="htmlCaseFile" type="file" accept=".html,.htm,text/html,application/xhtml+xml"><div class="help">僅接受 HTML／HTM，單檔上限 10 MB。</div></div></div>
+        <div class="field full"><label>照管平台 HTML *</label><div class="file-drop case-html-file-drop"><input id="htmlCaseFile" type="file" accept=".html,.htm,text/html,application/xhtml+xml"><div class="help">僅接受 HTML／HTM，單檔上限 10 MB。</div></div></div>
         <div class="field full"><button id="parseCaseHtml" class="btn primary" style="width:100%">解析 HTML 並預覽</button></div>
       </div><div id="htmlParseStatus" class="html-import-status">尚未開始解析。</div>`});
+    htmlBindCaseNoInput('htmlCaseNo');
