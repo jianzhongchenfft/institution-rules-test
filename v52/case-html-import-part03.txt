@@ -32,8 +32,9 @@
       if(m){out.push({category:'BC',benefit_limit:htmlNum(m[1]),planned_total:htmlNum(m[2]),remaining_amount:htmlNum(m[3]),valid_from:'',valid_to:''});cats.add('BC');}
     }
     if(services.some(x=>x.service_group==='G')){
-      const panels=[...doc.querySelectorAll('.panel, .panel-body, div')].filter(x=>/居家喘息服務|喘息服務\(G\)/.test(htmlCleanText(x.textContent)));
-      const txt=htmlCleanText(panels[0]?.textContent||whole);
+      const gTable=[...doc.querySelectorAll('table')].find(t=>/GA\d+/i.test(htmlCleanText(t.textContent)) && /服務數量/.test(htmlCleanText(t.textContent)));
+      const gPanel=gTable?.closest('.panel') || gTable?.parentElement;
+      const txt=htmlCleanText(gPanel?.textContent||'');
       const m=txt.match(/給付額度[：:]\s*([\d,.]+).*?擬定總計[：:]\s*([\d,.]+).*?剩餘額度[：:]\s*([\d,.]+)/s);
       if(m){out.push({category:'G',benefit_limit:htmlNum(m[1]),planned_total:htmlNum(m[2]),remaining_amount:htmlNum(m[3]),valid_from:'',valid_to:''});cats.add('G');}
     }
