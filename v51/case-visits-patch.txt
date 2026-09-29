@@ -139,17 +139,20 @@
     if(!canUseCases()) return;
     if(!silent) showLoading(true);
     try{
-      const [staffRes,casesRes,visitsRes] = await Promise.all([
+      const [staffRes,casesRes,visitsRes,servicesRes] = await Promise.all([
         db.rpc('get_case_staff_directory'),
-        db.from('care_cases').select('id,case_name,supervisor_id,care_worker_name,open_date,cms_level,service_status,notes,created_at').order('case_name'),
-        db.from('case_visits').select('*').order('visit_date',{ascending:false}).order('created_at',{ascending:false})
+        db.from('care_cases').select('id,case_no,case_name,national_id,birth_date,gender,address,phone,supervisor_id,care_worker_name,open_date,cms_level,service_status,notes,created_at').order('case_no',{ascending:true,nullsFirst:false}).order('case_name'),
+        db.from('case_visits').select('*').order('visit_date',{ascending:false}).order('created_at',{ascending:false}),
+        db.from('case_approved_services').select('case_id,service_group,service_code,service_name,approved_quantity').eq('is_current',true).order('service_code')
       ]);
       if(staffRes.error) throw staffRes.error;
       if(casesRes.error) throw casesRes.error;
       if(visitsRes.error) throw visitsRes.error;
+      if(servicesRes.error) throw servicesRes.error;
       state.caseStaff = staffRes.data || [];
       state.cases = casesRes.data || [];
       state.caseVisits = visitsRes.data || [];
+      state.caseServices = servicesRes.data || [];
       if(!state.caseSupervisorFilter) state.caseSupervisorFilter = state.profile?.role==='supervisor' ? 'mine' : 'all';
       state.caseDataLoaded = true;
     }catch(err){
@@ -178,13 +181,39 @@
     loadCaseVisitData().then(renderCaseVisitsPage);
   };
 
+  function currentServiceSummary(caseId){
+    const items=(state.caseServices||[]).filter(x=>x.case_id===caseId);
+    if(!items.length) return '—';
+    return items.map(x=>{
+      const qty=x.approved_quantity;
+      const qtyText=qty===null||qty===undefined||qty===''?'':` ×${Number(qty)%1===0?Number(qty):qty}`;
+      return `${x.service_code}${qtyText}`;
+    }).join('、');
+  }
+
+  function caseServiceStatusInfo(c){
+    const key=c.service_status||'active';
+    if(key==='suspended') return {key:'due',text:'暫停'};
+    if(key==='closed') return {key:'overdue',text:'已結案'};
+    return {key:'normal',text:'服務中'};
+  }
+
   function renderCaseVisitsPage(){
     if(state.page!=='cases') return;
     const supervisors = state.caseStaff.filter(s=>s.role==='supervisor');
     const scope = currentCaseScope();
+    const validServiceFilters=['all','active','suspended','closed'];
+    if(!validServiceFilters.includes(state.caseStatusFilter)) state.caseStatusFilter='all';
     const q = state.caseQuery.trim().toLowerCase();
-    let rows = scope.filter(c=>!q || c.case_name.toLowerCase().includes(q) || (c.care_worker_name||'').toLowerCase().includes(q) || caseStaffName(c.supervisor_id).toLowerCase().includes(q));
-    if(state.caseStatusFilter!=='all') rows = rows.filter(c=>caseStatusInfo(c).key===state.caseStatusFilter);
+    let rows = scope.filter(c=>{
+      if(!q) return true;
+      const services=(state.caseServices||[]).filter(x=>x.case_id===c.id).map(x=>`${x.service_code||''} ${x.service_name||''}`).join(' ');
+      return [
+        c.case_no,c.case_name,c.national_id,c.address,
+        caseStaffName(c.supervisor_id),services
+      ].some(v=>String(v||'').toLowerCase().includes(q));
+    });
+    if(state.caseStatusFilter!=='all') rows = rows.filter(c=>(c.service_status||'active')===state.caseStatusFilter);
 
     const now = new Date();
     const year = now.getFullYear(), month = now.getMonth();
@@ -194,14 +223,14 @@
 
     $('content').innerHTML = `
       <div class="page-head">
-        <div><h1>👤 個案家訪／電訪</h1><p>優先顯示自己的個案，也可切換查閱其他督導的個案與歷次訪視紀錄。</p></div>
+        <div><h1>👤 個案管理</h1><p>督導優先顯示自己的個案，也可切換查閱其他督導個案；可由照管平台 HTML 建立或更新個案資料。</p></div>
         <div class="actions"><button id="addCaseBtn" class="btn primary">＋ 新增個案</button></div>
       </div>
       <section class="case-stats">
-        <article class="stat-card"><div class="stat-head"><span>個案數</span><span class="stat-icon">👤</span></div><div class="stat-value">${scope.length}</div><div class="stat-foot">目前篩選督導的服務中個案</div></article>
+        <article class="stat-card"><div class="stat-head"><span>個案數</span><span class="stat-icon">👤</span></div><div class="stat-value">${scope.length}</div><div class="stat-foot">目前篩選範圍內的個案</div></article>
         <article class="stat-card"><div class="stat-head"><span>本月待訪</span><span class="stat-icon">📅</span></div><div class="stat-value">${monthDue}</div><div class="stat-foot">依紀錄設定的下次訪視日期</div></article>
         <article class="stat-card"><div class="stat-head"><span>待追蹤</span><span class="stat-icon">🔎</span></div><div class="stat-value">${followCount}</div><div class="stat-foot">尚未完成的追蹤事項</div></article>
-        <article class="stat-card"><div class="stat-head"><span>逾期</span><span class="stat-icon">⚠️</span></div><div class="stat-value">${overdueCount}</div><div class="stat-foot">訪視或追蹤日期已超過</div></article>
+        <article class="stat-card"><div class="stat-head"><span>訪視逾期</span><span class="stat-icon">⚠️</span></div><div class="stat-value">${overdueCount}</div><div class="stat-foot">訪視或追蹤日期已超過</div></article>
       </section>
       <div class="case-toolbar">
         <span class="case-filter-label">督導</span>
@@ -210,14 +239,12 @@
           <option value="all" ${state.caseSupervisorFilter==='all'?'selected':''}>全部個案</option>
           ${supervisors.map(s=>`<option value="${s.id}" ${state.caseSupervisorFilter===s.id?'selected':''}>${escapeHTML(s.display_name)}</option>`).join('')}
         </select>
-        <div class="searchbox"><input id="caseSearch" placeholder="搜尋個案、居服員或督導" value="${escapeHTML(state.caseQuery)}"></div>
+        <div class="searchbox"><input id="caseSearch" placeholder="搜尋個案編號、姓名、身分證、地址、督導或服務碼" value="${escapeHTML(state.caseQuery)}"></div>
         <select id="caseStatusFilter">
           <option value="all" ${state.caseStatusFilter==='all'?'selected':''}>全部狀態</option>
-          <option value="followup" ${state.caseStatusFilter==='followup'?'selected':''}>待追蹤</option>
-          <option value="due" ${state.caseStatusFilter==='due'?'selected':''}>即將到期</option>
-          <option value="overdue" ${state.caseStatusFilter==='overdue'?'selected':''}>逾期</option>
-          <option value="normal" ${state.caseStatusFilter==='normal'?'selected':''}>正常</option>
-          <option value="unplanned" ${state.caseStatusFilter==='unplanned'?'selected':''}>未排定</option>
+          <option value="active" ${state.caseStatusFilter==='active'?'selected':''}>服務中</option>
+          <option value="suspended" ${state.caseStatusFilter==='suspended'?'selected':''}>暫停</option>
+          <option value="closed" ${state.caseStatusFilter==='closed'?'selected':''}>已結案</option>
         </select>
         <button id="reloadCases" class="btn">↻ 重新整理</button>
       </div>
@@ -231,18 +258,16 @@
 
     const list = $('caseList');
     if(!rows.length){
-      const extra = state.cases.length ? '請調整督導、狀態或搜尋條件。' : '目前尚未建立個案資料，可先新增個案後開始記錄家訪與電訪。';
+      const extra = state.cases.length ? '請調整督導、狀態或搜尋條件。' : '目前尚未建立個案資料，可由 HTML 匯入或手動建立個案。';
       list.innerHTML = `<div class="empty"><div class="icon">👤</div><h3>目前沒有可顯示的個案</h3><p>${extra}</p></div>`;
       return;
     }
 
-    list.innerHTML = `<div class="case-table-shell"><table class="case-table"><thead><tr><th>個案姓名</th><th>負責督導</th><th>最近訪視</th><th>類型</th><th>下次追蹤／訪視</th><th>狀態</th></tr></thead><tbody>${rows.map(c=>{
-      const latest=latestVisitFor(c.id);
-      const pending=pendingFollowUpsFor(c.id)[0];
-      const next=nextVisitFor(c.id);
-      const s=caseStatusInfo(c);
-      const nextText=pending ? `${pending.follow_up_date?rocDate(pending.follow_up_date+'T00:00:00'):'未排日期'}・${escapeHTML(pending.follow_up_item||'追蹤事項')}` : (next?rocDate(next+'T00:00:00'):'—');
-      return `<tr><td><button class="case-name-btn" data-case-id="${c.id}">${escapeHTML(c.case_name)}</button></td><td>${escapeHTML(caseStaffName(c.supervisor_id))}</td><td>${latest?rocDate(latest.visit_date+'T00:00:00'):'—'}</td><td>${latest?caseTypeLabel(latest.visit_type):'—'}</td><td>${nextText}</td><td><span class="case-status ${s.key}">${s.text}</span></td></tr>`;
+    list.innerHTML = `<div class="case-table-shell"><table class="case-table"><thead><tr><th>個案編號</th><th>個案姓名</th><th>CMS</th><th>負責督導</th><th>主要服務</th><th>狀態</th></tr></thead><tbody>${rows.map(c=>{
+      const svc=currentServiceSummary(c.id);
+      const status=caseServiceStatusInfo(c);
+      const cms=c.cms_level ? (/^\d+$/.test(String(c.cms_level))?`${c.cms_level}級`:String(c.cms_level)) : '—';
+      return `<tr><td>${escapeHTML(c.case_no||'—')}</td><td><button class="case-name-btn" data-case-id="${c.id}">${escapeHTML(c.case_name)}</button></td><td>${escapeHTML(cms)}</td><td>${escapeHTML(caseStaffName(c.supervisor_id))}</td><td>${escapeHTML(svc)}</td><td><span class="case-status ${status.key}">${status.text}</span></td></tr>`;
     }).join('')}</tbody></table></div>`;
     list.querySelectorAll('[data-case-id]').forEach(btn=>btn.addEventListener('click',()=>openCaseDetail(state.cases.find(c=>c.id===btn.dataset.caseId))));
   }
