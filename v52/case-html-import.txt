@@ -386,18 +386,37 @@
     else if(potential.length)warning=`<div class="import-warning">找到姓名＋生日相同的可能個案。請在下方決定是否更新既有個案；若確定是不同人，可建立新個案。</div>`;
     const me=state.profile?.role==='supervisor';
     openModal({title:'確認 HTML 匯入資料',large:true,confirmText:'確認匯入',html:`${warning}
+      ${(exact||potential.length)?`<div class="import-section">變更預覽</div><div id="hiDiffBox">${exact?htmlBuildImportDiff(d):'<div class="diff-empty">請先選擇要更新的既有個案，系統會顯示差異。</div>'}</div>`:''}
       <div class="import-section">機構管理資料</div><div class="import-preview-grid"><div class="field"><label>個案編號 *</label><input id="hiCaseNo" value="${escapeHTML(d.case_no||'')}"></div><div class="field"><label>負責督導 *</label><select id="hiSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions(d.supervisor_id||'')}</select></div>${potential.length?`<div class="field full"><label>可能相同個案</label><select id="hiPotentialMatch"><option value="">建立為新個案</option>${potential.map(x=>`<option value="${x.id}">更新：${escapeHTML(x.case_no||'未編號')}｜${escapeHTML(x.case_name)}</option>`).join('')}</select></div>`:''}</div>
       <div class="import-section">基本資料</div><div class="import-preview-grid"><div class="field"><label>姓名 *</label><input id="hiName" value="${escapeHTML(d.case_name||'')}"></div><div class="field"><label>身分證字號</label><input id="hiNational" value="${escapeHTML(d.national_id||'')}"></div><div class="field"><label>出生日期</label><input id="hiBirth" type="date" value="${escapeHTML(d.birth_date||'')}"></div><div class="field"><label>性別</label><select id="hiGender"><option value="">未辨識</option><option value="男" ${d.gender==='男'?'selected':''}>男</option><option value="女" ${d.gender==='女'?'selected':''}>女</option></select></div><div class="field full"><label>地址</label><input id="hiAddress" value="${escapeHTML(d.address||'')}"></div><div class="field"><label>個案電話</label><input id="hiPhone" value="${escapeHTML(d.phone||'')}"></div><div class="field"><label>CMS</label><input id="hiCms" value="${escapeHTML(d.cms_level||'')}"></div><div class="field"><label>身分類別／長照資格</label><input id="hiIdentity" value="${escapeHTML(d.identity_type||'')}"></div><div class="field"><label>A單位</label><input id="hiAUnit" value="${escapeHTML(d.a_unit_name||'')}"></div><div class="field"><label>A個管</label><input id="hiManager" value="${escapeHTML(d.case_manager_name||'')}"></div><div class="field"><label>A個管電話</label><input id="hiManagerPhone" value="${escapeHTML(d.case_manager_phone||'')}"></div><div class="field"><label>照專／評估人員</label><input id="hiAssessor" value="${escapeHTML(d.assessor_name||'')}"></div></div>
       <div class="import-section">聯絡人／照顧者</div>${htmlContactsEditor(d.contacts||[])}
       <div class="import-section">核定服務</div>${htmlServiceEditor(d.services||[])}
+      <div class="import-section">額度資料</div>${htmlBudgetEditor(d.budgets||[])}
       <div class="import-section">照管平台照顧計畫</div><div class="html-import-status">計畫日期：${d.care_plan?.plan_date?rocDate(d.care_plan.plan_date+'T00:00:00'):'未辨識'}　家訪：${d.care_plan?.home_visit_date?rocDate(d.care_plan.home_visit_date+'T00:00:00'):'—'}　電聯：${d.care_plan?.phone_contact_date?rocDate(d.care_plan.phone_contact_date+'T00:00:00'):'—'}</div>${htmlPlanPreview(d.care_plan)}`,
       onConfirm:()=>htmlSavePreview(d,exact?.id||null)});
     htmlBindCaseNoInput('hiCaseNo');
-    const bindContactDelete=()=>document.querySelectorAll('[data-del-contact]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>b.closest('[data-contact-row]')?.remove());});
-    $('htmlAddContact').addEventListener('click',()=>{const host=$('htmlContactEditor');host.insertAdjacentHTML('beforeend',htmlContactRow({}));bindContactDelete();});
-    bindContactDelete();
-    $('htmlAddService').addEventListener('click',()=>{const host=$('htmlServiceEditor');host.insertAdjacentHTML('beforeend',`<div class="service-row" data-service-row><div class="mini-field"><label>類別</label><input data-svc-group></div><div class="mini-field"><label>服務碼</label><input data-svc-code></div><div class="mini-field wide"><label>服務名稱</label><input data-svc-name></div><div class="mini-field"><label>核定量</label><input data-svc-qty type="number" step="0.01"></div><div class="mini-field"><label>單價</label><input data-svc-price type="number" step="0.01"></div><div class="mini-field"><label>小計</label><input data-svc-subtotal type="number" step="0.01"></div><button class="btn sm" type="button" onclick="this.closest('[data-service-row]').remove()">刪除</button></div>`);});
-    document.querySelectorAll('[data-del-service]').forEach(b=>b.addEventListener('click',()=>b.closest('[data-service-row]')?.remove()));
+    htmlBindContactEditControls();
+    htmlBindServiceEditControls();
+    htmlBindBudgetEditControls();
+    const potentialSelect=$('hiPotentialMatch');
+    if(potentialSelect){
+      potentialSelect.addEventListener('change',async function(e){
+        const box=$('hiDiffBox');
+        if(!box)return;
+        if(!e.target.value){
+          d._existing=null;
+          box.innerHTML='<div class="diff-empty">請先選擇要更新的既有個案，系統會顯示差異。</div>';
+          return;
+        }
+        box.innerHTML='<div class="diff-empty">正在讀取既有資料…</div>';
+        try{
+          d._existing=await htmlLoadExistingSnapshot(e.target.value);
+          box.innerHTML=htmlBuildImportDiff(d);
+        }catch(err){
+          box.innerHTML='<div class="import-warning">差異資料讀取失敗，請重新選擇或重新開啟匯入畫面。</div>';
+        }
+      });
+    }
   }
 
   async function htmlSavePreview(d,exactMatchId){
@@ -409,7 +428,7 @@
     try{
       const safeNo=caseNo.replace(/[^A-Za-z0-9_-]/g,'_'); const ext=/\.htm$/i.test(file.name)?'htm':'html'; path=`${safeNo}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
       const up=await db.storage.from(CASE_HTML_BUCKET).upload(path,file,{contentType:'text/html',upsert:false}); if(up.error)throw up.error;
-      const payload={case_no:caseNo,case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,address:$('hiAddress').value.trim(),phone:$('hiPhone').value.trim(),cms_level:$('hiCms').value.trim(),identity_type:$('hiIdentity').value.trim(),assessment_date:d.assessment_date||'',plan_approval_date:d.plan_approval_date||'',a_unit_name:$('hiAUnit').value.trim(),case_manager_name:$('hiManager').value.trim(),case_manager_phone:$('hiManagerPhone').value.trim(),assessor_name:$('hiAssessor').value.trim(),supervisor_id:supervisor,service_usage_type:usageType,payment_method:paymentMethod||'',contacts:htmlReadContacts(),services:htmlReadServices(),budgets:d.budgets||[],care_plan:d.care_plan||{},source_ca110_id:d.source_ca110_id||'',source_hash:d.source_hash||'',file_name:file.name,storage_path:path,warnings:d.warnings||[],match_case_id:matchId};
+      const payload={case_no:caseNo,case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,address:$('hiAddress').value.trim(),phone:$('hiPhone').value.trim(),cms_level:$('hiCms').value.trim(),identity_type:$('hiIdentity').value.trim(),assessment_date:d.assessment_date||'',plan_approval_date:d.plan_approval_date||'',a_unit_name:$('hiAUnit').value.trim(),case_manager_name:$('hiManager').value.trim(),case_manager_phone:$('hiManagerPhone').value.trim(),assessor_name:$('hiAssessor').value.trim(),supervisor_id:supervisor,service_usage_type:usageType,payment_method:paymentMethod||'',contacts:htmlReadContacts(),services:htmlReadServices(),budgets:htmlReadBudgets(),care_plan:d.care_plan||{},source_ca110_id:d.source_ca110_id||'',source_hash:d.source_hash||'',file_name:file.name,storage_path:path,warnings:d.warnings||[],match_case_id:matchId};
       if(d.lives_alone!==null)payload.lives_alone=d.lives_alone;
       const r=await db.rpc('import_case_html_data',{payload}); if(r.error)throw r.error;
       if(r.data?.action==='duplicate'){await db.storage.from(CASE_HTML_BUCKET).remove([path]);closeModal();toast('這份 HTML 已經匯入過，未重複建立資料。','warn');navigate('cases');return true;}
