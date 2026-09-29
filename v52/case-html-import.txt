@@ -293,7 +293,7 @@
       if(d.lives_alone!==null)payload.lives_alone=d.lives_alone;
       const r=await db.rpc('import_case_html_data',{payload}); if(r.error)throw r.error;
       if(r.data?.action==='duplicate'){await db.storage.from(CASE_HTML_BUCKET).remove([path]);closeModal();toast('這份 HTML 已經匯入過，未重複建立資料。','warn');navigate('cases');return true;}
-      closeModal();toast(r.data?.action==='updated'?'既有個案已更新':'個案已建立','success');navigate('cases');return true;
+      closeModal();toast(r.data?.action==='updated'?(r.data?.care_plan_id&&!r.data?.plan_is_current?'既有個案已更新；本次照顧計畫已保存為歷史版本':'既有個案已更新'):'個案已建立','success');navigate('cases');return true;
     }catch(err){if(path)try{await db.storage.from(CASE_HTML_BUCKET).remove([path]);}catch(_){ }console.error(err);toast('HTML 匯入失敗：'+(err?.message||err),'error');return false;}finally{showLoading(false);}
   }
   function htmlOpenManualModal(){
@@ -373,20 +373,23 @@
       });
     }
     var add=$('htmlAddService');
-    if(add) add.addEventListener('click',function(){
-      var host=$('htmlServiceEditor');
-      if(host) host.insertAdjacentHTML('beforeend',
-        '<div class="service-row" data-service-row>'+
-        '<div class="mini-field"><label>類別</label><input data-svc-group></div>'+
-        '<div class="mini-field"><label>服務碼</label><input data-svc-code></div>'+
-        '<div class="mini-field wide"><label>服務名稱</label><input data-svc-name></div>'+
-        '<div class="mini-field"><label>核定量</label><input data-svc-qty type="number" step="0.01"></div>'+
-        '<div class="mini-field"><label>單價</label><input data-svc-price type="number" step="0.01"></div>'+
-        '<div class="mini-field"><label>小計</label><input data-svc-subtotal type="number" step="0.01"></div>'+
-        '<button class="btn sm" type="button" data-del-service>刪除</button></div>'
-      );
-      bindDelete();
-    });
+    if(add && !add.dataset.bound){
+      add.dataset.bound='1';
+      add.addEventListener('click',function(){
+        var host=$('htmlServiceEditor');
+        if(host) host.insertAdjacentHTML('beforeend',
+          '<div class="service-row" data-service-row>'+
+          '<div class="mini-field"><label>類別</label><input data-svc-group></div>'+
+          '<div class="mini-field"><label>服務碼</label><input data-svc-code></div>'+
+          '<div class="mini-field wide"><label>服務名稱</label><input data-svc-name></div>'+
+          '<div class="mini-field"><label>核定量</label><input data-svc-qty type="number" step="0.01"></div>'+
+          '<div class="mini-field"><label>單價</label><input data-svc-price type="number" step="0.01"></div>'+
+          '<div class="mini-field"><label>小計</label><input data-svc-subtotal type="number" step="0.01"></div>'+
+          '<button class="btn sm" type="button" data-del-service>刪除</button></div>'
+        );
+        bindDelete();
+      });
+    }
     bindDelete();
   }
 
