@@ -7,8 +7,8 @@
     .html-import-note{padding:11px 12px;border:1px solid #f0ded7;background:#fff8f5;border-radius:10px;font-size:11.5px;line-height:1.65;color:#765548;margin-bottom:12px}
     .html-import-status{margin-top:10px;padding:10px 12px;border-radius:9px;background:#f8fafc;border:1px solid var(--line);font-size:11.5px;color:#475467;white-space:pre-wrap}
     .case-html-file-drop{padding:10px 12px 12px!important;overflow:visible!important}
-    #htmlCaseFile{display:block;width:100%;box-sizing:border-box;min-height:48px;padding:7px 8px 9px;margin:0;line-height:1.45;overflow:visible}
-    #htmlCaseFile::file-selector-button{margin:0 12px 0 0;padding:7px 12px;line-height:1.25;cursor:pointer}
+    #htmlCaseFile,#planVersionFile{display:block;width:100%;box-sizing:border-box;min-height:48px;padding:7px 8px 9px;margin:0;line-height:1.45;overflow:visible}
+    #htmlCaseFile::file-selector-button,#planVersionFile::file-selector-button{margin:0 12px 0 0;padding:7px 12px;line-height:1.25;cursor:pointer}
     .import-section{font-size:12px;font-weight:900;color:#8b5746;margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
     .import-section:first-child{margin-top:0;padding-top:0;border-top:0}
     .import-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -23,6 +23,7 @@
     .import-detail-block{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.import-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.import-detail-cell{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fafcfb}.import-detail-cell label{display:block;font-size:9.5px;color:#667085;font-weight:900;margin-bottom:4px}.import-detail-cell div{font-size:12px;font-weight:800;color:#344054;word-break:break-word}
     .approved-chip-wrap{display:flex;gap:6px;flex-wrap:wrap}.approved-chip{display:inline-flex;border-radius:999px;padding:5px 8px;background:#fff3ee;color:#8b5746;font-size:10.5px;font-weight:900;border:1px solid #f0d5ca}
     .import-history{display:grid;gap:7px}.import-history-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff}.import-history-row small{display:block;color:#667085;margin-top:3px}
+    .plan-version-list{display:grid;gap:7px}.plan-version-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}.plan-version-row.current{background:#fff8f5;border-color:#efcabc}.plan-version-main{min-width:0}.plan-version-main strong{font-size:12px}.plan-version-main small{display:block;color:#667085;margin-top:3px;line-height:1.5}.plan-current-badge{display:inline-flex;margin-left:6px;border-radius:999px;padding:3px 7px;background:#eef7f1;color:#237a4b;font-size:9.5px;font-weight:900}.section-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
     @media(max-width:900px){.service-row{grid-template-columns:1fr 1fr}.service-row .wide{grid-column:1/-1}.import-detail-grid{grid-template-columns:1fr 1fr}}
     @media(max-width:650px){.import-choice,.import-preview-grid{grid-template-columns:1fr}.contact-row{grid-template-columns:1fr 1fr}.import-detail-grid{grid-template-columns:1fr}.service-row{grid-template-columns:1fr 1fr}}
   `;
@@ -312,9 +313,9 @@
         db.from('care_cases').select('*').eq('id',caseId).maybeSingle(),
         db.from('case_contacts').select('*').eq('case_id',caseId).order('is_primary_contact',{ascending:false}).order('created_at'),
         db.from('case_approved_services').select('*').eq('case_id',caseId).eq('is_current',true).order('service_group').order('service_code'),
-        db.from('care_plans').select('*').eq('case_id',caseId).order('created_at',{ascending:false}),
+        db.from('care_plans').select('*').eq('case_id',caseId).order('plan_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}),
         db.from('service_budgets').select('*').eq('case_id',caseId).eq('is_current',true).order('category'),
-        db.from('case_imports').select('id,file_name,storage_path,imported_at,import_type,detected_plan_date').eq('case_id',caseId).order('imported_at',{ascending:false}).limit(10)
+        db.from('case_imports').select('id,file_name,storage_path,imported_at,import_type,detected_plan_date').eq('case_id',caseId).order('imported_at',{ascending:false})
       ]); const err=cRes.error||ctRes.error||svRes.error||plRes.error||bdRes.error||imRes.error;if(err)throw err;const c=cRes.data;if(!c)return;
       const body=document.querySelector('#modalRoot .modal-body'); if(!body||body.querySelector('.import-detail-block'))return;
       const contacts=ctRes.data||[],services=svRes.data||[],plans=plRes.data||[],budgets=bdRes.data||[],imports=imRes.data||[]; const plan=plans.find(x=>x.is_current)||plans[0];
@@ -325,7 +326,160 @@
         <div class="case-section-title"><strong>目前照顧計畫</strong></div>${plan?htmlPlanPreview({sections:plan.sections||{}}):'<div class="html-import-status">尚無照顧計畫。</div>'}
         <div class="case-section-title"><strong>HTML 匯入紀錄</strong></div><div class="import-history">${imports.length?imports.map((x,i)=>`<div class="import-history-row"><div><strong>${escapeHTML(x.file_name)}</strong><small>${rocDate(x.imported_at)}・${x.import_type==='new_case'?'建立個案':'更新個案'}</small></div><button class="btn sm" data-view-import="${i}">查看原始 HTML</button></div>`).join(''):'<div class="html-import-status">此個案尚無 HTML 匯入紀錄。</div>'}</div>`;
       body.prepend(block); block.querySelectorAll('[data-view-import]').forEach(btn=>btn.addEventListener('click',()=>{const x=imports[Number(btn.dataset.viewImport)];if(x)htmlViewOriginal(x.storage_path,x.file_name);}));
+      if(typeof htmlAddCaseDetailControls==='function') htmlAddCaseDetailControls(block,c,plans,imports);
     }catch(err){console.error('讀取 HTML 個案資料失敗',err);}
+  }
+
+
+  function htmlCanEditCase(c){
+    var role=state.profile && state.profile.role;
+    return ['business_manager','organization_manager','admin'].includes(role) || (role==='supervisor' && c && c.supervisor_id===state.profile.id);
+  }
+
+  function htmlSelected(value,current){
+    return value===current?' selected':'';
+  }
+
+  async function htmlReturnToCaseList(message,type){
+    if(message) toast(message,type||'success');
+    closeModal();
+    await loadCaseVisitData(true);
+    navigate('cases');
+  }
+
+  function htmlBindContactEditControls(){
+    function bindDelete(){
+      document.querySelectorAll('[data-del-contact]').forEach(function(b){
+        if(b.dataset.bound)return;
+        b.dataset.bound='1';
+        b.addEventListener('click',function(){ var row=b.closest('[data-contact-row]'); if(row)row.remove(); });
+      });
+    }
+    var add=$('htmlAddContact');
+    if(add) add.addEventListener('click',function(){
+      var host=$('htmlContactEditor');
+      if(host) host.insertAdjacentHTML('beforeend',htmlContactRow({}));
+      bindDelete();
+    });
+    bindDelete();
+  }
+
+  function htmlBindServiceEditControls(){
+    function bindDelete(){
+      document.querySelectorAll('[data-del-service]').forEach(function(b){
+        if(b.dataset.bound)return;
+        b.dataset.bound='1';
+        b.addEventListener('click',function(){ var row=b.closest('[data-service-row]'); if(row)row.remove(); });
+      });
+    }
+    var add=$('htmlAddService');
+    if(add) add.addEventListener('click',function(){
+      var host=$('htmlServiceEditor');
+      if(host) host.insertAdjacentHTML('beforeend',
+        '<div class="service-row" data-service-row>'+
+        '<div class="mini-field"><label>類別</label><input data-svc-group></div>'+
+        '<div class="mini-field"><label>服務碼</label><input data-svc-code></div>'+
+        '<div class="mini-field wide"><label>服務名稱</label><input data-svc-name></div>'+
+        '<div class="mini-field"><label>核定量</label><input data-svc-qty type="number" step="0.01"></div>'+
+        '<div class="mini-field"><label>單價</label><input data-svc-price type="number" step="0.01"></div>'+
+        '<div class="mini-field"><label>小計</label><input data-svc-subtotal type="number" step="0.01"></div>'+
+        '<button class="btn sm" type="button" data-del-service>刪除</button></div>'
+      );
+      bindDelete();
+    });
+    bindDelete();
+  }
+
+  async function htmlOpenCaseEdit(caseId){
+    showLoading(true);
+    try{
+      var results=await Promise.all([
+        db.from('care_cases').select('*').eq('id',caseId).maybeSingle(),
+        db.from('case_contacts').select('*').eq('case_id',caseId).order('is_primary_contact',{ascending:false}).order('created_at')
+      ]);
+      var cRes=results[0], ctRes=results[1];
+      if(cRes.error)throw cRes.error;
+      if(ctRes.error)throw ctRes.error;
+      var c=cRes.data;
+      if(!c)return;
+      var lockSupervisor=state.profile && state.profile.role==='supervisor';
+      var html=[
+        '<div class="import-section">機構管理資料</div>',
+        '<div class="import-preview-grid">',
+          '<div class="field"><label>個案編號 *</label><input id="editCaseNo" value="'+escapeHTML(c.case_no||'')+'"></div>',
+          '<div class="field"><label>負責督導 *</label><select id="editSupervisor" '+(lockSupervisor?'disabled':'')+'>'+htmlSupervisorOptions(c.supervisor_id||'')+'</select></div>',
+          '<div class="field"><label>服務類別 *</label><select id="editUsage">',
+            '<option value="">請選擇</option>',
+            '<option value="居家"'+htmlSelected('居家',c.service_usage_type)+'>居家</option>',
+            '<option value="喘息"'+htmlSelected('喘息',c.service_usage_type)+'>喘息</option>',
+            '<option value="居家+喘息"'+htmlSelected('居家+喘息',c.service_usage_type)+'>居家+喘息</option>',
+          '</select></div>',
+          '<div class="field"><label>繳款方式</label><select id="editPayment">',
+            '<option value=""'+htmlSelected('',c.payment_method||'')+'>未設定</option>',
+            '<option value="銀行匯款"'+htmlSelected('銀行匯款',c.payment_method)+'>銀行匯款</option>',
+            '<option value="超商繳款"'+htmlSelected('超商繳款',c.payment_method)+'>超商繳款</option>',
+            '<option value="現金繳費"'+htmlSelected('現金繳費',c.payment_method)+'>現金繳費</option>',
+            '<option value="不收費"'+htmlSelected('不收費',c.payment_method)+'>不收費</option>',
+          '</select></div>',
+          '<div class="field"><label>服務狀態</label><select id="editStatus">',
+            '<option value="active"'+htmlSelected('active',c.service_status||'active')+'>服務中</option>',
+            '<option value="suspended"'+htmlSelected('suspended',c.service_status)+'>暫停</option>',
+            '<option value="closed"'+htmlSelected('closed',c.service_status)+'>已結案</option>',
+          '</select></div>',
+        '</div>',
+        '<div class="import-section">基本資料</div>',
+        '<div class="import-preview-grid">',
+          '<div class="field"><label>姓名 *</label><input id="editName" value="'+escapeHTML(c.case_name||'')+'"></div>',
+          '<div class="field"><label>身分證字號</label><input id="editNational" value="'+escapeHTML(c.national_id||'')+'"></div>',
+          '<div class="field"><label>出生日期</label><input id="editBirth" type="date" value="'+escapeHTML(c.birth_date||'')+'"></div>',
+          '<div class="field"><label>性別</label><select id="editGender"><option value=""></option><option value="男"'+htmlSelected('男',c.gender)+'>男</option><option value="女"'+htmlSelected('女',c.gender)+'>女</option></select></div>',
+          '<div class="field"><label>電話</label><input id="editPhone" value="'+escapeHTML(c.phone||'')+'"></div>',
+          '<div class="field"><label>CMS</label><input id="editCms" value="'+escapeHTML(c.cms_level||'')+'"></div>',
+          '<div class="field full"><label>地址</label><input id="editAddress" value="'+escapeHTML(c.address||'')+'"></div>',
+          '<div class="field"><label>身分類別／長照資格</label><input id="editIdentity" value="'+escapeHTML(c.identity_type||'')+'"></div>',
+          '<div class="field"><label>A單位</label><input id="editAUnit" value="'+escapeHTML(c.a_unit_name||'')+'"></div>',
+          '<div class="field"><label>A個管</label><input id="editManager" value="'+escapeHTML(c.case_manager_name||'')+'"></div>',
+          '<div class="field"><label>A個管電話</label><input id="editManagerPhone" value="'+escapeHTML(c.case_manager_phone||'')+'"></div>',
+          '<div class="field"><label>照專／評估人員</label><input id="editAssessor" value="'+escapeHTML(c.assessor_name||'')+'"></div>',
+          '<div class="field full"><label>備註</label><textarea id="editNotes">'+escapeHTML(c.notes||'')+'</textarea></div>',
+        '</div>',
+        '<div class="import-section">聯絡人／照顧者</div>',
+        htmlContactsEditor(ctRes.data||[])
+      ].join('');
+
+      openModal({title:'編輯個案資料',confirmText:'儲存',large:true,html:html,onConfirm:async function(){
+        var caseNo=htmlNormalizeCaseNo($('editCaseNo').value);
+        $('editCaseNo').value=caseNo;
+        var payload={
+          case_id:caseId,case_no:caseNo,case_name:$('editName').value.trim(),
+          supervisor_id:lockSupervisor?c.supervisor_id:$('editSupervisor').value,
+          service_usage_type:$('editUsage').value,payment_method:$('editPayment').value,
+          service_status:$('editStatus').value,national_id:$('editNational').value.trim().toUpperCase(),
+          birth_date:$('editBirth').value,gender:$('editGender').value,address:$('editAddress').value.trim(),
+          phone:$('editPhone').value.trim(),cms_level:$('editCms').value.trim(),
+          identity_type:$('editIdentity').value.trim(),a_unit_name:$('editAUnit').value.trim(),
+          case_manager_name:$('editManager').value.trim(),case_manager_phone:$('editManagerPhone').value.trim(),
+          assessor_name:$('editAssessor').value.trim(),notes:$('editNotes').value.trim(),
+          contacts:htmlReadContacts()
+        };
+        if(!payload.case_no||!payload.case_name||!payload.supervisor_id||!payload.service_usage_type){
+          toast('個案編號、姓名、負責督導與服務類別為必填','warn');return false;
+        }
+        showLoading(true);
+        try{
+          var r=await db.rpc('update_case_profile',{payload:payload});
+          if(r.error)throw r.error;
+          await htmlReturnToCaseList('個案資料已更新','success');
+          return true;
+        }catch(err){
+          toast('更新個案失敗：'+(err&&err.message?err.message:err),'error');return false;
+        }finally{showLoading(false);}
+      }});
+      htmlBindCaseNoInput('editCaseNo');
+      htmlBindContactEditControls();
+    }catch(err){
+      toast('讀取個案資料失敗：'+(err&&err.message?err.message:err),'error');
+    }finally{showLoading(false);}
   }
 
   // 提供個案管理主模組使用的明確掛勾，避免以 document capture 攔截事件。
