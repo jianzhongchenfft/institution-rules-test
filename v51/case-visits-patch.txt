@@ -271,7 +271,10 @@
     });
     $('caseStatusFilter').addEventListener('change',e=>{state.caseStatusFilter=e.target.value;renderCaseVisitsPage();});
     $('reloadCases').addEventListener('click',async()=>{await loadCaseVisitData();renderCaseVisitsPage();toast('已重新整理個案資料','success');});
-    $('addCaseBtn').addEventListener('click',openCaseModal);
+    $('addCaseBtn').addEventListener('click',()=>{
+      if(typeof window.openCaseCreateFlow==='function') window.openCaseCreateFlow();
+      else openCaseModal();
+    });
 
     const list = $('caseList');
     if(!rows.length){
@@ -286,7 +289,11 @@
       const cms=c.cms_level ? (/^\d+$/.test(String(c.cms_level))?`${c.cms_level}級`:String(c.cms_level)) : '—';
       return `<tr><td>${escapeHTML(c.case_no||'—')}</td><td><button class="case-name-btn" data-case-id="${c.id}">${escapeHTML(c.case_name)}</button></td><td>${escapeHTML(cms)}</td><td>${escapeHTML(caseStaffName(c.supervisor_id))}</td><td>${escapeHTML(svc)}</td><td><span class="case-status ${status.key}">${status.text}</span></td></tr>`;
     }).join('')}</tbody></table></div>`;
-    list.querySelectorAll('[data-case-id]').forEach(btn=>btn.addEventListener('click',()=>openCaseDetail(state.cases.find(c=>c.id===btn.dataset.caseId))));
+    list.querySelectorAll('[data-case-id]').forEach(btn=>btn.addEventListener('click',()=>{
+      const c=state.cases.find(x=>x.id===btn.dataset.caseId);
+      openCaseDetail(c);
+      if(c && typeof window.augmentCaseDetail==='function') setTimeout(()=>window.augmentCaseDetail(c.id),80);
+    }));
   }
 
   function openCaseModal(){
