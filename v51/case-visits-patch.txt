@@ -404,3 +404,15 @@
     }catch(err){toast('儲存訪視紀錄失敗：'+(err?.message||err),'error');return false;}
     finally{showLoading(false);}
   }
+  // 個案詳細頁等其他模組透過此介面使用訪視功能，避免跨 eval 直接引用內部函式。
+  window.caseVisitsApi = {
+    loadCaseVisitData,
+    pendingFollowUpsFor,
+    caseStatusInfo,
+    caseTypeLabel,
+    caseStaffName,
+    isFollowUpResolved,
+    openVisitModal,
+    renderCaseVisitsPage
+  };
+
