@@ -1,0 +1,52 @@
+  async function htmlSavePreview(d,exactMatchId){
+    const caseNo=$('hiCaseNo').value.trim(), name=$('hiName').value.trim(); const supervisor=state.profile?.role==='supervisor'?state.profile.id:$('hiSupervisor').value;
+    if(!caseNo||!name||!supervisor){toast('個案編號、姓名與負責督導為必填','warn');return false;}
+    const potential=$('hiPotentialMatch')?.value||''; const matchId=exactMatchId||potential||'';
+    const file=d._file; showLoading(true); let path='';
+    try{
+      const safeNo=caseNo.replace(/[^A-Za-z0-9_-]/g,'_'); const ext=/\.htm$/i.test(file.name)?'htm':'html'; path=`${safeNo}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+      const up=await db.storage.from(CASE_HTML_BUCKET).upload(path,file,{contentType:'text/html',upsert:false}); if(up.error)throw up.error;
+      const payload={case_no:caseNo,case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,address:$('hiAddress').value.trim(),phone:$('hiPhone').value.trim(),cms_level:$('hiCms').value.trim(),identity_type:$('hiIdentity').value.trim(),assessment_date:d.assessment_date||'',plan_approval_date:d.plan_approval_date||'',a_unit_name:$('hiAUnit').value.trim(),case_manager_name:$('hiManager').value.trim(),case_manager_phone:$('hiManagerPhone').value.trim(),assessor_name:$('hiAssessor').value.trim(),supervisor_id:supervisor,contacts:htmlReadContacts(),services:htmlReadServices(),budgets:d.budgets||[],care_plan:d.care_plan||{},source_ca110_id:d.source_ca110_id||'',source_hash:d.source_hash||'',file_name:file.name,storage_path:path,warnings:d.warnings||[],match_case_id:matchId};
+      if(d.lives_alone!==null)payload.lives_alone=d.lives_alone;
+      const r=await db.rpc('import_case_html_data',{payload}); if(r.error)throw r.error;
+      if(r.data?.action==='duplicate'){await db.storage.from(CASE_HTML_BUCKET).remove([path]);closeModal();toast('這份 HTML 已經匯入過，未重複建立資料。','warn');navigate('cases');return true;}
+      closeModal();toast(r.data?.action==='updated'?'既有個案已更新':'個案已建立','success');navigate('cases');return true;
+    }catch(err){if(path)try{await db.storage.from(CASE_HTML_BUCKET).remove([path]);}catch(_){ }console.error(err);toast('HTML 匯入失敗：'+(err?.message||err),'error');return false;}finally{showLoading(false);}
+  }
+  function htmlOpenManualModal(){
+    const me=state.profile?.role==='supervisor';
+    openModal({title:'手動建立個案',confirmText:'建立個案',large:true,html:`<div class="import-preview-grid"><div class="field"><label>個案編號 *</label><input id="hmCaseNo"></div><div class="field"><label>負責督導 *</label><select id="hmSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions('')}</select></div><div class="field"><label>姓名 *</label><input id="hmName"></div><div class="field"><label>身分證字號</label><input id="hmNational"></div><div class="field"><label>出生日期</label><input id="hmBirth" type="date"></div><div class="field"><label>性別</label><select id="hmGender"><option value=""></option><option>男</option><option>女</option></select></div><div class="field full"><label>地址</label><input id="hmAddress"></div><div class="field"><label>電話</label><input id="hmPhone"></div><div class="field"><label>CMS</label><input id="hmCms"></div></div>`,onConfirm:async()=>{
+      const caseNo=$('hmCaseNo').value.trim(),name=$('hmName').value.trim(),supervisor=me?state.profile.id:$('hmSupervisor').value;if(!caseNo||!name||!supervisor){toast('個案編號、姓名與負責督導為必填','warn');return false;}
+      showLoading(true);try{const r=await db.from('care_cases').insert({case_no:caseNo,case_name:name,supervisor_id:supervisor,national_id:$('hmNational').value.trim().toUpperCase()||null,birth_date:$('hmBirth').value||null,gender:$('hmGender').value||null,address:$('hmAddress').value.trim()||null,phone:$('hmPhone').value.trim()||null,cms_level:$('hmCms').value.trim()||null,service_status:'active',created_by:state.user.id});if(r.error)throw r.error;closeModal();toast('個案已建立','success');navigate('cases');return true;}catch(err){toast('建立個案失敗：'+(err?.message||err),'error');return false;}finally{showLoading(false);}
+    }});
+  }
+  async function htmlViewOriginal(path,fileName){
+    showLoading(true);try{const r=await db.storage.from(CASE_HTML_BUCKET).download(path);if(r.error)throw r.error;const text=await r.data.text();const blob=new Blob([text],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(err){toast('讀取原始 HTML 失敗：'+(err?.message||err),'error');}finally{showLoading(false);}
+  }
+  async function htmlAugmentCaseDetail(caseId){
+    try{
+      const [cRes,ctRes,svRes,plRes,bdRes,imRes]=await Promise.all([
+        db.from('care_cases').select('*').eq('id',caseId).maybeSingle(),
+        db.from('case_contacts').select('*').eq('case_id',caseId).order('is_primary_contact',{ascending:false}).order('created_at'),
+        db.from('case_approved_services').select('*').eq('case_id',caseId).eq('is_current',true).order('service_group').order('service_code'),
+        db.from('care_plans').select('*').eq('case_id',caseId).order('created_at',{ascending:false}),
+        db.from('service_budgets').select('*').eq('case_id',caseId).eq('is_current',true).order('category'),
+        db.from('case_imports').select('id,file_name,storage_path,imported_at,import_type,detected_plan_date').eq('case_id',caseId).order('imported_at',{ascending:false}).limit(10)
+      ]); const err=cRes.error||ctRes.error||svRes.error||plRes.error||bdRes.error||imRes.error;if(err)throw err;const c=cRes.data;if(!c)return;
+      const body=document.querySelector('#modalRoot .modal-body'); if(!body||body.querySelector('.import-detail-block'))return;
+      const contacts=ctRes.data||[],services=svRes.data||[],plans=plRes.data||[],budgets=bdRes.data||[],imports=imRes.data||[]; const plan=plans.find(x=>x.is_current)||plans[0];
+      const block=document.createElement('div');block.className='import-detail-block';block.innerHTML=`
+        <div class="case-section-title"><strong>基本資料</strong></div><div class="import-detail-grid"><div class="import-detail-cell"><label>個案編號</label><div>${escapeHTML(c.case_no||'—')}</div></div><div class="import-detail-cell"><label>身分證字號</label><div>${escapeHTML(c.national_id||'—')}</div></div><div class="import-detail-cell"><label>出生日期</label><div>${c.birth_date?rocDate(c.birth_date+'T00:00:00'):'—'}</div></div><div class="import-detail-cell"><label>性別</label><div>${escapeHTML(c.gender||'—')}</div></div><div class="import-detail-cell"><label>電話</label><div>${escapeHTML(c.phone||'—')}</div></div><div class="import-detail-cell"><label>CMS</label><div>${escapeHTML(c.cms_level||'—')}</div></div><div class="import-detail-cell" style="grid-column:1/-1"><label>地址</label><div>${escapeHTML(c.address||'—')}</div></div><div class="import-detail-cell"><label>A單位</label><div>${escapeHTML(c.a_unit_name||'—')}</div></div><div class="import-detail-cell"><label>A個管</label><div>${escapeHTML(c.case_manager_name||'—')}</div></div><div class="import-detail-cell"><label>A個管電話</label><div>${escapeHTML(c.case_manager_phone||'—')}</div></div></div>
+        <div class="case-section-title"><strong>聯絡人／照顧者</strong></div><div class="approved-chip-wrap">${contacts.length?contacts.map(x=>`<span class="approved-chip">${escapeHTML(x.contact_name)}${x.relationship?'・'+escapeHTML(x.relationship):''}${x.is_primary_contact?'・主要聯絡人':''}${x.is_primary_caregiver?'・主要照顧者':''}${x.is_secondary_caregiver?'・次要照顧者':''}</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無聯絡人資料</span>'}</div>
+        <div class="case-section-title"><strong>目前核定服務</strong></div><div class="approved-chip-wrap">${services.length?services.map(x=>`<span class="approved-chip">${escapeHTML(x.service_code)}${x.service_name?' '+escapeHTML(x.service_name):''}${x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):''}</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無核定服務資料</span>'}</div>${budgets.length?`<div class="html-import-status" style="margin-top:8px">${budgets.map(x=>`${escapeHTML(x.category)}：額度 ${x.benefit_limit??'—'}｜擬定 ${x.planned_total??'—'}｜剩餘 ${x.remaining_amount??'—'}`).join('\n')}</div>`:''}
+        <div class="case-section-title"><strong>目前照顧計畫</strong></div>${plan?htmlPlanPreview({sections:plan.sections||{}}):'<div class="html-import-status">尚無照顧計畫。</div>'}
+        <div class="case-section-title"><strong>HTML 匯入紀錄</strong></div><div class="import-history">${imports.length?imports.map((x,i)=>`<div class="import-history-row"><div><strong>${escapeHTML(x.file_name)}</strong><small>${rocDate(x.imported_at)}・${x.import_type==='new_case'?'建立個案':'更新個案'}</small></div><button class="btn sm" data-view-import="${i}">查看原始 HTML</button></div>`).join(''):'<div class="html-import-status">此個案尚無 HTML 匯入紀錄。</div>'}</div>`;
+      body.prepend(block); block.querySelectorAll('[data-view-import]').forEach(btn=>btn.addEventListener('click',()=>{const x=imports[Number(btn.dataset.viewImport)];if(x)htmlViewOriginal(x.storage_path,x.file_name);}));
+    }catch(err){console.error('讀取 HTML 個案資料失敗',err);}
+  }
+
+  // 攔截「新增個案」改用 HTML／手動建立；點個案後補上 HTML 匯入資料。
+  document.addEventListener('click',e=>{
+    const add=e.target.closest?.('#addCaseBtn'); if(add){e.preventDefault();e.stopImmediatePropagation();htmlOpenChoice();return;}
+    const caseBtn=e.target.closest?.('.case-name-btn'); if(caseBtn){const id=caseBtn.dataset.caseId;setTimeout(()=>htmlAugmentCaseDetail(id),80);}
+  },true);
