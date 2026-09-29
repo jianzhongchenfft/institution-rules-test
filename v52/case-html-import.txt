@@ -973,7 +973,7 @@
     (data.plans||[]).forEach(function(p){
       var d=p.plan_date?p.plan_date+'T12:00:00':p.created_at;
       items.push({date:d,title:'照管平台照顧計畫'+(p.is_current?'（目前使用）':p.is_voided?'（已作廢）':''),text:(p.plan_date?'計畫日期 '+htmlFormatPlanDate(p.plan_date):'未辨識計畫日期')+(p.is_voided&&p.void_reason?'｜作廢原因：'+p.void_reason:''),sort:new Date(d||0).getTime()});
-      if(p.is_voided&&p.voided_at)items.push({date:p.voided_at,title:'作廢照管平台照顧計畫',text:'版本 '+htmlFormatPlanDate(p.plan_date)+'｜原因：'+(p.void_reason||'未填寫'),sort:new Date(p.voided_at).getTime()});
+      if(p.is_voided&&p.voided_at)items.push({date:p.voided_at,title:'作廢照管平台照顧計畫',text:'版本 '+htmlFormatPlanDate(p.plan_date)+'｜原因：'+(p.void_reason||'未填寫')+(p.voided_by_staff_id?'｜作廢者：'+htmlGetCaseVisitsApi().caseStaffName(p.voided_by_staff_id):''),sort:new Date(p.voided_at).getTime()});
     });
     (data.visits||[]).forEach(function(v){
       var d=(v.visit_date||'1970-01-01')+'T12:00:00';
@@ -1057,7 +1057,7 @@
       actions='<div class="section-actions"><button class="btn sm" data-edit-plan="'+selected.id+'">編輯此版本</button><button class="btn sm" data-void-plan="'+selected.id+'">作廢此版本</button></div>';
     }
     var voidInfo=selected&&selected.is_voided
-      ?'<div class="import-warning" style="margin-top:10px"><strong>此版本已作廢</strong><br>原因：'+escapeHTML(selected.void_reason||'未填寫')+(selected.voided_at?'<br>作廢時間：'+escapeHTML(rocDate(selected.voided_at)):'')+'</div>'
+      ?'<div class="import-warning" style="margin-top:10px"><strong>此版本已作廢</strong><br>原因：'+escapeHTML(selected.void_reason||'未填寫')+(selected.voided_at?'<br>作廢時間：'+escapeHTML(rocDate(selected.voided_at)):'')+(selected.voided_by_staff_id?'<br>作廢者：'+escapeHTML(htmlGetCaseVisitsApi().caseStaffName(selected.voided_by_staff_id)):'')+'</div>'
       :'';
     var detail=selected?[
       '<div class="case-panel-card"><div class="case-panel-head"><strong>'+escapeHTML(htmlFormatPlanDate(selected.plan_date))+(selected.is_current?'　<span class="plan-current-badge">目前使用</span>':selected.is_voided?'　<span class="plan-void-badge">已作廢</span>':'')+'</strong>'+actions+'</div>',
