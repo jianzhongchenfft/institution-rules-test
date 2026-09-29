@@ -482,6 +482,269 @@
     }finally{showLoading(false);}
   }
 
+
+  async function htmlOpenPlanEdit(planId){
+    showLoading(true);
+    try{
+      var results=await Promise.all([
+        db.from('care_plans').select('*').eq('id',planId).maybeSingle(),
+        db.from('case_approved_services').select('*').eq('care_plan_id',planId).order('service_group').order('service_code')
+      ]);
+      var pRes=results[0], sRes=results[1];
+      if(pRes.error)throw pRes.error;
+      if(sRes.error)throw sRes.error;
+      var p=pRes.data;
+      if(!p)return;
+      var sections=Object.assign({},p.sections||{});
+      if(!Object.keys(sections).length){
+        ['計畫簡述','計畫目標','計畫執行規劃','其他備註'].forEach(function(k){sections[k]='';});
+      }
+      var sectionHtml=Object.keys(sections).map(function(k){
+        return '<div class="field full"><label>'+escapeHTML(k)+'</label><textarea data-plan-section-key="'+escapeHTML(k)+'" style="min-height:110px">'+escapeHTML(sections[k]||'')+'</textarea></div>';
+      }).join('');
+      var html=[
+        '<div class="html-import-note">修改的是系統整理後的照顧計畫版本；原始 HTML 來源檔不會被更動。若修改「計畫日期」，系統會重新判斷哪一版是目前最新版本。</div>',
+        '<div class="import-preview-grid">',
+          '<div class="field"><label>計畫日期</label><input id="editPlanDate" type="date" value="'+escapeHTML(p.plan_date||'')+'"></div>',
+          '<div class="field"><label>偕同訪視者</label><input id="editVisitWith" value="'+escapeHTML(p.visit_with||'')+'"></div>',
+          '<div class="field"><label>電聯日期</label><input id="editPhoneDate" type="date" value="'+escapeHTML(p.phone_contact_date||'')+'"></div>',
+          '<div class="field"><label>家訪日期</label><input id="editHomeDate" type="date" value="'+escapeHTML(p.home_visit_date||'')+'"></div>',
+          sectionHtml,
+        '</div>',
+        '<div class="import-section">此版本核定服務</div>',
+        htmlServiceEditor(sRes.data||[])
+      ].join('');
+
+      openModal({title:'編輯照顧計畫版本',confirmText:'儲存版本',large:true,html:html,onConfirm:async function(){
+        var sec={};
+        document.querySelectorAll('[data-plan-section-key]').forEach(function(el){sec[el.dataset.planSectionKey]=el.value.trim();});
+        var raw=Object.keys(sec).filter(function(k){return sec[k];}).map(function(k){return k+'\n'+sec[k];}).join('\n\n');
+        var payload={
+          plan_id:planId,
+          plan_date:$('editPlanDate').value,
+          phone_contact_date:$('editPhoneDate').value,
+          home_visit_date:$('editHomeDate').value,
+          visit_with:$('editVisitWith').value.trim(),
+          sections:sec,
+          raw_plan_text:raw,
+          services:htmlReadServices()
+        };
+        showLoading(true);
+        try{
+          var r=await db.rpc('update_care_plan_version',{payload:payload});
+          if(r.error)throw r.error;
+          await htmlReturnToCaseList(r.data&&r.data.is_current?'照顧計畫已更新，這一版目前為最新版本':'照顧計畫版本已更新','success');
+          return true;
+        }catch(err){
+          toast('更新照顧計畫失敗：'+(err&&err.message?err.message:err),'error');return false;
+        }finally{showLoading(false);}
+      }});
+      htmlBindServiceEditControls();
+    }catch(err){
+      toast('讀取照顧計畫失敗：'+(err&&err.message?err.message:err),'error');
+    }finally{showLoading(false);}
+  }
+
+  async function htmlOpenExistingPlanUpload(caseId){
+    showLoading(true);
+    try{
+      var r=await db.from('care_cases').select('*').eq('id',caseId).maybeSingle();
+      if(r.error)throw r.error;
+      var c=r.data;
+      if(!c)return;
+      if(!c.service_usage_type){
+        toast('請先編輯個案並設定服務類別，再上傳照顧計畫版本。','warn');return;
+      }
+      var html=[
+        '<div class="html-import-note">個案：<strong>'+escapeHTML(c.case_no||'—')+'　'+escapeHTML(c.case_name||'')+'</strong><br>可補上傳新、舊版本。系統以「計畫日期」判斷最新版本，不以上傳先後順序判斷。</div>',
+        '<div class="field"><label>照顧計畫 HTML *</label><div class="file-drop case-html-file-drop">',
+        '<input id="planVersionFile" type="file" accept=".html,.htm,text/html,application/xhtml+xml">',
+        '<div class="help">僅接受 HTML／HTM，單檔上限 10 MB。</div></div></div>',
+        '<div style="display:flex;justify-content:flex-end;margin-top:12px"><button id="parsePlanVersion" class="btn primary" type="button">解析並預覽</button></div>',
+        '<div id="planVersionStatus" class="html-import-status">尚未開始解析。</div>'
+      ].join('');
+      openModal({title:'上傳照顧計畫版本',showConfirm:false,large:true,html:html});
+      $('parsePlanVersion').addEventListener('click',async function(){
+        var file=$('planVersionFile').files[0];
+        if(!file){toast('請選擇 HTML 檔案','warn');return;}
+        if(!/\.html?$/i.test(file.name)){toast('檔案格式必須是 HTML 或 HTM','warn');return;}
+        if(file.size>10*1024*1024){toast('HTML 檔案不可超過 10 MB','warn');return;}
+        var status=$('planVersionStatus');
+        try{
+          status.textContent='正在解析 HTML…';
+          var source=await file.text();
+          var d=htmlParseDocument(source);
+          if(c.national_id&&d.national_id&&c.national_id.toUpperCase()!==d.national_id.toUpperCase()){
+            status.textContent='身分證字號與目前個案不一致，已停止匯入。';
+            toast('此 HTML 似乎不是這位個案的資料','error');return;
+          }
+          d._file=file;
+          d._source=source;
+          d.source_hash=await htmlSha256(file);
+          d.file_name=file.name;
+          htmlOpenExistingPlanPreview(c,d);
+        }catch(err){
+          status.textContent='解析失敗。';
+          toast('HTML 解析失敗：'+(err&&err.message?err.message:err),'error');
+        }
+      });
+    }catch(err){
+      toast('讀取個案資料失敗：'+(err&&err.message?err.message:err),'error');
+    }finally{showLoading(false);}
+  }
+
+  function htmlOpenExistingPlanPreview(c,d){
+    var planDate=d.care_plan&&d.care_plan.plan_date;
+    var warn=planDate?'':'<div class="import-warning">這份 HTML 未辨識到計畫日期；若個案已有含日期的版本，本次上傳不會取代目前版本。</div>';
+    var serviceHtml=(d.services||[]).length
+      ?(d.services||[]).map(function(x){return '<span class="approved-chip">'+escapeHTML(x.service_code)+(x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):'')+'</span>';}).join('')
+      :'<span style="font-size:11px;color:#667085">未辨識到核定服務</span>';
+    var html=[
+      warn,
+      '<div class="import-detail-grid">',
+        '<div class="import-detail-cell"><label>個案</label><div>'+escapeHTML(c.case_no||'—')+'　'+escapeHTML(c.case_name||'')+'</div></div>',
+        '<div class="import-detail-cell"><label>計畫日期</label><div>'+(planDate?rocDate(planDate+'T00:00:00'):'未辨識')+'</div></div>',
+        '<div class="import-detail-cell"><label>辨識服務數</label><div>'+String((d.services||[]).length)+' 項</div></div>',
+      '</div>',
+      '<div class="import-section">核定服務</div><div class="approved-chip-wrap">'+serviceHtml+'</div>',
+      '<div class="import-section">照顧計畫內容</div>',
+      htmlPlanPreview(d.care_plan)
+    ].join('');
+    openModal({title:'確認照顧計畫版本',confirmText:'確認上傳',large:true,html:html,onConfirm:function(){
+      return htmlSaveExistingPlanVersion(c,d);
+    }});
+  }
+
+  async function htmlSaveExistingPlanVersion(c,d){
+    var file=d._file;
+    var path='';
+    showLoading(true);
+    try{
+      var safeNo=htmlNormalizeCaseNo(c.case_no||c.id);
+      var ext=/\.htm$/i.test(file.name)?'htm':'html';
+      path=safeNo+'/plans/'+Date.now()+'-'+crypto.randomUUID()+'.'+ext;
+      var up=await db.storage.from(CASE_HTML_BUCKET).upload(path,file,{contentType:'text/html',upsert:false});
+      if(up.error)throw up.error;
+      var payload={
+        case_no:c.case_no,
+        case_name:d.case_name||c.case_name,
+        national_id:d.national_id||c.national_id||'',
+        birth_date:d.birth_date||c.birth_date||'',
+        gender:d.gender||c.gender||'',
+        address:d.address||c.address||'',
+        phone:d.phone||c.phone||'',
+        cms_level:d.cms_level||c.cms_level||'',
+        identity_type:d.identity_type||c.identity_type||'',
+        assessment_date:d.assessment_date||'',
+        plan_approval_date:d.plan_approval_date||'',
+        a_unit_name:d.a_unit_name||c.a_unit_name||'',
+        case_manager_name:d.case_manager_name||c.case_manager_name||'',
+        case_manager_phone:d.case_manager_phone||c.case_manager_phone||'',
+        assessor_name:d.assessor_name||c.assessor_name||'',
+        supervisor_id:c.supervisor_id,
+        service_usage_type:c.service_usage_type,
+        payment_method:c.payment_method||'',
+        contacts:d.contacts||[],
+        services:d.services||[],
+        budgets:d.budgets||[],
+        care_plan:d.care_plan||{},
+        source_ca110_id:d.source_ca110_id||'',
+        source_hash:d.source_hash||'',
+        file_name:file.name,
+        storage_path:path,
+        warnings:d.warnings||[],
+        match_case_id:c.id
+      };
+      if(d.lives_alone!==null)payload.lives_alone=d.lives_alone;
+      var r=await db.rpc('import_case_html_data',{payload:payload});
+      if(r.error)throw r.error;
+      if(r.data&&r.data.action==='duplicate'){
+        await db.storage.from(CASE_HTML_BUCKET).remove([path]);
+        await htmlReturnToCaseList('這份 HTML 已經上傳過，未重複建立版本。','warn');
+      }else{
+        await htmlReturnToCaseList(r.data&&r.data.plan_is_current?'照顧計畫已上傳，系統判定此版為目前最新版本':'照顧計畫已上傳並保存為歷史版本，目前最新版本不變','success');
+      }
+      return true;
+    }catch(err){
+      if(path){try{await db.storage.from(CASE_HTML_BUCKET).remove([path]);}catch(_e){}}
+      toast('上傳照顧計畫失敗：'+(err&&err.message?err.message:err),'error');
+      return false;
+    }finally{showLoading(false);}
+  }
+
+  function htmlAddCaseDetailControls(block,c,plans,imports){
+    var canEdit=htmlCanEditCase(c);
+    var titles=[].slice.call(block.querySelectorAll('.case-section-title'));
+    var basicTitle=titles.find(function(x){return x.textContent.indexOf('基本資料')>=0;});
+    if(basicTitle&&canEdit){
+      var editBtn=document.createElement('button');
+      editBtn.className='btn sm';
+      editBtn.textContent='編輯個案';
+      editBtn.addEventListener('click',function(){htmlOpenCaseEdit(c.id);});
+      basicTitle.appendChild(editBtn);
+    }
+
+    var currentTitle=titles.find(function(x){return x.textContent.indexOf('目前照顧計畫')>=0;});
+    if(!currentTitle)return;
+
+    var versionTitle=document.createElement('div');
+    versionTitle.className='case-section-title';
+    var strong=document.createElement('strong');
+    strong.textContent='照顧計畫版本';
+    versionTitle.appendChild(strong);
+    if(canEdit){
+      var actionWrap=document.createElement('div');
+      actionWrap.className='section-actions';
+      var uploadBtn=document.createElement('button');
+      uploadBtn.className='btn sm primary';
+      uploadBtn.textContent='＋ 上傳照顧計畫 HTML';
+      uploadBtn.addEventListener('click',function(){htmlOpenExistingPlanUpload(c.id);});
+      actionWrap.appendChild(uploadBtn);
+      versionTitle.appendChild(actionWrap);
+    }
+
+    var list=document.createElement('div');
+    list.className='plan-version-list';
+    var importMap=new Map((imports||[]).map(function(x){return [x.id,x];}));
+    if(!(plans||[]).length){
+      list.innerHTML='<div class="html-import-status">尚無照顧計畫版本。</div>';
+    }else{
+      (plans||[]).forEach(function(p){
+        var row=document.createElement('div');
+        row.className='plan-version-row'+(p.is_current?' current':'');
+        var main=document.createElement('div');
+        main.className='plan-version-main';
+        var titleText=document.createElement('strong');
+        titleText.textContent=p.plan_date?rocDate(p.plan_date+'T00:00:00'):'日期未辨識';
+        if(p.is_current){
+          var badge=document.createElement('span');
+          badge.className='plan-current-badge';
+          badge.textContent='目前使用';
+          titleText.appendChild(badge);
+        }
+        main.appendChild(titleText);
+        var meta=document.createElement('small');
+        var src=importMap.get(p.source_import_id);
+        meta.textContent=(src&&src.file_name?'來源：'+src.file_name:'系統版本')+(p.updated_at?'｜更新：'+rocDate(p.updated_at):'');
+        main.appendChild(meta);
+        row.appendChild(main);
+        if(canEdit){
+          var actions=document.createElement('div');
+          actions.className='section-actions';
+          var edit=document.createElement('button');
+          edit.className='btn sm';
+          edit.textContent='編輯';
+          edit.addEventListener('click',function(){htmlOpenPlanEdit(p.id);});
+          actions.appendChild(edit);
+          row.appendChild(actions);
+        }
+        list.appendChild(row);
+      });
+    }
+    currentTitle.parentNode.insertBefore(versionTitle,currentTitle);
+    currentTitle.parentNode.insertBefore(list,currentTitle);
+  }
+
   // 提供個案管理主模組使用的明確掛勾，避免以 document capture 攔截事件。
   window.openCaseCreateFlow = htmlOpenFileModal;
   window.augmentCaseDetail = htmlAugmentCaseDetail;
