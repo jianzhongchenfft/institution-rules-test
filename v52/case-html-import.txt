@@ -25,6 +25,21 @@
     .approved-chip-wrap{display:flex;gap:6px;flex-wrap:wrap}.approved-chip{display:inline-flex;border-radius:999px;padding:5px 8px;background:#fff3ee;color:#8b5746;font-size:10.5px;font-weight:900;border:1px solid #f0d5ca}
     .import-history{display:grid;gap:7px}.import-history-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff}.import-history-row small{display:block;color:#667085;margin-top:3px}
     .plan-version-list{display:grid;gap:7px}.plan-version-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}.plan-version-row.current{background:#fff8f5;border-color:#efcabc}.plan-version-main{min-width:0}.plan-version-main strong{font-size:12px}.plan-version-main small{display:block;color:#667085;margin-top:3px;line-height:1.5}.plan-current-badge{display:inline-flex;margin-left:6px;border-radius:999px;padding:3px 7px;background:#eef7f1;color:#237a4b;font-size:9.5px;font-weight:900}.section-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .case-page{display:grid;gap:14px}
+    .case-page-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
+    .case-page-title-wrap{display:flex;gap:12px;align-items:flex-start;min-width:0}.case-back-btn{flex:0 0 auto}.case-page-title{font-size:20px;font-weight:900;color:#344054;line-height:1.25}.case-page-sub{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+    .case-meta-chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:5px 8px;background:#fff;font-size:10.5px;font-weight:800;color:#475467}.case-meta-chip.primary{background:#fff5f0;border-color:#efcfc2;color:#9a5c47}
+    .case-page-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+    .case-detail-tabs{display:flex;gap:6px;overflow-x:auto;padding:4px;background:#fff;border:1px solid var(--line);border-radius:13px;scrollbar-width:thin}.case-detail-tab{border:0;background:transparent;border-radius:9px;padding:9px 12px;white-space:nowrap;font-size:11.5px;font-weight:900;color:#667085;cursor:pointer}.case-detail-tab.active{background:#fff2ec;color:#914f39}.case-detail-tab:hover{background:#faf5f2}
+    .case-tab-panel{display:grid;gap:14px}.case-panel-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px}.case-panel-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:11px}.case-panel-head strong{font-size:13px;color:#344054}.case-panel-note{font-size:10.5px;color:#667085;line-height:1.55}
+    .case-overview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.case-overview-card{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}.case-overview-card label{display:block;font-size:10px;color:#667085;font-weight:900;margin-bottom:5px}.case-overview-card strong{display:block;font-size:14px;color:#344054}.case-overview-card small{display:block;margin-top:5px;color:#667085;line-height:1.5}
+    .case-data-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.case-data-item{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafcfb;min-width:0}.case-data-item.wide{grid-column:1/-1}.case-data-item label{display:block;font-size:9.5px;color:#667085;font-weight:900;margin-bottom:4px}.case-data-item div{font-size:11.5px;font-weight:800;color:#344054;word-break:break-word;line-height:1.55}
+    .case-table-simple{width:100%;border-collapse:collapse;font-size:11px}.case-table-simple th,.case-table-simple td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.case-table-simple th{font-size:10px;color:#667085;background:#fafafa}.case-table-simple tr:last-child td{border-bottom:0}
+    .case-version-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(0,1.6fr);gap:12px}.case-version-nav{display:grid;gap:7px;align-content:start}.case-version-btn{width:100%;text-align:left;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;cursor:pointer}.case-version-btn.active{background:#fff7f3;border-color:#ecc7b9}.case-version-btn strong{font-size:11.5px}.case-version-btn small{display:block;color:#667085;margin-top:4px;line-height:1.45}
+    .case-timeline{display:grid;gap:0}.case-timeline-item{position:relative;padding:0 0 18px 26px;border-left:2px solid #eee;margin-left:7px}.case-timeline-item:last-child{padding-bottom:0}.case-timeline-dot{position:absolute;left:-7px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid #d9a38d}.case-timeline-date{font-size:10px;color:#667085;font-weight:800}.case-timeline-title{font-size:11.5px;font-weight:900;color:#344054;margin-top:3px}.case-timeline-text{font-size:10.5px;color:#667085;line-height:1.55;margin-top:3px}
+    .case-empty-inline{padding:16px;border:1px dashed var(--line);border-radius:11px;text-align:center;color:#667085;font-size:11px;background:#fafafa}
+    @media(max-width:1000px){.case-overview-grid{grid-template-columns:1fr 1fr}.case-data-grid{grid-template-columns:1fr 1fr}.case-version-grid{grid-template-columns:1fr}}
+    @media(max-width:650px){.case-page-head{flex-direction:column}.case-page-actions{justify-content:flex-start}.case-overview-grid,.case-data-grid{grid-template-columns:1fr}.case-data-item.wide{grid-column:auto}.case-detail-tab{padding:8px 10px}}
     @media(max-width:900px){.service-row,.budget-row{grid-template-columns:1fr 1fr}.service-row .wide{grid-column:1/-1}.import-detail-grid{grid-template-columns:1fr 1fr}.diff-row{grid-template-columns:120px 1fr 24px 1fr}}
     @media(max-width:650px){.import-choice,.import-preview-grid{grid-template-columns:1fr}.contact-row{grid-template-columns:1fr 1fr}.import-detail-grid{grid-template-columns:1fr}.service-row,.budget-row{grid-template-columns:1fr 1fr}.diff-row{grid-template-columns:1fr}.diff-arrow{display:none}}
   `;
@@ -446,30 +461,6 @@
   async function htmlViewOriginal(path,fileName){
     showLoading(true);try{const r=await db.storage.from(CASE_HTML_BUCKET).download(path);if(r.error)throw r.error;const text=await r.data.text();const blob=new Blob([text],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(err){toast('讀取原始 HTML 失敗：'+(err?.message||err),'error');}finally{showLoading(false);}
   }
-  async function htmlAugmentCaseDetail(caseId){
-    try{
-      const [cRes,ctRes,svRes,plRes,bdRes,imRes]=await Promise.all([
-        db.from('care_cases').select('*').eq('id',caseId).maybeSingle(),
-        db.from('case_contacts').select('*').eq('case_id',caseId).order('is_primary_contact',{ascending:false}).order('created_at'),
-        db.from('case_approved_services').select('*').eq('case_id',caseId).eq('is_current',true).order('service_group').order('service_code'),
-        db.from('care_plans').select('*').eq('case_id',caseId).order('plan_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}),
-        db.from('service_budgets').select('*').eq('case_id',caseId).eq('is_current',true).order('category'),
-        db.from('case_imports').select('id,file_name,storage_path,imported_at,import_type,detected_plan_date').eq('case_id',caseId).order('imported_at',{ascending:false})
-      ]); const err=cRes.error||ctRes.error||svRes.error||plRes.error||bdRes.error||imRes.error;if(err)throw err;const c=cRes.data;if(!c)return;
-      const body=document.querySelector('#modalRoot .modal-body'); if(!body||body.querySelector('.import-detail-block'))return;
-      const contacts=ctRes.data||[],services=svRes.data||[],plans=plRes.data||[],budgets=bdRes.data||[],imports=imRes.data||[]; const plan=plans.find(x=>x.is_current)||plans[0];
-      const block=document.createElement('div');block.className='import-detail-block';block.innerHTML=`
-        <div class="case-section-title"><strong>基本資料</strong></div><div class="import-detail-grid"><div class="import-detail-cell"><label>個案編號</label><div>${escapeHTML(c.case_no||'—')}</div></div><div class="import-detail-cell"><label>身分證字號</label><div>${escapeHTML(c.national_id||'—')}</div></div><div class="import-detail-cell"><label>出生日期</label><div>${c.birth_date?rocDate(c.birth_date+'T00:00:00'):'—'}</div></div><div class="import-detail-cell"><label>性別</label><div>${escapeHTML(c.gender||'—')}</div></div><div class="import-detail-cell"><label>電話</label><div>${escapeHTML(c.phone||'—')}</div></div><div class="import-detail-cell"><label>CMS</label><div>${escapeHTML(c.cms_level||'—')}</div></div><div class="import-detail-cell" style="grid-column:1/-1"><label>地址</label><div>${escapeHTML(c.address||'—')}</div></div><div class="import-detail-cell"><label>A單位</label><div>${escapeHTML(c.a_unit_name||'—')}</div></div><div class="import-detail-cell"><label>A個管</label><div>${escapeHTML(c.case_manager_name||'—')}</div></div><div class="import-detail-cell"><label>A個管電話</label><div>${escapeHTML(c.case_manager_phone||'—')}</div></div><div class="import-detail-cell"><label>服務類別</label><div>${escapeHTML(c.service_usage_type||'—')}</div></div><div class="import-detail-cell"><label>繳款方式</label><div>${escapeHTML(c.payment_method||'未設定')}</div></div></div>
-        <div class="case-section-title"><strong>聯絡人／照顧者</strong></div><div class="approved-chip-wrap">${contacts.length?contacts.map(x=>`<span class="approved-chip">${escapeHTML(x.contact_name)}${x.relationship?'・'+escapeHTML(x.relationship):''}${x.is_primary_contact?'・主要聯絡人':''}${x.is_primary_caregiver?'・主要照顧者':''}${x.is_secondary_caregiver?'・次要照顧者':''}</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無聯絡人資料</span>'}</div>
-        <div class="case-section-title"><strong>目前核定服務</strong></div><div class="approved-chip-wrap">${services.length?services.map(x=>`<span class="approved-chip">${escapeHTML(x.service_code)}${x.service_name?' '+escapeHTML(x.service_name):''}${x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):''}</span>`).join(''):'<span style="font-size:11px;color:#667085">尚無核定服務資料</span>'}</div>${budgets.length?`<div class="html-import-status" style="margin-top:8px">${budgets.map(x=>`${escapeHTML(x.category)}：額度 ${x.benefit_limit??'—'}｜擬定 ${x.planned_total??'—'}｜剩餘 ${x.remaining_amount??'—'}`).join('\n')}</div>`:''}
-        <div class="case-section-title"><strong>目前照管平台照顧計畫</strong></div>${plan?htmlPlanPreview({sections:plan.sections||{}}):'<div class="html-import-status">尚無照管平台照顧計畫。</div>'}
-        <div class="case-section-title"><strong>HTML 匯入紀錄</strong></div><div class="import-history">${imports.length?imports.map((x,i)=>`<div class="import-history-row"><div><strong>${escapeHTML(x.file_name)}</strong><small>${rocDate(x.imported_at)}・${x.import_type==='new_case'?'建立個案':'更新個案'}</small></div><button class="btn sm" data-view-import="${i}">查看原始 HTML</button></div>`).join(''):'<div class="html-import-status">此個案尚無 HTML 匯入紀錄。</div>'}</div>`;
-      body.prepend(block); block.querySelectorAll('[data-view-import]').forEach(btn=>btn.addEventListener('click',()=>{const x=imports[Number(btn.dataset.viewImport)];if(x)htmlViewOriginal(x.storage_path,x.file_name);}));
-      if(typeof htmlAddCaseDetailControls==='function') htmlAddCaseDetailControls(block,c,plans,imports);
-    }catch(err){console.error('讀取 HTML 個案資料失敗',err);}
-  }
-
-
   function htmlCanEditCase(c){
     var role=state.profile && state.profile.role;
     return ['business_manager','organization_manager','admin'].includes(role) || (role==='supervisor' && c && c.supervisor_id===state.profile.id);
@@ -821,79 +812,6 @@
       toast('上傳照管平台照顧計畫失敗：'+(err&&err.message?err.message:err),'error');
       return false;
     }finally{showLoading(false);}
-  }
-
-  function htmlAddCaseDetailControls(block,c,plans,imports){
-    var canEdit=htmlCanEditCase(c);
-    var titles=[].slice.call(block.querySelectorAll('.case-section-title'));
-    var basicTitle=titles.find(function(x){return x.textContent.indexOf('基本資料')>=0;});
-    if(basicTitle&&canEdit){
-      var editBtn=document.createElement('button');
-      editBtn.className='btn sm';
-      editBtn.textContent='編輯個案';
-      editBtn.addEventListener('click',function(){htmlOpenCaseEdit(c.id);});
-      basicTitle.appendChild(editBtn);
-    }
-
-    var currentTitle=titles.find(function(x){return x.textContent.indexOf('目前照管平台照顧計畫')>=0;});
-    if(!currentTitle)return;
-
-    var versionTitle=document.createElement('div');
-    versionTitle.className='case-section-title';
-    var strong=document.createElement('strong');
-    strong.textContent='照管平台照顧計畫版本';
-    versionTitle.appendChild(strong);
-    if(canEdit){
-      var actionWrap=document.createElement('div');
-      actionWrap.className='section-actions';
-      var uploadBtn=document.createElement('button');
-      uploadBtn.className='btn sm primary';
-      uploadBtn.textContent='＋ 上傳照管平台照顧計畫 HTML';
-      uploadBtn.addEventListener('click',function(){htmlOpenExistingPlanUpload(c.id);});
-      actionWrap.appendChild(uploadBtn);
-      versionTitle.appendChild(actionWrap);
-    }
-
-    var list=document.createElement('div');
-    list.className='plan-version-list';
-    var importMap=new Map((imports||[]).map(function(x){return [x.id,x];}));
-    if(!(plans||[]).length){
-      list.innerHTML='<div class="html-import-status">尚無照管平台照顧計畫版本。</div>';
-    }else{
-      (plans||[]).forEach(function(p){
-        var row=document.createElement('div');
-        row.className='plan-version-row'+(p.is_current?' current':'');
-        var main=document.createElement('div');
-        main.className='plan-version-main';
-        var titleText=document.createElement('strong');
-        titleText.textContent=p.plan_date?rocDate(p.plan_date+'T00:00:00'):'日期未辨識';
-        if(p.is_current){
-          var badge=document.createElement('span');
-          badge.className='plan-current-badge';
-          badge.textContent='目前使用';
-          titleText.appendChild(badge);
-        }
-        main.appendChild(titleText);
-        var meta=document.createElement('small');
-        var src=importMap.get(p.source_import_id);
-        meta.textContent=(src&&src.file_name?'來源：'+src.file_name:'系統版本')+(p.updated_at?'｜更新：'+rocDate(p.updated_at):'');
-        main.appendChild(meta);
-        row.appendChild(main);
-        if(canEdit){
-          var actions=document.createElement('div');
-          actions.className='section-actions';
-          var edit=document.createElement('button');
-          edit.className='btn sm';
-          edit.textContent='編輯';
-          edit.addEventListener('click',function(){htmlOpenPlanEdit(p.id);});
-          actions.appendChild(edit);
-          row.appendChild(actions);
-        }
-        list.appendChild(row);
-      });
-    }
-    currentTitle.parentNode.insertBefore(versionTitle,currentTitle);
-    currentTitle.parentNode.insertBefore(list,currentTitle);
   }
 
   // 提供個案管理主模組使用的明確掛勾，避免以 document capture 攔截事件。
