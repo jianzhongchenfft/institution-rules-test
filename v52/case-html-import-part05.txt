@@ -1,5 +1,5 @@
     $('parseCaseHtml').addEventListener('click',async()=>{
-      const caseNo=$('htmlCaseNo').value.trim(); const file=$('htmlCaseFile').files[0]; const supervisor=me?state.profile.id:$('htmlSupervisor').value;
+      const caseNo=htmlNormalizeCaseNo($('htmlCaseNo').value); $('htmlCaseNo').value=caseNo; const file=$('htmlCaseFile').files[0]; const supervisor=me?state.profile.id:$('htmlSupervisor').value;
       if(!caseNo){toast('請輸入個案編號','warn');return;} if(!supervisor){toast('請選擇負責督導','warn');return;} if(!file){toast('請選擇 HTML 檔案','warn');return;}
       if(!/\.html?$/i.test(file.name)){toast('檔案格式必須是 HTML 或 HTM','warn');return;} if(file.size>10*1024*1024){toast('HTML 檔案不可超過 10 MB','warn');return;}
       const status=$('htmlParseStatus'); $('parseCaseHtml').disabled=true;
@@ -45,6 +45,7 @@
       <div class="import-section">核定服務</div>${htmlServiceEditor(d.services||[])}
       <div class="import-section">照顧計畫</div><div class="html-import-status">計畫日期：${d.care_plan?.plan_date?rocDate(d.care_plan.plan_date+'T00:00:00'):'未辨識'}　家訪：${d.care_plan?.home_visit_date?rocDate(d.care_plan.home_visit_date+'T00:00:00'):'—'}　電聯：${d.care_plan?.phone_contact_date?rocDate(d.care_plan.phone_contact_date+'T00:00:00'):'—'}</div>${htmlPlanPreview(d.care_plan)}`,
       onConfirm:()=>htmlSavePreview(d,exact?.id||null)});
+    htmlBindCaseNoInput('hiCaseNo');
     const bindContactDelete=()=>document.querySelectorAll('[data-del-contact]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>b.closest('[data-contact-row]')?.remove());});
     $('htmlAddContact').addEventListener('click',()=>{const host=$('htmlContactEditor');host.insertAdjacentHTML('beforeend',htmlContactRow({}));bindContactDelete();});
     bindContactDelete();
