@@ -141,7 +141,7 @@
     try{
       const [staffRes,casesRes,visitsRes,servicesRes] = await Promise.all([
         db.rpc('get_case_staff_directory'),
-        db.from('care_cases').select('id,case_no,case_name,national_id,birth_date,gender,address,phone,supervisor_id,care_worker_name,open_date,cms_level,service_status,notes,created_at').order('case_no',{ascending:true,nullsFirst:false}).order('case_name'),
+        db.from('care_cases').select('id,case_no,case_name,national_id,birth_date,gender,address,phone,supervisor_id,care_worker_name,open_date,cms_level,service_status,service_usage_type,payment_method,notes,created_at').order('case_no',{ascending:true,nullsFirst:false}).order('case_name'),
         db.from('case_visits').select('*').order('visit_date',{ascending:false}).order('created_at',{ascending:false}),
         db.from('case_approved_services').select('case_id,service_group,service_code,service_name,approved_quantity').eq('is_current',true).order('service_code')
       ]);
@@ -251,7 +251,24 @@
       <div id="caseList"></div>`;
 
     $('caseSupervisorFilter').addEventListener('change',e=>{state.caseSupervisorFilter=e.target.value;renderCaseVisitsPage();});
-    $('caseSearch').addEventListener('input',e=>{const pos=e.target.selectionStart;state.caseQuery=e.target.value;renderCaseVisitsPage();const i=$('caseSearch');if(i){i.focus();try{i.setSelectionRange(pos,pos);}catch(_){}}});
+    const caseSearchInput=$('caseSearch');
+    let caseSearchComposing=false;
+    const applyCaseSearch=(target)=>{
+      const pos=target.selectionStart;
+      state.caseQuery=target.value;
+      renderCaseVisitsPage();
+      const i=$('caseSearch');
+      if(i){
+        i.focus();
+        try{i.setSelectionRange(pos,pos);}catch(_){}
+      }
+    };
+    caseSearchInput.addEventListener('compositionstart',()=>{caseSearchComposing=true;});
+    caseSearchInput.addEventListener('compositionend',e=>{caseSearchComposing=false;applyCaseSearch(e.target);});
+    caseSearchInput.addEventListener('input',e=>{
+      if(caseSearchComposing || e.isComposing) return;
+      applyCaseSearch(e.target);
+    });
     $('caseStatusFilter').addEventListener('change',e=>{state.caseStatusFilter=e.target.value;renderCaseVisitsPage();});
     $('reloadCases').addEventListener('click',async()=>{await loadCaseVisitData();renderCaseVisitsPage();toast('已重新整理個案資料','success');});
     $('addCaseBtn').addEventListener('click',openCaseModal);
