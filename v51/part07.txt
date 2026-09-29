@@ -20,9 +20,15 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!res.ok) throw new Error(`v51/case-visits-patch.txt 載入失敗（${res.status}）`);
       eval(await res.text());
 
-      const importRes=await fetch('v51/case-pdf-import-patch.txt',{cache:'no-store'});
-      if(!importRes.ok) throw new Error(`v51/case-pdf-import-patch.txt 載入失敗（${importRes.status}）`);
-      eval(await importRes.text());
+      const caseHtmlParts = await Promise.all(
+        [1,2,3,4,5,6].map(async n=>{
+          const path=`v52/case-html-import-part${String(n).padStart(2,'0')}.txt`;
+          const res=await fetch(path,{cache:'no-store'});
+          if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
+          return await res.text();
+        })
+      );
+      eval(caseHtmlParts.join('\n'));
 
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
