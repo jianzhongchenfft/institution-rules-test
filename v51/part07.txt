@@ -92,9 +92,19 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimeWithdrawRes.ok) throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${overtimeWithdrawRes.status}）`);
       eval(await overtimeWithdrawRes.text());
 
-      const eventTrackingRes = await fetch('v52/event-tracking-patch.txt?v=event-finalize-3456-20260930p',{cache:'no-store'});
-      if(!eventTrackingRes.ok) throw new Error(`v52/event-tracking-patch.txt 載入失敗（${eventTrackingRes.status}）`);
-      eval(await eventTrackingRes.text());
+      const eventTrackingFiles=[
+        'v52/event-core.txt',
+        'v52/event-detail.txt',
+        'v52/event-sensitive.txt',
+        'v52/event-forms.txt'
+      ];
+      let eventTrackingCode='';
+      for(const path of eventTrackingFiles){
+        const res=await fetch(`${path}?v=event-refactor-20260930q`,{cache:'no-store'});
+        if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
+        eventTrackingCode+='\n'+await res.text();
+      }
+      eval(eventTrackingCode);
 
       if(state.profile) renderNav();
 
