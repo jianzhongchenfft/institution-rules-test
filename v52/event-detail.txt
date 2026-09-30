@@ -111,7 +111,7 @@ function renderEventDetail(id){
     z.push(`<h3>操作歷程</h3><div class="panel" style="padding:8px 18px">${hist.map(HLINE).join('')}</div>`);
   }
 
-  let A=['<button id="bk" class="btn">←返回</button>'];
+  let A=['<button id="bk" class="btn">←返回</button>','<button id="eventPrint" class="btn">列印／匯出</button>'];
   if(e.status==='draft')A.push('<button id="ed" class="btn primary">編輯草稿</button>');
   if(['pending_followup','tracking','pending_close'].includes(e.status))A.push('<button id="fu" class="btn">＋續報</button>');
   if(e.status==='pending_close')A.push('<button id="cl" class="btn primary">結報</button>');
@@ -142,6 +142,7 @@ function renderEventDetail(id){
   `;
 
   $('bk').onclick=renderEventList;
+  $('eventPrint')&&($('eventPrint').onclick=()=>openEventPrintPreview(e.id));
   $('ed')&&($('ed').onclick=()=>openInitialReportForm(e));
   $('fu')&&($('fu').onclick=()=>openFollowupForm(e));
   $('cl')&&($('cl').onclick=()=>openClosureForm(e));
