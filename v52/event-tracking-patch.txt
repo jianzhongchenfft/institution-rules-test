@@ -14,6 +14,7 @@ EVSTYLE.textContent=`
 .event-field.full{grid-column:1/-1}
 .event-field label{display:block;font-size:12px;font-weight:850;color:#475467;margin-bottom:7px}
 .event-field input,.event-field select,.event-field textarea{width:100%;box-sizing:border-box}
+.event-time-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}.event-time-pair span{font-weight:800;color:#667085;text-align:center}
 .event-field textarea{resize:vertical;line-height:1.65}
 .event-field .event-help{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45}
 .event-section-title{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:3px 0 -2px;font-size:13px;font-weight:900;color:#344054}
@@ -70,6 +71,9 @@ async function DL(a){
   if(r.error)return toast('附件開啟失敗：'+r.error.message,'error');
   window.open(r.data.signedUrl,'_blank','noopener,noreferrer')
 }
+const TH=(id,val='')=>`<select id="${id}"><option value="">--</option>${Array.from({length:24},(_,i)=>String(i).padStart(2,'0')).map(x=>`<option value="${x}" ${x===val?'selected':''}>${x}</option>`).join('')}</select>`;
+const TM=(id,val='')=>`<select id="${id}"><option value="">--</option>${Array.from({length:60},(_,i)=>String(i).padStart(2,'0')).map(x=>`<option value="${x}" ${x===val?'selected':''}>${x}</option>`).join('')}</select>`;
+const TV=(h,m)=>{const hh=v(h),mm=v(m);if(!hh&&!mm)return null;if(!hh||!mm)return '__INVALID__';return hh+':'+mm};
 const OS=id=>state.es.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${escapeHTML(x.display_name)}</option>`).join(''),OC=id=>state.eca.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${escapeHTML(x.case_name)}</option>`).join(''),OW=id=>state.ew.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${escapeHTML(x.worker_name)}</option>`).join('');
 function F(e=null){
   let i=e?I(e.id):null;
@@ -85,8 +89,12 @@ function F(e=null){
         <input id="d" type="date" value="${e?.event_date||isoDate(new Date())}">
       </div>
       <div class="event-field">
-        <label>時間</label>
-        <input id="tm" type="time" value="${e?.event_time?.slice(0,5)||''}">
+        <label>時間（24 小時制）</label>
+        <div class="event-time-pair">
+          ${TH('th',e?.event_time?.slice(0,2)||'')}
+          <span>：</span>
+          ${TM('tmin',e?.event_time?.slice(3,5)||'')}
+        </div>
       </div>
       <div class="event-field">
         <label>類別 *</label>
@@ -130,18 +138,16 @@ function F(e=null){
       <div class="event-field full">
         <label>1　事件說明 *</label>
         <textarea id="de" class="event-text-long" placeholder="記錄事件發生經過、時間、人物、現場情形及目前狀況等">${escapeHTML(i?.event_description||'')}</textarea>
-        <div class="event-help">依一般使用情形配置約 500 字的閱讀與編輯空間，不限制一定要寫滿。</div>
       </div>
 
-      <div class="event-field half">
+      <div class="event-field full">
         <label>2　已完成處置 *</label>
         <textarea id="dn" class="event-text-short" placeholder="記錄目前已完成的聯繫、處理或協助">${escapeHTML(i?.completed_actions||'')}</textarea>
-        <div class="event-help">約 100 字的編輯空間。</div>
       </div>
-      <div class="event-field half">
+
+      <div class="event-field full">
         <label>3　後續待辦 *</label>
         <textarea id="td" class="event-text-short" placeholder="記錄後續需追蹤、確認或完成的事項">${escapeHTML(i?.pending_tasks||'')}</textarea>
-        <div class="event-help">約 100 字的編輯空間。</div>
       </div>
 
       <div class="event-option-row">
@@ -188,8 +194,8 @@ function F(e=null){
   $('sr').onclick=()=>save(e,'pending_close');
 }
 const v=id=>$(id).value.trim();
-async function save(e,a){let p={event_id:e?.id||null,event_date:v('d'),event_time:v('tm')||null,category:v('cat'),subject:v('sub'),case_id:v('ca')||null,care_worker_id:v('wo')||null,reporter_type:v('rt')||null,reporter_name:v('rn')||null,responsible_staff_id:v('ow'),event_description:v('de'),completed_actions:v('dn'),pending_tasks:v('td'),requires_followup:a==='pending_followup',next_followup_date:a==='pending_followup'?(v('nx')||null):null,line_notify:$('ln').checked};if(!p.subject)return toast('請填主旨','warn');if(a!=='draft'&&(!p.event_description||!p.completed_actions||!p.pending_tasks))return toast('請填妥初報三欄','warn');if(a==='pending_followup'&&!p.next_followup_date)return toast('請填下次追蹤日期','warn');showLoading(true);try{let r=await db.rpc('save_tracking_event_draft',{payload:p});if(r.error)throw r.error;if(a!=='draft'){let q=await db.rpc('submit_tracking_event',{p_event_id:r.data,p_target_status:a,p_line_notify:p.line_notify});if(q.error)throw q.error}let ae=null;try{await U(r.data,'initial',null,'att')}catch(err){ae=err}closeModal();await L();V(r.data);if(ae)toast('事件已儲存，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('儲存失敗：'+x.message,'error')}finally{showLoading(false)}}
-function FF(e){openModal({title:'新增續報',large:true,showConfirm:false,html:`<div class="form-grid"><div><label>日期*</label><input id="fd" type="date" value="${isoDate(new Date())}"></div><div><label>時間</label><input id="ftm" type="time"></div><div><label>方式*</label><select id="fm">${Object.entries(M).map(([k,x])=>`<option value="${k}">${x}</option>`).join('')}</select></div><div class="full"><label>1 最新狀況*</label><textarea id="fn"></textarea></div><div class="full"><label>2 本次已完成處置</label><textarea id="ff"></textarea></div><div class="full"><label>3 後續待辦</label><textarea id="ft"></textarea></div><div><label>狀態</label><select id="fo"><option value="continue">繼續追蹤</option><option value="ready_to_close">準備結報</option></select></div><div><label>下次追蹤</label><input id="fx" type="date"></div><div><label><input id="fl" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="fatt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="fs" class="btn primary">送出續報</button></div>`});$('fs').onclick=async()=>{let p={event_id:e.id,followup_date:v('fd'),followup_time:v('ftm')||null,followup_method:v('fm'),latest_status:v('fn'),completed_actions:v('ff'),pending_tasks:v('ft'),outcome:v('fo'),next_followup_date:v('fo')==='continue'?(v('fx')||null):null,line_notify:$('fl').checked};if(!p.latest_status)return toast('請填最新狀況','warn');if(p.outcome==='continue'&&!p.next_followup_date)return toast('請填下次追蹤日期','warn');showLoading(true);try{let r=await db.rpc('add_tracking_event_followup',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'followup',r.data,'fatt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('續報已儲存，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('續報失敗：'+x.message,'error')}finally{showLoading(false)}}}
+async function save(e,a){const eventTime=TV('th','tmin');if(eventTime==='__INVALID__')return toast('時間請同時選擇「時」與「分」','warn');let p={event_id:e?.id||null,event_date:v('d'),event_time:eventTime,category:v('cat'),subject:v('sub'),case_id:v('ca')||null,care_worker_id:v('wo')||null,reporter_type:v('rt')||null,reporter_name:v('rn')||null,responsible_staff_id:v('ow'),event_description:v('de'),completed_actions:v('dn'),pending_tasks:v('td'),requires_followup:a==='pending_followup',next_followup_date:a==='pending_followup'?(v('nx')||null):null,line_notify:$('ln').checked};if(!p.subject)return toast('請填主旨','warn');if(a!=='draft'&&(!p.event_description||!p.completed_actions||!p.pending_tasks))return toast('請填妥初報三欄','warn');if(a==='pending_followup'&&!p.next_followup_date)return toast('請填下次追蹤日期','warn');showLoading(true);try{let r=await db.rpc('save_tracking_event_draft',{payload:p});if(r.error)throw r.error;if(a!=='draft'){let q=await db.rpc('submit_tracking_event',{p_event_id:r.data,p_target_status:a,p_line_notify:p.line_notify});if(q.error)throw q.error}let ae=null;try{await U(r.data,'initial',null,'att')}catch(err){ae=err}closeModal();await L();V(r.data);if(ae)toast('事件已儲存，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('儲存失敗：'+x.message,'error')}finally{showLoading(false)}}
+function FF(e){openModal({title:'新增續報',large:true,showConfirm:false,html:`<div class="form-grid"><div><label>日期*</label><input id="fd" type="date" value="${isoDate(new Date())}"></div><div><label>時間（24 小時制）</label><div class="event-time-pair">${TH('fth') }<span>：</span>${TM('ftmin')}</div></div><div><label>方式*</label><select id="fm">${Object.entries(M).map(([k,x])=>`<option value="${k}">${x}</option>`).join('')}</select></div><div class="full"><label>1 最新狀況*</label><textarea id="fn"></textarea></div><div class="full"><label>2 本次已完成處置</label><textarea id="ff"></textarea></div><div class="full"><label>3 後續待辦</label><textarea id="ft"></textarea></div><div><label>狀態</label><select id="fo"><option value="continue">繼續追蹤</option><option value="ready_to_close">準備結報</option></select></div><div><label>下次追蹤</label><input id="fx" type="date"></div><div><label><input id="fl" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="fatt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="fs" class="btn primary">送出續報</button></div>`});$('fs').onclick=async()=>{const followTime=TV('fth','ftmin');if(followTime==='__INVALID__')return toast('時間請同時選擇「時」與「分」','warn');let p={event_id:e.id,followup_date:v('fd'),followup_time:followTime,followup_method:v('fm'),latest_status:v('fn'),completed_actions:v('ff'),pending_tasks:v('ft'),outcome:v('fo'),next_followup_date:v('fo')==='continue'?(v('fx')||null):null,line_notify:$('fl').checked};if(!p.latest_status)return toast('請填最新狀況','warn');if(p.outcome==='continue'&&!p.next_followup_date)return toast('請填下次追蹤日期','warn');showLoading(true);try{let r=await db.rpc('add_tracking_event_followup',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'followup',r.data,'fatt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('續報已儲存，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('續報失敗：'+x.message,'error')}finally{showLoading(false)}}}
 function FC(e){let last=FU(e.id).slice(-1)[0]?.pending_tasks||I(e.id)?.pending_tasks||'',warn=last?`<div style="grid-column:1/-1;padding:9px 10px;border:1px solid #f5dca8;background:#fff8e8;border-radius:9px;font-size:11.5px">目前仍記有後續待辦：<b>${escapeHTML(last)}</b><br><label><input id="ack" type="checkbox"> 確認上述待辦已完成或不再需要處理</label></div>`:'';openModal({title:'事件結報',large:true,showConfirm:false,html:`<div class="form-grid">${warn}<div><label>結報日期*</label><input id="cd" type="date" value="${isoDate(new Date())}"></div><div class="full"><label>1 最終狀況*</label><textarea id="cf"></textarea></div><div class="full"><label>2 結案判定*</label><textarea id="cw"></textarea></div><div><label><input id="cln" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="catt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="cs" class="btn primary">完成結報</button></div>`});$('cs').onclick=async()=>{let p={event_id:e.id,close_date:v('cd'),final_status:v('cf'),closure_decision:v('cw'),line_notify:$('cln').checked};if(!p.final_status||!p.closure_decision)return toast('請填妥結報內容','warn');if(last&&!$('ack')?.checked)return toast('請先確認尚未完成的後續待辦','warn');showLoading(true);try{let r=await db.rpc('close_tracking_event',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'closure',r.data,'catt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('結報已完成，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('結報失敗：'+x.message,'error')}finally{showLoading(false)}}}
 async function reopen(e){let x=prompt('重新開啟原因');if(!x)return;let r=await db.rpc('reopen_tracking_event',{p_event_id:e.id,p_reason:x});if(r.error)return toast(r.error.message,'error');await L();V(e.id)}
 async function voided(e){let x=prompt('作廢原因');if(!x)return;let r=await db.rpc('void_tracking_event',{p_event_id:e.id,p_reason:x});if(r.error)return toast(r.error.message,'error');await L();V(e.id)}
