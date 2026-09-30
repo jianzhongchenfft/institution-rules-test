@@ -93,3 +93,117 @@ function renderSensitiveEventFieldsHtml(sd){
   `;
 }
 
+
+function renderSensitivePersonField(side,type,detail){
+  const field=$(side==='victim'?'svPersonField':'saPersonField');
+  if(!field)return;
+
+  const label=side==='victim'
+    ?'疑似被害人'
+    :(fieldValue('cat')==='性侵害'?'疑似加害人':'疑似行為人');
+
+  if(type==='staff'){
+    field.innerHTML=`<label>${label} *</label><select id="${side==='victim'?'svPerson':'saPerson'}">${sensitiveStaffOptions(detail?.[side+'_person_kind'],detail?.[side+'_person_id'])}</select>`;
+  }else if(type==='service_recipient'){
+    field.innerHTML=`<label>${label} *</label><select id="${side==='victim'?'svPerson':'saPerson'}">${sensitiveCaseOptions(detail?.[side+'_person_kind'],detail?.[side+'_person_id'])}</select>`;
+  }else if(type==='family'||type==='third_party'){
+    field.innerHTML=`<label>${label} *</label><input id="${side==='victim'?'svName':'saName'}" value="${escapeHTML(detail?.[side+'_name']||'')}">`;
+  }else{
+    field.innerHTML=`<label>${label} *</label><input disabled>`;
+  }
+}
+
+function updateSensitiveRelationField(){
+  const victimType=fieldValue('svType');
+  const actorType=fieldValue('saType');
+  if($('srel')){
+    $('srel').value=(victimType&&actorType)
+      ?`${SIT[victimType]}－${SIT[actorType]}`
+      :'';
+  }
+}
+
+function updateSensitiveReportingFields(){
+  const reported=$('srs')?.value==='reported';
+  ['srMethodField','srDateField','srTimeField','srAgencyField','srNoteField'].forEach(id=>{
+    if($(id))$(id).style.display=reported?'block':'none';
+  });
+}
+
+function bindSensitiveEventFields(initialDetail){
+  let detail=initialDetail;
+
+  const refresh=()=>{
+    const category=fieldValue('cat');
+    const show=isSensitiveCategory(category);
+
+    ['sensitiveTitle','svTypeField','svPersonField','saTypeField','saPersonField','srelField','sensitiveActionTitle','sipField','srsField'].forEach(id=>{
+      if($(id))$(id).style.display=show?(id==='sensitiveTitle'||id==='sensitiveActionTitle'?'flex':'block'):'none';
+    });
+
+    ['srMethodField','srDateField','srTimeField','srAgencyField','srNoteField'].forEach(id=>{
+      if($(id)&&!show)$(id).style.display='none';
+    });
+
+    if(!show)return;
+
+    $('sensitiveTitle').textContent=category==='性侵害'?'性侵害事件資料':'性騷擾事件資料';
+    $('saTypeLabel').textContent=category==='性侵害'?'疑似加害人身分 *':'疑似行為人身分 *';
+
+    renderSensitivePersonField('victim',fieldValue('svType'),detail);
+    renderSensitivePersonField('actor',fieldValue('saType'),detail);
+    updateSensitiveRelationField();
+    updateSensitiveReportingFields();
+  };
+
+  $('cat')?.addEventListener('change',()=>{
+    detail=null;
+    refresh();
+  });
+
+  $('svType')?.addEventListener('change',()=>{
+    renderSensitivePersonField('victim',fieldValue('svType'),null);
+    updateSensitiveRelationField();
+  });
+
+  $('saType')?.addEventListener('change',()=>{
+    renderSensitivePersonField('actor',fieldValue('saType'),null);
+    updateSensitiveRelationField();
+  });
+
+  $('srs')?.addEventListener('change',updateSensitiveReportingFields);
+
+  refresh();
+}
+
+function readSensitiveParty(side){
+  const type=fieldValue(side==='victim'?'svType':'saType');
+  if(!type){
+    return {identity_type:null,person_kind:null,person_id:null,name:null};
+  }
+
+  if(type==='staff'||type==='service_recipient'){
+    const el=$(side==='victim'?'svPerson':'saPerson');
+    const raw=el?.value||'';
+    const [kind,id]=raw.split(':');
+    let name='';
+
+    if(kind==='staff_user')name=staffName(id);
+    else if(kind==='care_worker')name=workerName(id);
+    else if(kind==='care_case')name=caseName(id);
+
+    return {
+      identity_type:type,
+      person_kind:kind||null,
+      person_id:id||null,
+      name:name||null
+    };
+  }
+
+  return {
+    identity_type:type,
+    person_kind:'manual',
+    person_id:null,
+    name:fieldValue(side==='victim'?'svName':'saName')||null
+  };
+}
