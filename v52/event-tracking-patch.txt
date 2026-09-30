@@ -86,11 +86,11 @@ function F(e=null){
       <div class="event-section-title">事件基本資料</div>
 
       <div class="event-field">
-        <label>事件日期 *</label>
+        <label>事件發生日期 *</label>
         <input id="d" type="date" value="${e?.event_date||isoDate(new Date())}">
       </div>
       <div class="event-field">
-        <label>事件時間</label>
+        <label>事件發生時間</label>
         <div class="event-time-pair">
           ${TH('th',e?.event_time?.slice(0,2)||'')}
           <span>：</span>
