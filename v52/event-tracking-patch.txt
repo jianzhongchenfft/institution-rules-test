@@ -19,7 +19,7 @@ EVSTYLE.textContent=`
 .event-field .event-help{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45}
 .event-section-title{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:3px 0 -2px;font-size:13px;font-weight:900;color:#344054}
 .event-section-title:after{content:"";height:1px;background:var(--line);flex:1}
-.event-text-long{min-height:210px!important}
+.event-text-long{min-height:260px!important}
 .event-text-short{min-height:112px!important}
 .event-option-row{grid-column:1/-1;display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr);gap:16px 18px;align-items:end}
 .event-check{display:flex!important;align-items:center;gap:8px;min-height:42px;margin:0!important;font-size:13px!important}
@@ -259,14 +259,19 @@ function FF(e){
         <label>附件</label>
         <input id="fatt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
       </div>
-    </div>
-
-    <div class="event-actions">
-      <button id="fs" class="btn primary">送出續報</button>
     </div>`
   });
 
   document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
+  const followFoot=document.querySelector('#modalRoot .modal-foot');
+  const followCancel=$('modalCancel');
+  if(followFoot&&followCancel){
+    const submitBtn=document.createElement('button');
+    submitBtn.id='fs';
+    submitBtn.className='btn primary';
+    submitBtn.textContent='送出續報';
+    followFoot.insertBefore(submitBtn,followCancel.nextSibling);
+  }
 
   const toggleNext=()=>{
     const continuing=v('fo')==='continue';
