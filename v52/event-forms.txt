@@ -103,18 +103,6 @@ function openInitialReportForm(e=null){
 
   bindSensitiveEventFields(sd);
 
-  });
-  $('svType')?.addEventListener('change',()=>{
-    renderSensitivePerson('victim',fieldValue('svType'),null);
-    updateSensitiveRelation();
-  });
-  $('saType')?.addEventListener('change',()=>{
-    renderSensitivePerson('actor',fieldValue('saType'),null);
-    updateSensitiveRelation();
-  });
-  $('srs')?.addEventListener('change',updateReportingFields);
-  refreshSensitive();
-
   $('dr').onclick=()=>saveInitialReport(e,'draft');
   $('sd').onclick=()=>saveInitialReport(e,'pending_followup');
   $('sr').onclick=()=>saveInitialReport(e,'pending_close');
