@@ -420,7 +420,119 @@ function FF(e){
     }
   };
 }
-function FC(e){let last=FUA(e.id).slice(-1)[0]?.pending_tasks||I(e.id)?.pending_tasks||'',warn=last?`<div style="grid-column:1/-1;padding:9px 10px;border:1px solid #f5dca8;background:#fff8e8;border-radius:9px;font-size:11.5px">目前仍記有後續待辦：<b>${escapeHTML(last)}</b><br><label><input id="ack" type="checkbox"> 確認上述待辦已完成或不再需要處理</label></div>`:'';openModal({title:'事件結報',large:true,showConfirm:false,html:`<div class="form-grid">${warn}<div><label>結報日期*</label><input id="cd" type="date" value="${isoDate(new Date())}"></div><div class="full"><label>1 最終狀況*</label><textarea id="cf"></textarea></div><div class="full"><label>2 結案判定*</label><textarea id="cw"></textarea></div><div><label><input id="cln" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="catt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="cs" class="btn primary">完成結報</button></div>`});$('cs').onclick=async()=>{let p={event_id:e.id,close_date:v('cd'),final_status:v('cf'),closure_decision:v('cw'),line_notify:$('cln').checked};if(!p.final_status||!p.closure_decision)return toast('請填妥結報內容','warn');if(last&&!$('ack')?.checked)return toast('請先確認尚未完成的後續待辦','warn');showLoading(true);try{let r=await db.rpc('close_tracking_event',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'closure',r.data,'catt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('結報已完成，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('結報失敗：'+x.message,'error')}finally{showLoading(false)}}}
+function FC(e){
+  const last=FUA(e.id).slice(-1)[0]?.pending_tasks||I(e.id)?.pending_tasks||'';
+
+  const warning=last?`
+    <div class="event-field full">
+      <div style="padding:14px 16px;border:1px solid #f5dca8;background:#fff8e8;border-radius:10px;line-height:1.65">
+        <div><b>目前仍有後續待辦：</b>${escapeHTML(last)}</div>
+        <label class="event-check" style="margin-top:10px!important">
+          <input id="ack" type="checkbox">
+          確認上述待辦已完成或不再需要處理
+        </label>
+      </div>
+    </div>`:'';
+
+  openModal({
+    title:'事件結報',
+    large:true,
+    showConfirm:false,
+    html:`<div class="event-form">
+      <div class="event-section-title">結報基本資料</div>
+
+      <div class="event-field">
+        <label>結報日期 *</label>
+        <input id="cd" type="date" value="${isoDate(new Date())}">
+      </div>
+
+      ${warning}
+
+      <div class="event-section-title">結報內容</div>
+
+      <div class="event-field full">
+        <label>1　最終狀況 *</label>
+        <textarea id="cf" class="event-text-long"></textarea>
+      </div>
+
+      <div class="event-field full">
+        <label>2　結案判定 *</label>
+        <select id="cw">
+          <option value="">請選擇</option>
+          <option value="已完成處理，無後續待辦">已完成處理，無後續待辦</option>
+          <option value="狀況已穩定，無需繼續追蹤">狀況已穩定，無需繼續追蹤</option>
+          <option value="已完成轉介／交由其他單位處理">已完成轉介／交由其他單位處理</option>
+          <option value="服務已終止／轉出，無需繼續追蹤">服務已終止／轉出，無需繼續追蹤</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+
+      <div class="event-field full" id="cwOtherField" style="display:none">
+        <label>其他結案判定 *</label>
+        <input id="cwOther">
+      </div>
+
+      <div class="event-field full">
+        <label class="event-check"><input id="cln" type="checkbox" checked> LINE 通知</label>
+      </div>
+
+      <div class="event-field full event-file">
+        <label>附件</label>
+        <input id="catt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+      </div>
+    </div>`
+  });
+
+  document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
+
+  const closeFoot=document.querySelector('#modalRoot .modal-foot');
+  const closeCancel=$('modalCancel');
+  if(closeFoot&&closeCancel){
+    const submitBtn=document.createElement('button');
+    submitBtn.id='cs';
+    submitBtn.className='btn primary';
+    submitBtn.textContent='完成結報';
+    closeFoot.insertBefore(submitBtn,closeCancel.nextSibling);
+  }
+
+  const toggleOther=()=>{
+    const isOther=v('cw')==='其他';
+    if($('cwOtherField'))$('cwOtherField').style.display=isOther?'block':'none';
+    if(!isOther&&$('cwOther'))$('cwOther').value='';
+  };
+  $('cw')?.addEventListener('change',toggleOther);
+  toggleOther();
+
+  $('cs').onclick=async()=>{
+    const decision=v('cw')==='其他'?v('cwOther'):v('cw');
+    const p={
+      event_id:e.id,
+      close_date:v('cd'),
+      final_status:v('cf'),
+      closure_decision:decision,
+      line_notify:$('cln').checked
+    };
+
+    if(!p.final_status||!p.closure_decision)return toast('請填妥結報內容','warn');
+    if(last&&!$('ack')?.checked)return toast('請先確認尚未完成的後續待辦','warn');
+
+    showLoading(true);
+    try{
+      const r=await db.rpc('close_tracking_event',{payload:p});
+      if(r.error)throw r.error;
+      let ae=null;
+      try{await U(e.id,'closure',r.data,'catt')}catch(err){ae=err}
+      closeModal();
+      await L();
+      V(e.id);
+      if(ae)toast('結報已完成，但附件上傳失敗：'+ae.message,'warn');
+    }catch(x){
+      toast('結報失敗：'+x.message,'error');
+    }finally{
+      showLoading(false);
+    }
+  };
+}
 async function reopen(e){
   let x=prompt('重新開啟原因');
   if(!x)return;
