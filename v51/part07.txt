@@ -92,12 +92,17 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimeWithdrawRes.ok) throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${overtimeWithdrawRes.status}）`);
       eval(await overtimeWithdrawRes.text());
 
+      const eventTrackingRes = await fetch('v52/event-tracking-patch.txt',{cache:'no-store'});
+      if(!eventTrackingRes.ok) throw new Error(`v52/event-tracking-patch.txt 載入失敗（${eventTrackingRes.status}）`);
+      eval(await eventTrackingRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
       else if(state.profile && state.page==='cases') navigate('cases');
       else if(state.profile && state.page==='schedule') navigate('schedule');
       else if(state.profile && state.page==='overtime') navigate('overtime');
+      else if(state.profile && state.page==='events') navigate('events');
     }catch(err){
       console.error('系統功能模組載入失敗',err);
       if(state.profile) toast('系統功能模組載入失敗，請重新整理頁面。','error');
