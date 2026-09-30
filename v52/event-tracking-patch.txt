@@ -189,18 +189,130 @@ function F(e=null){
 }
 const v=id=>$(id).value.trim();
 async function save(e,a){const eventTime=TVE('th','tmin');const nextDays=Number(v('nday'));if(a!=='pending_close'&&(!Number.isInteger(nextDays)||nextDays<1))return toast('請填正確的追蹤天數','warn');let p={event_id:e?.id||null,event_date:v('d'),event_time:eventTime,category:v('cat'),subject:v('sub'),case_id:v('ca')||null,care_worker_id:v('wo')||null,reporter_type:v('rt')||null,reporter_name:v('rn')||null,responsible_staff_id:v('ow'),event_description:v('de'),completed_actions:v('dn'),pending_tasks:v('td'),requires_followup:a==='pending_followup',next_followup_date:a==='pending_close'?null:AD(isoDate(new Date()),nextDays),line_notify:$('ln').checked};if(!p.subject)return toast('請填主旨','warn');if(a!=='draft'&&(!p.event_description||!p.completed_actions||!p.pending_tasks))return toast('請填妥初報三欄','warn');showLoading(true);try{let r=await db.rpc('save_tracking_event_draft',{payload:p});if(r.error)throw r.error;if(a!=='draft'){let q=await db.rpc('submit_tracking_event',{p_event_id:r.data,p_target_status:a,p_line_notify:p.line_notify});if(q.error)throw q.error}let ae=null;try{await U(r.data,'initial',null,'att')}catch(err){ae=err}closeModal();await L();V(r.data);if(ae)toast('事件已儲存，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('儲存失敗：'+x.message,'error')}finally{showLoading(false)}}
-function FF(e){openModal({title:'新增續報',large:true,showConfirm:false,html:`<div class="form-grid"><div><label>日期*</label><input id="fd" type="date" value="${isoDate(new Date())}"></div><div><label>時間</label><div class="event-time-pair">${TH('fth') }<span>：</span>${TM('ftmin')}</div></div><div><label>方式*</label><select id="fm">${Object.entries(M).map(([k,x])=>`<option value="${k}">${x}</option>`).join('')}</select></div><div class="full"><label>1 最新狀況*</label><textarea id="fn"></textarea></div><div class="full"><label>2 本次已完成處置</label><textarea id="ff"></textarea></div><div class="full"><label>3 後續待辦</label><textarea id="ft"></textarea></div><div><label>狀態</label><select id="fo"><option value="continue">繼續追蹤</option><option value="ready_to_close">準備結報</option></select></div><div><label>幾天後追蹤</label><input id="fday" type="number" min="1" step="1"></div><div><label>下次追蹤日期</label><input id="fx" type="date" readonly></div><div><label><input id="fl" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="fatt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="fs" class="btn primary">送出續報</button></div>`});
-const calcNext=()=>{
-  if(!$('fx'))return;
-  if(v('fo')!=='continue'){ $('fx').value=''; return; }
-  const days=Number(v('fday'));
-  $('fx').value=(v('fd')&&Number.isInteger(days)&&days>0)?AD(v('fd'),days):'';
-};
-$('fd')?.addEventListener('change',calcNext);
-$('fday')?.addEventListener('input',calcNext);
-$('fo')?.addEventListener('change',calcNext);
-calcNext();
-$('fs').onclick=async()=>{const followTime=TV('fth','ftmin');if(followTime==='__INVALID__')return toast('時間請同時選擇「時」與「分」','warn');const days=Number(v('fday'));if(v('fo')==='continue'&&(!Number.isInteger(days)||days<1))return toast('請填正確的追蹤天數','warn');let p={event_id:e.id,followup_date:v('fd'),followup_time:followTime,followup_method:v('fm'),latest_status:v('fn'),completed_actions:v('ff'),pending_tasks:v('ft'),outcome:v('fo'),next_followup_date:v('fo')==='continue'?AD(v('fd'),days):null,line_notify:$('fl').checked};if(!p.latest_status)return toast('請填最新狀況','warn');showLoading(true);try{let r=await db.rpc('add_tracking_event_followup',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'followup',r.data,'fatt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('續報已儲存，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('續報失敗：'+x.message,'error')}finally{showLoading(false)}}}
+function FF(e){
+  openModal({
+    title:'新增續報',
+    large:true,
+    showConfirm:false,
+    html:`<div class="event-form">
+      <div class="event-section-title">追蹤基本資料</div>
+
+      <div class="event-field">
+        <label>追蹤日期 *</label>
+        <input id="fd" type="date" value="${isoDate(new Date())}">
+      </div>
+
+      <div class="event-field">
+        <label>追蹤時間</label>
+        <div class="event-time-pair">
+          ${TH('fth')}
+          <span>：</span>
+          ${T10('ftmin','00')}
+        </div>
+      </div>
+
+      <div class="event-field">
+        <label>追蹤方式 *</label>
+        <select id="fm">${Object.entries(M).map(([k,x])=>`<option value="${k}">${x}</option>`).join('')}</select>
+      </div>
+
+      <div class="event-section-title">續報內容</div>
+
+      <div class="event-field full">
+        <label>1　最新狀況 *</label>
+        <textarea id="fn" class="event-text-long"></textarea>
+      </div>
+
+      <div class="event-field full">
+        <label>2　本次已完成處置</label>
+        <textarea id="ff" class="event-text-short"></textarea>
+      </div>
+
+      <div class="event-field full">
+        <label>3　後續待辦</label>
+        <textarea id="ft" class="event-text-short"></textarea>
+      </div>
+
+      <div class="event-section-title">追蹤判定</div>
+
+      <div class="event-field half">
+        <label>狀態</label>
+        <select id="fo">
+          <option value="continue">繼續追蹤</option>
+          <option value="ready_to_close">已處理完成（準備結報）</option>
+        </select>
+      </div>
+
+      <div class="event-field half" id="nextFollowField">
+        <label>下次追蹤</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input id="fday" type="number" min="1" step="1" style="max-width:120px">
+          <span>天後</span>
+        </div>
+      </div>
+
+      <div class="event-field full">
+        <label class="event-check"><input id="fl" type="checkbox" checked> LINE 通知</label>
+      </div>
+
+      <div class="event-field full event-file">
+        <label>附件</label>
+        <input id="fatt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+      </div>
+    </div>
+
+    <div class="event-actions">
+      <button id="fs" class="btn primary">送出續報</button>
+    </div>`
+  });
+
+  document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
+
+  const toggleNext=()=>{
+    const continuing=v('fo')==='continue';
+    if($('nextFollowField'))$('nextFollowField').style.display=continuing?'block':'none';
+    if(!continuing&&$('fday'))$('fday').value='';
+  };
+  $('fo')?.addEventListener('change',toggleNext);
+  toggleNext();
+
+  $('fs').onclick=async()=>{
+    const followTime=TVE('fth','ftmin');
+    const days=Number(v('fday'));
+    if(v('fo')==='continue'&&(!Number.isInteger(days)||days<1))return toast('請填正確的追蹤天數','warn');
+
+    const p={
+      event_id:e.id,
+      followup_date:v('fd'),
+      followup_time:followTime,
+      followup_method:v('fm'),
+      latest_status:v('fn'),
+      completed_actions:v('ff'),
+      pending_tasks:v('ft'),
+      outcome:v('fo'),
+      next_followup_date:v('fo')==='continue'?AD(v('fd'),days):null,
+      line_notify:$('fl').checked
+    };
+
+    if(!p.latest_status)return toast('請填最新狀況','warn');
+
+    showLoading(true);
+    try{
+      const r=await db.rpc('add_tracking_event_followup',{payload:p});
+      if(r.error)throw r.error;
+      let ae=null;
+      try{await U(e.id,'followup',r.data,'fatt')}catch(err){ae=err}
+      closeModal();
+      await L();
+      V(e.id);
+      if(ae)toast('續報已儲存，但附件上傳失敗：'+ae.message,'warn');
+    }catch(x){
+      toast('續報失敗：'+x.message,'error');
+    }finally{
+      showLoading(false);
+    }
+  };
+}
 function FC(e){let last=FU(e.id).slice(-1)[0]?.pending_tasks||I(e.id)?.pending_tasks||'',warn=last?`<div style="grid-column:1/-1;padding:9px 10px;border:1px solid #f5dca8;background:#fff8e8;border-radius:9px;font-size:11.5px">目前仍記有後續待辦：<b>${escapeHTML(last)}</b><br><label><input id="ack" type="checkbox"> 確認上述待辦已完成或不再需要處理</label></div>`:'';openModal({title:'事件結報',large:true,showConfirm:false,html:`<div class="form-grid">${warn}<div><label>結報日期*</label><input id="cd" type="date" value="${isoDate(new Date())}"></div><div class="full"><label>1 最終狀況*</label><textarea id="cf"></textarea></div><div class="full"><label>2 結案判定*</label><textarea id="cw"></textarea></div><div><label><input id="cln" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="catt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="cs" class="btn primary">完成結報</button></div>`});$('cs').onclick=async()=>{let p={event_id:e.id,close_date:v('cd'),final_status:v('cf'),closure_decision:v('cw'),line_notify:$('cln').checked};if(!p.final_status||!p.closure_decision)return toast('請填妥結報內容','warn');if(last&&!$('ack')?.checked)return toast('請先確認尚未完成的後續待辦','warn');showLoading(true);try{let r=await db.rpc('close_tracking_event',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'closure',r.data,'catt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('結報已完成，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('結報失敗：'+x.message,'error')}finally{showLoading(false)}}}
 async function reopen(e){let x=prompt('重新開啟原因');if(!x)return;let r=await db.rpc('reopen_tracking_event',{p_event_id:e.id,p_reason:x});if(r.error)return toast(r.error.message,'error');await L();V(e.id)}
 async function voided(e){let x=prompt('作廢原因');if(!x)return;let r=await db.rpc('void_tracking_event',{p_event_id:e.id,p_reason:x});if(r.error)return toast(r.error.message,'error');await L();V(e.id)}
