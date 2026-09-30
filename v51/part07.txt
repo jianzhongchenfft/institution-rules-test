@@ -96,8 +96,8 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
         'v52/event-core.txt',
         'v52/event-detail.txt',
         'v52/event-sensitive.txt',
-        'v52/event-forms.txt',
-        'v52/event-print.txt'
+        'v52/event-print.txt',
+        'v52/event-forms.txt'
       ];
       let eventTrackingCode='';
       for(const path of eventTrackingFiles){
