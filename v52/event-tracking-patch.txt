@@ -40,9 +40,9 @@ EVSTYLE.textContent=`
 }
 `;
 document.head.appendChild(EVSTYLE);
-Object.assign(state,{ev:[],ei:[],ef:[],ec:[],ea:[],esd:[],es:[],eca:[],ew:[],evOwner:null});
+Object.assign(state,{ev:[],ei:[],ef:[],ec:[],ea:[],eh:[],esd:[],es:[],eca:[],ew:[],evOwner:null});
 const en=id=>state.es.find(x=>x.id===id)?.display_name||'—',cn=id=>state.eca.find(x=>x.id===id)?.case_name||'',wn=id=>state.ew.find(x=>x.id===id)?.worker_name||'',D=v=>v?rocDate(v+'T00:00:00'):'—',O=e=>['pending_followup','tracking'].includes(e.status)&&e.next_followup_date&&e.next_followup_date<isoDate(new Date());
-async function L(){showLoading(true);try{let r=await Promise.all([db.rpc('get_case_staff_directory'),db.from('care_cases').select('id,case_name,case_no').order('case_name'),db.from('care_workers').select('id,worker_name').order('worker_name'),db.from('tracking_events').select('*').order('event_date',{ascending:false}),db.from('tracking_event_initial_reports').select('*'),db.from('tracking_event_followups').select('*').order('created_at'),db.from('tracking_event_closures').select('*').order('created_at'),db.from('tracking_event_attachments').select('*').order('created_at'),db.from('tracking_event_sensitive_details').select('*')]);for(let x of r)if(x.error)throw x.error;[state.es,state.eca,state.ew,state.ev,state.ei,state.ef,state.ec,state.ea,state.esd]=r.map(x=>x.data||[]);if(state.evOwner===null)state.evOwner=state.profile.role==='supervisor'?'mine':'all'}catch(e){toast('事件資料讀取失敗：'+e.message,'error')}finally{showLoading(false)}}
+async function L(){showLoading(true);try{let r=await Promise.all([db.rpc('get_case_staff_directory'),db.from('care_cases').select('id,case_name,case_no').order('case_name'),db.from('care_workers').select('id,worker_name').order('worker_name'),db.from('tracking_events').select('*').order('event_date',{ascending:false}),db.from('tracking_event_initial_reports').select('*'),db.from('tracking_event_followups').select('*').order('created_at'),db.from('tracking_event_closures').select('*').order('created_at'),db.from('tracking_event_attachments').select('*').order('created_at'),db.from('tracking_event_sensitive_details').select('*'),db.from('tracking_event_history').select('*').order('created_at')]);for(let x of r)if(x.error)throw x.error;[state.es,state.eca,state.ew,state.ev,state.ei,state.ef,state.ec,state.ea,state.esd,state.eh]=r.map(x=>x.data||[]);if(state.evOwner===null)state.evOwner=state.profile.role==='supervisor'?'mine':'all'}catch(e){toast('事件資料讀取失敗：'+e.message,'error')}finally{showLoading(false)}}
 const N=navigate;navigate=function(id){if(id!=='events')return N(id);if(!state.profile||!['supervisor','business_manager','organization_manager','admin'].includes(state.profile.role)){state.page=id;renderNav();$('topTitle').textContent='事件追蹤';$('crumb').textContent='事件追蹤';$('content').innerHTML='<div class="empty"><div class="icon">🔒</div><h3>此帳號沒有事件追蹤權限</h3></div>';return}state.page=id;renderNav();$('topTitle').textContent='事件追蹤';$('crumb').textContent='事件追蹤';$('content').innerHTML='<div class="empty">載入中…</div>';L().then(R)};
 function B(e){return `<span class="pill">${S[e.status]||e.status}</span>${O(e)?' <span class="pill danger">逾期</span>':''}${e.is_sensitive?' <span class="pill">敏感</span>':''}`}
 function R(){let a=state.evOwner==='mine'?state.ev.filter(x=>x.responsible_staff_id===state.profile.id):state.ev,ct={p:a.filter(x=>x.status==='pending_followup').length,t:a.filter(x=>x.status==='tracking').length,c:a.filter(x=>x.status==='pending_close').length,o:a.filter(O).length};a=a.filter(x=>!['closed','voided'].includes(x.status)).sort((x,y)=>(O(y)-O(x))||String(y.event_date).localeCompare(String(x.event_date)));$('content').innerHTML=`<div class="page-head"><div><h1>⚠️ 事件追蹤</h1><p>初報、續報、結報與期限管理</p></div><button id="evNew" class="btn primary">＋新增事件</button></div><section class="case-stats">${[['待追蹤',ct.p],['追蹤中',ct.t],['待結報',ct.c],['逾期追蹤',ct.o]].map(x=>`<article class="stat-card"><div class="stat-head"><span>${x[0]}</span></div><div class="stat-value">${x[1]}</div></article>`).join('')}</section><div class="case-toolbar"><select id="evScope"><option value="mine" ${state.evOwner==='mine'?'selected':''}>我的事件</option><option value="all" ${state.evOwner==='all'?'selected':''}>全部事件</option></select><button id="evAll" class="btn">查看全部／已結案</button><button id="evRe" class="btn">↻</button></div><div class="case-table-shell"><table class="case-table"><thead><tr><th>日期</th><th>類別</th><th>主旨</th><th>個案／居服員</th><th>負責人</th><th>狀態</th><th>下次追蹤</th></tr></thead><tbody>${a.length?a.map(e=>`<tr data-id="${e.id}"><td>${D(e.event_date)}</td><td>${e.category}</td><td><button class="case-name-btn">${escapeHTML(e.subject)}</button></td><td>${escapeHTML([cn(e.case_id),wn(e.care_worker_id)].filter(Boolean).join('／')||'—')}</td><td>${escapeHTML(en(e.responsible_staff_id))}</td><td>${B(e)}</td><td>${D(e.next_followup_date)}</td></tr>`).join(''):'<tr><td colspan="7">目前沒有待處理事件</td></tr>'}</tbody></table></div>`;$('evNew').onclick=()=>F();$('evScope').onchange=e=>{state.evOwner=e.target.value;R()};$('evRe').onclick=async()=>{await L();R()};$('evAll').onclick=()=>RA();document.querySelectorAll('[data-id]').forEach(x=>x.onclick=()=>V(x.dataset.id))}
@@ -51,15 +51,41 @@ const I=id=>state.ei.find(x=>x.event_id===id),
 FU=id=>state.ef.filter(x=>x.event_id===id),
 FUA=id=>state.ef.filter(x=>x.event_id===id&&!x.is_voided),
 CL=id=>state.ec.filter(x=>x.event_id===id),
-AF=id=>state.ea.filter(x=>x.event_id===id),SD=id=>state.esd.find(x=>x.event_id===id);
+AF=id=>state.ea.filter(x=>x.event_id===id),SD=id=>state.esd.find(x=>x.event_id===id),EH=id=>state.eh.filter(x=>x.event_id===id).sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
 
 const SIT={staff:'工作人員',service_recipient:'服務對象',family:'家屬',third_party:'第三人'};
 const relText=s=>s?`${SIT[s.victim_identity_type]||'—'}－${SIT[s.actor_identity_type]||'—'}`:'—';
 const sensitiveActorLabel=e=>e?.category==='性侵害'?'疑似加害人':'疑似行為人';
 const sensitiveKindTitle=e=>e?.category==='性侵害'?'性侵害事件資料':'性騷擾事件資料';
+const SRS={not_assessed:'尚未判定',not_required:'無需外部通報',required_pending:'需外部通報－尚未完成',reported:'已完成外部通報'};
+const SRM={online:'線上系統',phone:'電話',paper:'紙本／公文',other:'其他'};
 function QG(items){
   return `<div class="panel" style="margin-top:8px;padding:18px 20px">${items.map((x,i)=>`<div style="${i?'margin-top:18px;padding-top:16px;border-top:1px solid var(--line)':''}"><b style="display:block;margin-bottom:8px">${escapeHTML(x[0])}</b><div style="white-space:pre-wrap;line-height:1.75;padding:0 2px 2px">${escapeHTML(x[1]||'—')}</div></div>`).join('')}</div>`;
 }
+
+const AG=(eventId,type,recordId)=>{
+  const files=state.ea.filter(a=>a.event_id===eventId&&a.record_type===type&&(type==='initial'||a.record_id===recordId));
+  if(!files.length)return '';
+  return `<div class="panel" style="margin-top:8px;padding:14px 18px"><b>附件</b><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${files.map(a=>`<button class="btn sm" data-att="${a.id}">📎 ${escapeHTML(a.file_name)}</button>`).join('')}</div></div>`;
+};
+
+const HACT={
+  created:'建立事件',
+  status_changed:'狀態變更',
+  initial_submitted:'送出初報',
+  followup_added:'新增續報',
+  closure_added:'完成結報',
+  reopened:'重新開啟事件',
+  voided:'作廢整件事件',
+  followup_voided:'作廢單次續報',
+  restored:'恢復事件'
+};
+const HLINE=h=>{
+  const label=HACT[h.action_type]||h.action_type;
+  const status=h.action_type==='status_changed'?`：${S[h.from_status]||h.from_status||'—'} → ${S[h.to_status]||h.to_status||'—'}`:'';
+  const note=h.note?`｜${escapeHTML(h.note)}`:'';
+  return `<div style="padding:10px 0;border-bottom:1px solid var(--line);line-height:1.6"><b>${escapeHTML(label)}</b>${escapeHTML(status)}<div style="margin-top:4px">${escapeHTML(showTs(h.created_at))}　${escapeHTML(en(h.actor_staff_id))}${note}</div></div>`;
+};
 
 const canVoidFU=x=>!x.is_voided&&(
   x.submitted_by_staff_id===state.profile.id ||
@@ -72,14 +98,25 @@ const showTs=v=>{
 };
 
 function V(id){
-  let e=state.ev.find(x=>x.id===id),i=I(id),f=FU(id),c=CL(id),ats=AF(id),sd=SD(id),z=[];
+  let e=state.ev.find(x=>x.id===id),i=I(id),f=FU(id),c=CL(id),ats=AF(id),sd=SD(id),hist=EH(id),z=[];
 
   if(sd&&['性騷擾','性侵害'].includes(e.category)){
-    z.push(`<h3>${sensitiveKindTitle(e)}</h3>${QG([
+    const reporting=[
       ['事件關係',relText(sd)],
       ['疑似被害人',`${sd.victim_name||'—'}（${SIT[sd.victim_identity_type]||'—'}）`],
-      [sensitiveActorLabel(e),`${sd.actor_name||'—'}（${SIT[sd.actor_identity_type]||'—'}）`]
-    ])}`);
+      [sensitiveActorLabel(e),`${sd.actor_name||'—'}（${SIT[sd.actor_identity_type]||'—'}）`],
+      ['立即保護／隔離措施',sd.immediate_protection_actions||'—'],
+      ['外部通報狀態',SRS[sd.external_reporting_status]||'尚未判定']
+    ];
+    if(sd.external_reporting_status==='reported'){
+      reporting.push(
+        ['外部通報時間',showTs(sd.external_reported_at)],
+        ['外部通報單位',sd.external_reporting_agency||'—'],
+        ['外部通報方式',SRM[sd.external_reporting_method]||'—'],
+        ['外部通報備註',sd.external_reporting_note||'—']
+      );
+    }
+    z.push(`<h3>${sensitiveKindTitle(e)}</h3>${QG(reporting)}`);
   }
 
   if(i){
@@ -87,7 +124,7 @@ function V(id){
       ['事件說明',i.event_description],
       ['已完成處置',i.completed_actions],
       ['後續待辦',i.pending_tasks]
-    ])}`);
+    ])}${AG(e.id,'initial',i.id)}`);
   }
 
   f.forEach((x,n)=>{
@@ -110,16 +147,17 @@ function V(id){
         ['後續待辦',x.pending_tasks],
         ...voidInfo
       ])}
+      ${AG(e.id,'followup',x.id)}
     `);
   });
 
   c.forEach(x=>z.push(`<h3>結報</h3>${QG([
     ['最終狀況',x.final_status],
     ['結案判定',x.closure_decision]
-  ])}`));
+  ])}${AG(e.id,'closure',x.id)}`));
 
-  if(ats.length){
-    z.push(`<h3>附件</h3><div class="panel">${ats.map(a=>`<button class="btn sm" data-att="${a.id}">📎 ${escapeHTML(a.file_name)}</button>`).join(' ')}</div>`);
+  if(hist.length){
+    z.push(`<h3>操作歷程</h3><div class="panel" style="padding:8px 18px">${hist.map(HLINE).join('')}</div>`);
   }
 
   let A=['<button id="bk" class="btn">←返回</button>'];
@@ -291,6 +329,58 @@ function F(e=null){
         <input id="srel" readonly>
       </div>
 
+      <div id="sensitiveActionTitle" class="event-section-title" style="display:none">特殊處置／外部通報</div>
+
+      <div id="sipField" class="event-field full" style="display:none">
+        <label>立即保護／隔離措施</label>
+        <textarea id="sip" class="event-text-short">${escapeHTML(sd?.immediate_protection_actions||'')}</textarea>
+      </div>
+
+      <div id="srsField" class="event-field half" style="display:none">
+        <label>外部通報狀態 *</label>
+        <select id="srs">
+          <option value="not_assessed" ${!sd?.external_reporting_status||sd?.external_reporting_status==='not_assessed'?'selected':''}>尚未判定</option>
+          <option value="not_required" ${sd?.external_reporting_status==='not_required'?'selected':''}>無需外部通報</option>
+          <option value="required_pending" ${sd?.external_reporting_status==='required_pending'?'selected':''}>需外部通報－尚未完成</option>
+          <option value="reported" ${sd?.external_reporting_status==='reported'?'selected':''}>已完成外部通報</option>
+        </select>
+      </div>
+
+      <div id="srMethodField" class="event-field half" style="display:none">
+        <label>通報方式</label>
+        <select id="srMethod">
+          <option value="">請選擇</option>
+          <option value="online" ${sd?.external_reporting_method==='online'?'selected':''}>線上系統</option>
+          <option value="phone" ${sd?.external_reporting_method==='phone'?'selected':''}>電話</option>
+          <option value="paper" ${sd?.external_reporting_method==='paper'?'selected':''}>紙本／公文</option>
+          <option value="other" ${sd?.external_reporting_method==='other'?'selected':''}>其他</option>
+        </select>
+      </div>
+
+      <div id="srDateField" class="event-field" style="display:none">
+        <label>通報日期 *</label>
+        <input id="srDate" type="date" value="${sd?.external_reported_at?isoDate(new Date(sd.external_reported_at)):''}">
+      </div>
+
+      <div id="srTimeField" class="event-field" style="display:none">
+        <label>通報時間 *</label>
+        <div class="event-time-pair">
+          ${TH('srHour',sd?.external_reported_at?String(new Date(sd.external_reported_at).getHours()).padStart(2,'0'):'')}
+          <span>：</span>
+          ${T10('srMin',sd?.external_reported_at?String(Math.floor(new Date(sd.external_reported_at).getMinutes()/10)*10).padStart(2,'0'):'00')}
+        </div>
+      </div>
+
+      <div id="srAgencyField" class="event-field" style="display:none">
+        <label>通報單位 *</label>
+        <input id="srAgency" value="${escapeHTML(sd?.external_reporting_agency||'')}">
+      </div>
+
+      <div id="srNoteField" class="event-field full" style="display:none">
+        <label>通報備註</label>
+        <textarea id="srNote" class="event-text-short">${escapeHTML(sd?.external_reporting_note||'')}</textarea>
+      </div>
+
       <div class="event-section-title">初報內容</div>
 
       <div class="event-field full">
@@ -355,11 +445,21 @@ function F(e=null){
     if($('srel'))$('srel').value=(vt&&at)?`${SIT[vt]}－${SIT[at]}`:'';
   };
 
+  const updateReportingFields=()=>{
+    const reported=$('srs')?.value==='reported';
+    ['srMethodField','srDateField','srTimeField','srAgencyField','srNoteField'].forEach(id=>{
+      if($(id))$(id).style.display=reported?'block':'none';
+    });
+  };
+
   const refreshSensitive=()=>{
     const cat=v('cat');
     const show=cat==='性騷擾'||cat==='性侵害';
-    ['sensitiveTitle','svTypeField','svPersonField','saTypeField','saPersonField','srelField'].forEach(id=>{
-      if($(id))$(id).style.display=show?(id==='sensitiveTitle'?'flex':'block'):'none';
+    ['sensitiveTitle','svTypeField','svPersonField','saTypeField','saPersonField','srelField','sensitiveActionTitle','sipField','srsField'].forEach(id=>{
+      if($(id))$(id).style.display=show?(id==='sensitiveTitle'||id==='sensitiveActionTitle'?'flex':'block'):'none';
+    });
+    ['srMethodField','srDateField','srTimeField','srAgencyField','srNoteField'].forEach(id=>{
+      if($(id)&&!show)$(id).style.display='none';
     });
     if(!show)return;
     $('sensitiveTitle').textContent=cat==='性侵害'?'性侵害事件資料':'性騷擾事件資料';
@@ -367,6 +467,7 @@ function F(e=null){
     renderSensitivePerson('victim',v('svType'),sd);
     renderSensitivePerson('actor',v('saType'),sd);
     updateSensitiveRelation();
+    updateReportingFields();
   };
 
   $('cat')?.addEventListener('change',()=>{
@@ -381,6 +482,7 @@ function F(e=null){
     renderSensitivePerson('actor',v('saType'),null);
     updateSensitiveRelation();
   });
+  $('srs')?.addEventListener('change',updateReportingFields);
   refreshSensitive();
 
   $('dr').onclick=()=>save(e,'draft');
@@ -418,6 +520,13 @@ async function save(e,a){
   const sensitive=cat==='性騷擾'||cat==='性侵害';
   const victim=sensitive?readSensitiveParty('victim'):{identity_type:null,person_kind:null,person_id:null,name:null};
   const actor=sensitive?readSensitiveParty('actor'):{identity_type:null,person_kind:null,person_id:null,name:null};
+  const reportingStatus=sensitive?v('srs'):null;
+  let reportedAt=null;
+  if(sensitive&&reportingStatus==='reported'){
+    const rd=v('srDate'),rh=v('srHour'),rm=v('srMin');
+    if(!rd||!rh||!v('srAgency'))return toast('請填妥外部通報日期、時間與通報單位','warn');
+    reportedAt=new Date(`${rd}T${rh}:${rm||'00'}:00`).toISOString();
+  }
 
   if(sensitive&&a!=='draft'){
     if(!victim.identity_type||!victim.name||!actor.identity_type||!actor.name){
@@ -452,7 +561,13 @@ async function save(e,a){
     sensitive_actor_identity_type:actor.identity_type,
     sensitive_actor_person_kind:actor.person_kind,
     sensitive_actor_person_id:actor.person_id,
-    sensitive_actor_name:actor.name
+    sensitive_actor_name:actor.name,
+    sensitive_immediate_protection_actions:sensitive?v('sip'):null,
+    sensitive_external_reporting_status:reportingStatus,
+    sensitive_external_reported_at:reportedAt,
+    sensitive_external_reporting_agency:sensitive&&reportingStatus==='reported'?v('srAgency')||null:null,
+    sensitive_external_reporting_method:sensitive&&reportingStatus==='reported'?v('srMethod')||null:null,
+    sensitive_external_reporting_note:sensitive&&reportingStatus==='reported'?v('srNote')||null:null
   };
 
   if(!p.subject)return toast('請填主旨','warn');
