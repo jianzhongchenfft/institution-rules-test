@@ -356,10 +356,9 @@ function buildEventPrintHtml(eventId){
     <section class="signatures">
       <h2>紙本核章</h2>
       <table class="signature-table">
-        <thead><tr><th>居家督導員</th><th>業務負責人</th><th>機構負責人</th></tr></thead>
-        <tbody><tr><td>日期：</td><td>日期：</td><td>日期：</td></tr></tbody>
+        <thead><tr><th>督導</th><th>業務負責人</th></tr></thead>
+        <tbody><tr><td>日期：</td><td>日期：</td></tr></tbody>
       </table>
-      <div class="print-note">本欄供紙本簽章／核章使用，系統不自動代入簽章。</div>
     </section>
 
     <footer class="footer">
