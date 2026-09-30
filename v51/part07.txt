@@ -92,7 +92,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimeWithdrawRes.ok) throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${overtimeWithdrawRes.status}）`);
       eval(await overtimeWithdrawRes.text());
 
-      const eventTrackingRes = await fetch('v52/event-tracking-patch.txt?v=event-followup-20260930b',{cache:'no-store'});
+      const eventTrackingRes = await fetch('v52/event-tracking-patch.txt?v=event-followup-20260930c',{cache:'no-store'});
       if(!eventTrackingRes.ok) throw new Error(`v52/event-tracking-patch.txt 載入失敗（${eventTrackingRes.status}）`);
       eval(await eventTrackingRes.text());
 
