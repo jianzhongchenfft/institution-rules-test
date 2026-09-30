@@ -461,6 +461,7 @@ function FC(e){
           <option value="">請選擇</option>
           <option value="已完成處理，無後續待辦">已完成處理，無後續待辦</option>
           <option value="狀況已穩定，無需繼續追蹤">狀況已穩定，無需繼續追蹤</option>
+          <option value="近期未再發生類似事件，無需繼續追蹤">近期未再發生類似事件，無需繼續追蹤</option>
           <option value="已完成轉介／交由其他單位處理">已完成轉介／交由其他單位處理</option>
           <option value="服務已終止／轉出，無需繼續追蹤">服務已終止／轉出，無需繼續追蹤</option>
           <option value="其他">其他</option>
