@@ -1,0 +1,71 @@
+
+(()=>{
+const eventModule=modules.find(x=>x.id==='events');
+if(eventModule)eventModule.ready=true;
+
+const EVENT_CATEGORIES=['異常事件','居服員事件','服務暫停','居服回報','服務轉介','意見申訴','家庭／照顧風險','性騷擾','性侵害','其他'];
+const EVENT_STATUS_LABELS={draft:'草稿',pending_followup:'待追蹤',tracking:'追蹤中',pending_close:'待結報',closed:'已結案',voided:'作廢'};
+const FOLLOWUP_METHOD_LABELS={phone:'電話',official_line:'官方 LINE',home_visit:'家訪',interview:'面談',care_worker_report:'居服員回報',case_manager_contact:'個管師／照專聯繫',other:'其他'};
+const EVENT_MANAGER_ROLES=['business_manager','organization_manager','admin'];
+const EVENT_ACCESS_ROLES=['supervisor',...EVENT_MANAGER_ROLES];
+const SENSITIVE_EVENT_CATEGORIES=['性騷擾','性侵害'];
+const EVENT_ATTACHMENT_ACCEPT='.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx';
+
+const canUseEventModule=()=>EVENT_ACCESS_ROLES.includes(state.profile?.role);
+const canManageEvents=()=>EVENT_MANAGER_ROLES.includes(state.profile?.role);
+const isSensitiveCategory=category=>SENSITIVE_EVENT_CATEGORIES.includes(category);
+const EVSTYLE=document.createElement('style');
+EVSTYLE.id='v52-event-tracking-style';
+EVSTYLE.textContent=`
+.event-modal{width:min(980px,calc(100vw - 40px))!important;max-height:92vh}
+.event-modal .modal-head{position:sticky;top:0;z-index:5;background:#fff}
+.event-modal .modal-body{padding:22px 26px 24px}
+.event-form{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px 18px}
+.event-field{grid-column:span 2;min-width:0}
+.event-field.half{grid-column:span 3}
+.event-field.full{grid-column:1/-1}
+.event-field label{display:block;font-size:12px;font-weight:850;color:#475467;margin-bottom:7px}
+.event-field input,.event-field select,.event-field textarea{width:100%;box-sizing:border-box}
+.event-time-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}.event-time-pair span{font-weight:800;color:#667085;text-align:center}
+.event-field textarea{resize:vertical;line-height:1.65}
+.event-field .event-help{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45}
+.event-section-title{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:3px 0 -2px;font-size:13px;font-weight:900;color:#344054}
+.event-section-title:after{content:"";height:1px;background:var(--line);flex:1}
+.event-text-long{min-height:260px!important}
+.event-text-short{min-height:112px!important}
+.event-option-row{grid-column:1/-1;display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr);gap:16px 18px;align-items:end}
+.event-check{display:flex!important;align-items:center;gap:8px;min-height:42px;margin:0!important;font-size:13px!important}
+.event-check input{width:auto!important}
+.event-file input{background:#fff}
+.event-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+@media(max-width:760px){
+  .event-modal{width:min(96vw,980px)!important}
+  .event-form{grid-template-columns:1fr 1fr}
+  .event-field,.event-field.half{grid-column:span 1}
+  .event-field.full,.event-section-title,.event-option-row{grid-column:1/-1}
+  .event-option-row{grid-template-columns:1fr}
+}
+@media(max-width:540px){
+  .event-form{grid-template-columns:1fr}
+  .event-field,.event-field.half,.event-field.full,.event-section-title,.event-option-row{grid-column:1/-1}
+  .event-modal .modal-body{padding:18px 16px 22px}
+}
+`;
+document.head.appendChild(EVSTYLE);
+Object.assign(state,{ev:[],ei:[],ef:[],ec:[],ea:[],eh:[],esd:[],es:[],eca:[],ew:[],evOwner:null});
+const staffName=id=>state.es.find(x=>x.id===id)?.display_name||'—';
+const caseName=id=>state.eca.find(x=>x.id===id)?.case_name||'';
+const workerName=id=>state.ew.find(x=>x.id===id)?.worker_name||'';
+const displayEventDate=value=>value?rocDate(value+'T00:00:00'):'—';
+const isEventOverdue=event=>['pending_followup','tracking'].includes(event.status)&&event.next_followup_date&&event.next_followup_date<isoDate(new Date());
+async function loadEventData(){showLoading(true);try{let r=await Promise.all([db.rpc('get_case_staff_directory'),db.from('care_cases').select('id,case_name,case_no').order('case_name'),db.from('care_workers').select('id,worker_name').order('worker_name'),db.from('tracking_events').select('*').order('event_date',{ascending:false}),db.from('tracking_event_initial_reports').select('*'),db.from('tracking_event_followups').select('*').order('created_at'),db.from('tracking_event_closures').select('*').order('created_at'),db.from('tracking_event_attachments').select('*').order('created_at'),db.from('tracking_event_sensitive_details').select('*'),db.from('tracking_event_history').select('*').order('created_at')]);for(let x of r)if(x.error)throw x.error;[state.es,state.eca,state.ew,state.ev,state.ei,state.ef,state.ec,state.ea,state.esd,state.eh]=r.map(x=>x.data||[]);if(state.evOwner===null)state.evOwner=state.profile.role==='supervisor'?'mine':'all'}catch(e){toast('事件資料讀取失敗：'+e.message,'error')}finally{showLoading(false)}}
+const N=navigate;navigate=function(id){if(id!=='events')return N(id);if(!state.profile||!canUseEventModule()){state.page=id;renderNav();$('topTitle').textContent='事件追蹤';$('crumb').textContent='事件追蹤';$('content').innerHTML='<div class="empty"><div class="icon">🔒</div><h3>此帳號沒有事件追蹤權限</h3></div>';return}state.page=id;renderNav();$('topTitle').textContent='事件追蹤';$('crumb').textContent='事件追蹤';$('content').innerHTML='<div class="empty">載入中…</div>';loadEventData().then(renderEventList)};
+function renderEventStatus(e){return `<span class="pill">${EVENT_STATUS_LABELS[e.status]||e.status}</span>${isEventOverdue(e)?' <span class="pill danger">逾期</span>':''}${e.is_sensitive?' <span class="pill">敏感</span>':''}`}
+function renderEventList(){let a=state.evOwner==='mine'?state.ev.filter(x=>x.responsible_staff_id===state.profile.id):state.ev,ct={p:a.filter(x=>x.status==='pending_followup').length,t:a.filter(x=>x.status==='tracking').length,c:a.filter(x=>x.status==='pending_close').length,o:a.filter(O).length};a=a.filter(x=>!['closed','voided'].includes(x.status)).sort((x,y)=>(isEventOverdue(y)-isEventOverdue(x))||String(y.event_date).localeCompare(String(x.event_date)));$('content').innerHTML=`<div class="page-head"><div><h1>⚠️ 事件追蹤</h1><p>初報、續報、結報與期限管理</p></div><button id="evNew" class="btn primary">＋新增事件</button></div><section class="case-stats">${[['待追蹤',ct.p],['追蹤中',ct.t],['待結報',ct.c],['逾期追蹤',ct.o]].map(x=>`<article class="stat-card"><div class="stat-head"><span>${x[0]}</span></div><div class="stat-value">${x[1]}</div></article>`).join('')}</section><div class="case-toolbar"><select id="evScope"><option value="mine" ${state.evOwner==='mine'?'selected':''}>我的事件</option><option value="all" ${state.evOwner==='all'?'selected':''}>全部事件</option></select><button id="evAll" class="btn">查看全部／已結案</button><button id="evRe" class="btn">↻</button></div><div class="case-table-shell"><table class="case-table"><thead><tr><th>日期</th><th>類別</th><th>主旨</th><th>個案／居服員</th><th>負責人</th><th>狀態</th><th>下次追蹤</th></tr></thead><tbody>${a.length?a.map(e=>`<tr data-id="${e.id}"><td>${displayEventDate(e.event_date)}</td><td>${e.category}</td><td><button class="case-name-btn">${escapeHTML(e.subject)}</button></td><td>${escapeHTML([caseName(e.case_id),workerName(e.care_worker_id)].filter(Boolean).join('／')||'—')}</td><td>${escapeHTML(staffName(e.responsible_staff_id))}</td><td>${renderEventStatus(e)}</td><td>${displayEventDate(e.next_followup_date)}</td></tr>`).join(''):'<tr><td colspan="7">目前沒有待處理事件</td></tr>'}</tbody></table></div>`;$('evNew').onclick=()=>openInitialReportForm();$('evScope').onchange=e=>{state.evOwner=e.target.value;renderEventList()};$('evRe').onclick=async()=>{await loadEventData();renderEventList()};$('evAll').onclick=()=>renderAllEvents();document.querySelectorAll('[data-id]').forEach(x=>x.onclick=()=>renderEventDetail(x.dataset.id))}
+function renderAllEvents(){let a=[...state.ev].sort((x,y)=>String(y.event_date).localeCompare(String(x.event_date)));$('content').innerHTML=`<div class="page-head"><div><h1>全部事件</h1></div><button id="evBack" class="btn">←返回</button></div><div class="case-table-shell"><table class="case-table"><thead><tr><th>日期</th><th>類別</th><th>主旨</th><th>負責人</th><th>狀態</th></tr></thead><tbody>${a.map(e=>`<tr data-id="${e.id}"><td>${displayEventDate(e.event_date)}</td><td>${e.category}</td><td>${escapeHTML(e.subject)}</td><td>${escapeHTML(staffName(e.responsible_staff_id))}</td><td>${renderEventStatus(e)}</td></tr>`).join('')}</tbody></table></div>`;$('evBack').onclick=renderEventList;document.querySelectorAll('[data-id]').forEach(x=>x.onclick=()=>renderEventDetail(x.dataset.id))}
+const addDays=(dateStr,days)=>{const d=new Date((dateStr||isoDate(new Date()))+'T00:00:00');d.setDate(d.getDate()+Number(days||0));return isoDate(d)};
+const hourSelect=(id,val='')=>`<select id="${id}"><option value="">--</option>${Array.from({length:24},(_,i)=>String(i).padStart(2,'0')).map(x=>`<option value="${x}" ${x===val?'selected':''}>${x}</option>`).join('')}</select>`;
+const tenMinuteSelect=(id,val='00')=>{const opts=['00','10','20','30','40','50'],selected=opts.includes(val)?val:'00';return `<select id="${id}">${opts.map(x=>`<option value="${x}" ${x===selected?'selected':''}>${x}</option>`).join('')}</select>`};
+const readOptionalTime=(h,m)=>{const hh=fieldValue(h),mm=fieldValue(m);if(!hh)return null;return hh+':'+(mm||'00')};
+const responsibleStaffOptions=id=>state.es.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${escapeHTML(x.display_name)}</option>`).join(''),caseOptions=id=>state.eca.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${escapeHTML(x.case_name)}</option>`).join(''),workerOptions=id=>state.ew.map(x=>`<option value="${x.id}" ${x.id===id?'selected':''}>${escapeHTML(x.worker_name)}</option>`).join('');
+
