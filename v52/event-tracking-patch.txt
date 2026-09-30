@@ -47,13 +47,115 @@ const N=navigate;navigate=function(id){if(id!=='events')return N(id);if(!state.p
 function B(e){return `<span class="pill">${S[e.status]||e.status}</span>${O(e)?' <span class="pill danger">逾期</span>':''}${e.is_sensitive?' <span class="pill">敏感</span>':''}`}
 function R(){let a=state.evOwner==='mine'?state.ev.filter(x=>x.responsible_staff_id===state.profile.id):state.ev,ct={p:a.filter(x=>x.status==='pending_followup').length,t:a.filter(x=>x.status==='tracking').length,c:a.filter(x=>x.status==='pending_close').length,o:a.filter(O).length};a=a.filter(x=>!['closed','voided'].includes(x.status)).sort((x,y)=>(O(y)-O(x))||String(y.event_date).localeCompare(String(x.event_date)));$('content').innerHTML=`<div class="page-head"><div><h1>⚠️ 事件追蹤</h1><p>初報、續報、結報與期限管理</p></div><button id="evNew" class="btn primary">＋新增事件</button></div><section class="case-stats">${[['待追蹤',ct.p],['追蹤中',ct.t],['待結報',ct.c],['逾期追蹤',ct.o]].map(x=>`<article class="stat-card"><div class="stat-head"><span>${x[0]}</span></div><div class="stat-value">${x[1]}</div></article>`).join('')}</section><div class="case-toolbar"><select id="evScope"><option value="mine" ${state.evOwner==='mine'?'selected':''}>我的事件</option><option value="all" ${state.evOwner==='all'?'selected':''}>全部事件</option></select><button id="evAll" class="btn">查看全部／已結案</button><button id="evRe" class="btn">↻</button></div><div class="case-table-shell"><table class="case-table"><thead><tr><th>日期</th><th>類別</th><th>主旨</th><th>個案／居服員</th><th>負責人</th><th>狀態</th><th>下次追蹤</th></tr></thead><tbody>${a.length?a.map(e=>`<tr data-id="${e.id}"><td>${D(e.event_date)}</td><td>${e.category}</td><td><button class="case-name-btn">${escapeHTML(e.subject)}</button></td><td>${escapeHTML([cn(e.case_id),wn(e.care_worker_id)].filter(Boolean).join('／')||'—')}</td><td>${escapeHTML(en(e.responsible_staff_id))}</td><td>${B(e)}</td><td>${D(e.next_followup_date)}</td></tr>`).join(''):'<tr><td colspan="7">目前沒有待處理事件</td></tr>'}</tbody></table></div>`;$('evNew').onclick=()=>F();$('evScope').onchange=e=>{state.evOwner=e.target.value;R()};$('evRe').onclick=async()=>{await L();R()};$('evAll').onclick=()=>RA();document.querySelectorAll('[data-id]').forEach(x=>x.onclick=()=>V(x.dataset.id))}
 function RA(){let a=[...state.ev].sort((x,y)=>String(y.event_date).localeCompare(String(x.event_date)));$('content').innerHTML=`<div class="page-head"><div><h1>全部事件</h1></div><button id="evBack" class="btn">←返回</button></div><div class="case-table-shell"><table class="case-table"><thead><tr><th>日期</th><th>類別</th><th>主旨</th><th>負責人</th><th>狀態</th></tr></thead><tbody>${a.map(e=>`<tr data-id="${e.id}"><td>${D(e.event_date)}</td><td>${e.category}</td><td>${escapeHTML(e.subject)}</td><td>${escapeHTML(en(e.responsible_staff_id))}</td><td>${B(e)}</td></tr>`).join('')}</tbody></table></div>`;$('evBack').onclick=R;document.querySelectorAll('[data-id]').forEach(x=>x.onclick=()=>V(x.dataset.id))}
-const I=id=>state.ei.find(x=>x.event_id===id),FU=id=>state.ef.filter(x=>x.event_id===id),CL=id=>state.ec.filter(x=>x.event_id===id),AF=id=>state.ea.filter(x=>x.event_id===id);
-function QG(items){return `<div class="panel" style="margin-top:8px;padding:18px 20px">${items.map((x,i)=>`<div style="${i?'margin-top:18px;padding-top:16px;border-top:1px solid var(--line)':''}"><b style="display:block;margin-bottom:8px">${escapeHTML(x[0])}</b><div style="white-space:pre-wrap;line-height:1.75;padding:0 2px 2px">${escapeHTML(x[1]||'—')}</div></div>`).join('')}</div>`}
-function V(id){let e=state.ev.find(x=>x.id===id),i=I(id),f=FU(id),c=CL(id),ats=AF(id),z=[];if(i)z.push(`<h3>初報</h3>${QG([['事件說明',i.event_description],['已完成處置',i.completed_actions],['後續待辦',i.pending_tasks]])}`);f.forEach((x,n)=>z.push(`<h3>續報 ${n+1}</h3>${QG([['最新狀況',x.latest_status],['本次已完成處置',x.completed_actions],['後續待辦',x.pending_tasks]])}`));c.forEach(x=>z.push(`<h3>結報</h3>${QG([['最終狀況',x.final_status],['結案判定',x.closure_decision]])}`));if(ats.length)z.push(`<h3>附件</h3><div class="panel">${ats.map(a=>`<button class="btn sm" data-att="${a.id}">📎 ${escapeHTML(a.file_name)}</button>`).join(' ')}</div>`);let A=['<button id="bk" class="btn">←返回</button>'];if(e.status==='draft')A.push('<button id="ed" class="btn primary">編輯草稿</button>');if(['pending_followup','tracking','pending_close'].includes(e.status))A.push('<button id="fu" class="btn">＋續報</button>');if(e.status==='pending_close')A.push('<button id="cl" class="btn primary">結報</button>');if(e.status==='closed')A.push('<button id="ro" class="btn">重新開啟</button>');if(['business_manager','organization_manager','admin'].includes(state.profile.role)&&!['closed','voided'].includes(e.status))A.push('<button id="vo" class="btn">作廢</button>');$('content').innerHTML=`<div class="page-head"><div><h1>${escapeHTML(e.subject)}</h1><p>${e.category}　${B(e)}</p></div><div>${A.join(' ')}</div></div><div class="panel" style="padding:14px 18px;display:flex;gap:14px 28px;align-items:center;flex-wrap:wrap;line-height:1.6">
-  <span><b>事件發生日期：</b>${D(e.event_date)}</span>
-  <span><b>個案／居服員：</b>${escapeHTML([cn(e.case_id),wn(e.care_worker_id)].filter(Boolean).join('／')||'—')}</span>
-  <span><b>負責人：</b>${escapeHTML(en(e.responsible_staff_id))}</span>
-</div>${z.join('')}`;$('bk').onclick=R;$('ed')&&($('ed').onclick=()=>F(e));$('fu')&&($('fu').onclick=()=>FF(e));$('cl')&&($('cl').onclick=()=>FC(e));$('ro')&&($('ro').onclick=()=>reopen(e));$('vo')&&($('vo').onclick=()=>voided(e));document.querySelectorAll('[data-att]').forEach(b=>b.onclick=()=>DL(ats.find(a=>a.id===b.dataset.att)))}
+const I=id=>state.ei.find(x=>x.event_id===id),
+FU=id=>state.ef.filter(x=>x.event_id===id),
+FUA=id=>state.ef.filter(x=>x.event_id===id&&!x.is_voided),
+CL=id=>state.ec.filter(x=>x.event_id===id),
+AF=id=>state.ea.filter(x=>x.event_id===id);
+
+function QG(items){
+  return `<div class="panel" style="margin-top:8px;padding:18px 20px">${items.map((x,i)=>`<div style="${i?'margin-top:18px;padding-top:16px;border-top:1px solid var(--line)':''}"><b style="display:block;margin-bottom:8px">${escapeHTML(x[0])}</b><div style="white-space:pre-wrap;line-height:1.75;padding:0 2px 2px">${escapeHTML(x[1]||'—')}</div></div>`).join('')}</div>`;
+}
+
+const canVoidFU=x=>!x.is_voided&&(
+  x.submitted_by_staff_id===state.profile.id ||
+  ['business_manager','organization_manager','admin'].includes(state.profile.role)
+);
+
+const showTs=v=>{
+  if(!v)return '—';
+  try{return new Date(v).toLocaleString('zh-TW',{hour12:false})}catch{return v}
+};
+
+function V(id){
+  let e=state.ev.find(x=>x.id===id),i=I(id),f=FU(id),c=CL(id),ats=AF(id),z=[];
+
+  if(i){
+    z.push(`<h3>初報</h3>${QG([
+      ['事件說明',i.event_description],
+      ['已完成處置',i.completed_actions],
+      ['後續待辦',i.pending_tasks]
+    ])}`);
+  }
+
+  f.forEach((x,n)=>{
+    const voidedBadge=x.is_voided?' <span class="pill">已作廢</span>':'';
+    const voidBtn=canVoidFU(x)&&!['closed','voided'].includes(e.status)
+      ?`<button class="btn sm" data-void-fu="${x.id}">作廢本次續報</button>`
+      :'';
+    const voidInfo=x.is_voided
+      ?[['作廢紀錄',`作廢人：${en(x.voided_by_staff_id)}\n作廢時間：${showTs(x.voided_at)}\n作廢原因：${x.void_reason||'—'}`]]
+      :[];
+
+    z.push(`
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:22px">
+        <h3 style="margin:0">續報 ${n+1}${voidedBadge}</h3>
+        ${voidBtn}
+      </div>
+      ${QG([
+        ['最新狀況',x.latest_status],
+        ['本次已完成處置',x.completed_actions],
+        ['後續待辦',x.pending_tasks],
+        ...voidInfo
+      ])}
+    `);
+  });
+
+  c.forEach(x=>z.push(`<h3>結報</h3>${QG([
+    ['最終狀況',x.final_status],
+    ['結案判定',x.closure_decision]
+  ])}`));
+
+  if(ats.length){
+    z.push(`<h3>附件</h3><div class="panel">${ats.map(a=>`<button class="btn sm" data-att="${a.id}">📎 ${escapeHTML(a.file_name)}</button>`).join(' ')}</div>`);
+  }
+
+  let A=['<button id="bk" class="btn">←返回</button>'];
+  if(e.status==='draft')A.push('<button id="ed" class="btn primary">編輯草稿</button>');
+  if(['pending_followup','tracking','pending_close'].includes(e.status))A.push('<button id="fu" class="btn">＋續報</button>');
+  if(e.status==='pending_close')A.push('<button id="cl" class="btn primary">結報</button>');
+  if(e.status==='closed')A.push('<button id="ro" class="btn">重新開啟</button>');
+  if(['business_manager','organization_manager','admin'].includes(state.profile.role)&&!['closed','voided'].includes(e.status)){
+    A.push('<button id="vo" class="btn">作廢整件事件</button>');
+  }
+  if(['business_manager','organization_manager','admin'].includes(state.profile.role)&&e.status==='voided'){
+    A.push('<button id="restoreEvent" class="btn primary">恢復事件</button>');
+  }
+
+  const voidSummary=e.status==='voided'
+    ?`<div class="panel" style="margin-top:12px;padding:14px 18px"><b>整件事件已作廢</b><div style="margin-top:8px;line-height:1.7">作廢人：${escapeHTML(en(e.voided_by_staff_id))}<br>作廢時間：${escapeHTML(showTs(e.voided_at))}<br>作廢原因：${escapeHTML(e.void_reason||'—')}</div></div>`
+    :'';
+
+  $('content').innerHTML=`
+    <div class="page-head">
+      <div><h1>${escapeHTML(e.subject)}</h1><p>${e.category}　${B(e)}</p></div>
+      <div>${A.join(' ')}</div>
+    </div>
+    <div class="panel" style="padding:14px 18px;display:flex;gap:14px 28px;align-items:center;flex-wrap:wrap;line-height:1.6">
+      <span><b>事件發生日期：</b>${D(e.event_date)}</span>
+      <span><b>個案／居服員：</b>${escapeHTML([cn(e.case_id),wn(e.care_worker_id)].filter(Boolean).join('／')||'—')}</span>
+      <span><b>負責人：</b>${escapeHTML(en(e.responsible_staff_id))}</span>
+    </div>
+    ${voidSummary}
+    ${z.join('')}
+  `;
+
+  $('bk').onclick=R;
+  $('ed')&&($('ed').onclick=()=>F(e));
+  $('fu')&&($('fu').onclick=()=>FF(e));
+  $('cl')&&($('cl').onclick=()=>FC(e));
+  $('ro')&&($('ro').onclick=()=>reopen(e));
+  $('vo')&&($('vo').onclick=()=>voided(e));
+  $('restoreEvent')&&($('restoreEvent').onclick=()=>restoreEvent(e));
+
+  document.querySelectorAll('[data-void-fu]').forEach(b=>{
+    b.onclick=()=>voidFollowup(e,b.dataset.voidFu);
+  });
+
+  document.querySelectorAll('[data-att]').forEach(b=>{
+    b.onclick=()=>DL(ats.find(a=>a.id===b.dataset.att));
+  });
+}
 async function U(eventId,recordType,recordId,inputId){
   const input=$(inputId);if(!input?.files?.length)return null;
   for(const file of input.files){
@@ -318,7 +420,37 @@ function FF(e){
     }
   };
 }
-function FC(e){let last=FU(e.id).slice(-1)[0]?.pending_tasks||I(e.id)?.pending_tasks||'',warn=last?`<div style="grid-column:1/-1;padding:9px 10px;border:1px solid #f5dca8;background:#fff8e8;border-radius:9px;font-size:11.5px">目前仍記有後續待辦：<b>${escapeHTML(last)}</b><br><label><input id="ack" type="checkbox"> 確認上述待辦已完成或不再需要處理</label></div>`:'';openModal({title:'事件結報',large:true,showConfirm:false,html:`<div class="form-grid">${warn}<div><label>結報日期*</label><input id="cd" type="date" value="${isoDate(new Date())}"></div><div class="full"><label>1 最終狀況*</label><textarea id="cf"></textarea></div><div class="full"><label>2 結案判定*</label><textarea id="cw"></textarea></div><div><label><input id="cln" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="catt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="cs" class="btn primary">完成結報</button></div>`});$('cs').onclick=async()=>{let p={event_id:e.id,close_date:v('cd'),final_status:v('cf'),closure_decision:v('cw'),line_notify:$('cln').checked};if(!p.final_status||!p.closure_decision)return toast('請填妥結報內容','warn');if(last&&!$('ack')?.checked)return toast('請先確認尚未完成的後續待辦','warn');showLoading(true);try{let r=await db.rpc('close_tracking_event',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'closure',r.data,'catt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('結報已完成，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('結報失敗：'+x.message,'error')}finally{showLoading(false)}}}
-async function reopen(e){let x=prompt('重新開啟原因');if(!x)return;let r=await db.rpc('reopen_tracking_event',{p_event_id:e.id,p_reason:x});if(r.error)return toast(r.error.message,'error');await L();V(e.id)}
-async function voided(e){let x=prompt('作廢原因');if(!x)return;let r=await db.rpc('void_tracking_event',{p_event_id:e.id,p_reason:x});if(r.error)return toast(r.error.message,'error');await L();V(e.id)}
+function FC(e){let last=FUA(e.id).slice(-1)[0]?.pending_tasks||I(e.id)?.pending_tasks||'',warn=last?`<div style="grid-column:1/-1;padding:9px 10px;border:1px solid #f5dca8;background:#fff8e8;border-radius:9px;font-size:11.5px">目前仍記有後續待辦：<b>${escapeHTML(last)}</b><br><label><input id="ack" type="checkbox"> 確認上述待辦已完成或不再需要處理</label></div>`:'';openModal({title:'事件結報',large:true,showConfirm:false,html:`<div class="form-grid">${warn}<div><label>結報日期*</label><input id="cd" type="date" value="${isoDate(new Date())}"></div><div class="full"><label>1 最終狀況*</label><textarea id="cf"></textarea></div><div class="full"><label>2 結案判定*</label><textarea id="cw"></textarea></div><div><label><input id="cln" type="checkbox" checked> LINE通知</label></div><div class="full"><label>附件</label><input id="catt" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"></div></div><div class="modal-actions"><button id="cs" class="btn primary">完成結報</button></div>`});$('cs').onclick=async()=>{let p={event_id:e.id,close_date:v('cd'),final_status:v('cf'),closure_decision:v('cw'),line_notify:$('cln').checked};if(!p.final_status||!p.closure_decision)return toast('請填妥結報內容','warn');if(last&&!$('ack')?.checked)return toast('請先確認尚未完成的後續待辦','warn');showLoading(true);try{let r=await db.rpc('close_tracking_event',{payload:p});if(r.error)throw r.error;let ae=null;try{await U(e.id,'closure',r.data,'catt')}catch(err){ae=err}closeModal();await L();V(e.id);if(ae)toast('結報已完成，但附件上傳失敗：'+ae.message,'warn')}catch(x){toast('結報失敗：'+x.message,'error')}finally{showLoading(false)}}}
+async function reopen(e){
+  let x=prompt('重新開啟原因');
+  if(!x)return;
+  let r=await db.rpc('reopen_tracking_event',{p_event_id:e.id,p_reason:x});
+  if(r.error)return toast(r.error.message,'error');
+  await L();V(e.id);
+}
+
+async function voidFollowup(e,followupId){
+  let x=prompt('作廢本次續報原因');
+  if(!x)return;
+  let r=await db.rpc('void_tracking_event_followup',{p_followup_id:followupId,p_reason:x});
+  if(r.error)return toast(r.error.message,'error');
+  await L();V(e.id);
+}
+
+async function voided(e){
+  if(!confirm('這會作廢整件事件，不只是單次續報。確定要繼續嗎？'))return;
+  let x=prompt('作廢整件事件原因');
+  if(!x)return;
+  let r=await db.rpc('void_tracking_event',{p_event_id:e.id,p_reason:x});
+  if(r.error)return toast(r.error.message,'error');
+  await L();V(e.id);
+}
+
+async function restoreEvent(e){
+  let x=prompt('恢復事件原因');
+  if(!x)return;
+  let r=await db.rpc('restore_tracking_event',{p_event_id:e.id,p_reason:x});
+  if(r.error)return toast(r.error.message,'error');
+  await L();V(e.id);
+}
 })();
