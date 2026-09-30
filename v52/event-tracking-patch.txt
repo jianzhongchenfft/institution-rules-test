@@ -85,11 +85,11 @@ function F(e=null){
       <div class="event-section-title">事件基本資料</div>
 
       <div class="event-field">
-        <label>日期 *</label>
+        <label>事件日期 *</label>
         <input id="d" type="date" value="${e?.event_date||isoDate(new Date())}">
       </div>
       <div class="event-field">
-        <label>時間（24 小時制）</label>
+        <label>事件時間</label>
         <div class="event-time-pair">
           ${TH('th',e?.event_time?.slice(0,2)||'')}
           <span>：</span>
@@ -125,7 +125,6 @@ function F(e=null){
       <div class="event-field half">
         <label>通報人姓名</label>
         <input id="rn" value="${escapeHTML(e?.reporter_name||'')}" placeholder="填寫實際提供本次資訊的人">
-        <div id="rnHelp" class="event-help">例如：家屬來電通報，就填該名家屬姓名。</div>
       </div>
 
       <div class="event-field full">
@@ -174,20 +173,6 @@ function F(e=null){
   });
 
   document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
-
-  const updateReporterHelp=()=>{
-    const type=$('rt')?.value||'';
-    const map={
-      '個案':'填寫實際通報的個案姓名；若就是上方所選個案，可填同一姓名。',
-      '家屬':'填寫實際來電、LINE 或當面提供資訊的家屬姓名。',
-      '居服員':'填寫實際回報本次事件的居服員姓名。',
-      '督導':'填寫實際提供本次資訊的督導姓名。',
-      '其他':'填寫實際提供本次資訊者的姓名或稱謂。'
-    };
-    if($('rnHelp'))$('rnHelp').textContent=map[type]||'填寫實際提供本次資訊的人；若無法確認可暫不填。';
-  };
-  $('rt')?.addEventListener('change',updateReporterHelp);
-  updateReporterHelp();
 
   $('dr').onclick=()=>save(e,'draft');
   $('sd').onclick=()=>save(e,'pending_followup');
