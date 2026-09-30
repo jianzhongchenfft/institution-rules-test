@@ -101,54 +101,8 @@ function openInitialReportForm(e=null){
 
   document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
 
-  const renderSensitivePerson=(side,type,detail)=>{
-    const field=$(side==='victim'?'svPersonField':'saPersonField');
-    if(!field)return;
-    const label=side==='victim'?'疑似被害人':(fieldValue('cat')==='性侵害'?'疑似加害人':'疑似行為人');
-    if(type==='staff'){
-      field.innerHTML=`<label>${label} *</label><select id="${side==='victim'?'svPerson':'saPerson'}">${sensitiveStaffOptions(detail?.[side+'_person_kind'],detail?.[side+'_person_id'])}</select>`;
-    }else if(type==='service_recipient'){
-      field.innerHTML=`<label>${label} *</label><select id="${side==='victim'?'svPerson':'saPerson'}">${sensitiveCaseOptions(detail?.[side+'_person_kind'],detail?.[side+'_person_id'])}</select>`;
-    }else if(type==='family'||type==='third_party'){
-      field.innerHTML=`<label>${label} *</label><input id="${side==='victim'?'svName':'saName'}" value="${escapeHTML(detail?.[side+'_name']||'')}">`;
-    }else{
-      field.innerHTML=`<label>${label} *</label><input disabled>`;
-    }
-  };
+  bindSensitiveEventFields(sd);
 
-  const updateSensitiveRelation=()=>{
-    const vt=fieldValue('svType'),at=fieldValue('saType');
-    if($('srel'))$('srel').value=(vt&&at)?`${SIT[vt]}－${SIT[at]}`:'';
-  };
-
-  const updateReportingFields=()=>{
-    const reported=$('srs')?.value==='reported';
-    ['srMethodField','srDateField','srTimeField','srAgencyField','srNoteField'].forEach(id=>{
-      if($(id))$(id).style.display=reported?'block':'none';
-    });
-  };
-
-  const refreshSensitive=()=>{
-    const cat=fieldValue('cat');
-    const show=isSensitiveCategory(cat);
-    ['sensitiveTitle','svTypeField','svPersonField','saTypeField','saPersonField','srelField','sensitiveActionTitle','sipField','srsField'].forEach(id=>{
-      if($(id))$(id).style.display=show?(id==='sensitiveTitle'||id==='sensitiveActionTitle'?'flex':'block'):'none';
-    });
-    ['srMethodField','srDateField','srTimeField','srAgencyField','srNoteField'].forEach(id=>{
-      if($(id)&&!show)$(id).style.display='none';
-    });
-    if(!show)return;
-    $('sensitiveTitle').textContent=cat==='性侵害'?'性侵害事件資料':'性騷擾事件資料';
-    $('saTypeLabel').textContent=cat==='性侵害'?'疑似加害人身分 *':'疑似行為人身分 *';
-    renderSensitivePerson('victim',fieldValue('svType'),sd);
-    renderSensitivePerson('actor',fieldValue('saType'),sd);
-    updateSensitiveRelation();
-    updateReportingFields();
-  };
-
-  $('cat')?.addEventListener('change',()=>{
-    sd=null;
-    refreshSensitive();
   });
   $('svType')?.addEventListener('change',()=>{
     renderSensitivePerson('victim',fieldValue('svType'),null);
@@ -161,33 +115,12 @@ function openInitialReportForm(e=null){
   $('srs')?.addEventListener('change',updateReportingFields);
   refreshSensitive();
 
-  $('dr').onclick=()=>save(e,'draft');
-  $('sd').onclick=()=>save(e,'pending_followup');
-  $('sr').onclick=()=>save(e,'pending_close');
+  $('dr').onclick=()=>saveInitialReport(e,'draft');
+  $('sd').onclick=()=>saveInitialReport(e,'pending_followup');
+  $('sr').onclick=()=>saveInitialReport(e,'pending_close');
 }
 const fieldValue=id=>$(id).value.trim();
-const readSensitiveParty=side=>{
-  const type=fieldValue(side==='victim'?'svType':'saType');
-  if(!type)return {identity_type:null,person_kind:null,person_id:null,name:null};
-  if(type==='staff'||type==='service_recipient'){
-    const el=$(side==='victim'?'svPerson':'saPerson');
-    const raw=el?.value||'';
-    const [kind,id]=raw.split(':');
-    let name='';
-    if(kind==='staff_user')name=staffName(id);
-    else if(kind==='care_worker')name=workerName(id);
-    else if(kind==='care_case')name=caseName(id);
-    return {identity_type:type,person_kind:kind||null,person_id:id||null,name:name||null};
-  }
-  return {
-    identity_type:type,
-    person_kind:'manual',
-    person_id:null,
-    name:fieldValue(side==='victim'?'svName':'saName')||null
-  };
-};
-
-async function save(e,a){
+async function saveInitialReport(e,a){
   const eventTime=readOptionalTime('th','tmin');
   const nextDays=Number(fieldValue('nday'));
   if(a!=='pending_close'&&(!Number.isInteger(nextDays)||nextDays<1))return toast('請填正確的追蹤天數','warn');
