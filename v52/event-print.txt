@@ -1,11 +1,31 @@
 const EVENT_PRINT_ORG_NAME='桃園市私立劉信子居家長照機構';
 
+const PRINT_STATUS_LABELS={draft:'草稿',pending_followup:'待追蹤',tracking:'追蹤中',pending_close:'待結報',closed:'已結案',voided:'作廢'};
+const PRINT_FOLLOWUP_METHOD_LABELS={phone:'電話',official_line:'官方 LINE',home_visit:'家訪',interview:'面談',care_worker_report:'居服員回報',case_manager_contact:'個管師／照專聯繫',other:'其他'};
+const PRINT_IDENTITY_LABELS={staff:'工作人員',service_recipient:'服務對象',family:'家屬',third_party:'第三人'};
+const PRINT_REPORT_STATUS_LABELS={not_assessed:'尚未判定',not_required:'無需外部通報',required_pending:'需外部通報－尚未完成',reported:'已完成外部通報'};
+const PRINT_REPORT_METHOD_LABELS={online:'線上系統',phone:'電話',paper:'紙本／公文',other:'其他'};
+
+const printGetInitialReport=id=>(state.ei||[]).find(item=>item.event_id===id);
+const printGetFollowups=id=>(state.ef||[]).filter(item=>item.event_id===id);
+const printGetClosures=id=>(state.ec||[]).filter(item=>item.event_id===id);
+const printGetSensitiveDetails=id=>(state.esd||[]).find(item=>item.event_id===id);
+const printGetAttachments=id=>(state.ea||[]).filter(item=>item.event_id===id);
+
+const printStaffName=id=>(state.es||[]).find(item=>item.id===id)?.display_name||'—';
+const printCaseName=id=>(state.eca||[]).find(item=>item.id===id)?.case_name||'';
+const printWorkerName=id=>(state.ew||[]).find(item=>item.id===id)?.worker_name||'';
+const printIsSensitiveCategory=category=>category==='性騷擾'||category==='性侵害';
+const printSensitiveRelation=detail=>detail
+  ?`${PRINT_IDENTITY_LABELS[detail.victim_identity_type]||'—'}－${PRINT_IDENTITY_LABELS[detail.actor_identity_type]||'—'}`
+  :'—';
+
 const printText=value=>{
   const text=value===null||value===undefined||value===''?'—':String(value);
   return escapeHTML(text).replace(/\n/g,'<br>');
 };
 
-const printDate=value=>value?displayEventDate(value):'—';
+const printDate=value=>value?rocDate(value+'T00:00:00'):'—';
 const printTime=value=>value?String(value).slice(0,5):'—';
 const printDateTime=value=>{
   if(!value)return '—';
@@ -56,18 +76,18 @@ function buildEventPrintHtml(eventId){
   const event=state.ev.find(item=>item.id===eventId);
   if(!event)throw new Error('找不到事件資料');
 
-  const initial=getInitialReport(eventId);
-  const followups=getFollowups(eventId);
-  const closures=getClosures(eventId);
-  const sensitive=getSensitiveDetails(eventId);
-  const isSensitive=isSensitiveCategory(event.category);
+  const initial=printGetInitialReport(eventId);
+  const followups=printGetFollowups(eventId);
+  const closures=printGetClosures(eventId);
+  const sensitive=printGetSensitiveDetails(eventId);
+  const isSensitive=printIsSensitiveCategory(event.category);
   const today=rocDate(isoDate(new Date())+'T00:00:00');
 
   const basicRows=[
     ['事件發生日期',printDate(event.event_date),'事件發生時間',printTime(event.event_time)],
-    ['事件類別',printText(event.category),'目前狀態',printText(EVENT_STATUS_LABELS[event.status]||event.status)],
-    ['主旨',printText(event.subject),'負責追蹤人',printText(staffName(event.responsible_staff_id))],
-    ['個案',printText(caseName(event.case_id)||'—'),'居服員',printText(workerName(event.care_worker_id)||'—')],
+    ['事件類別',printText(event.category),'目前狀態',printText(PRINT_STATUS_LABELS[event.status]||event.status)],
+    ['主旨',printText(event.subject),'負責追蹤人',printText(printStaffName(event.responsible_staff_id))],
+    ['個案',printText(printCaseName(event.case_id)||'—'),'居服員',printText(printWorkerName(event.care_worker_id)||'—')],
     ['通報人身分',printText(event.reporter_type||'—'),'通報人姓名',printText(event.reporter_name||'—')]
   ];
 
@@ -88,17 +108,17 @@ function buildEventPrintHtml(eventId){
   if(isSensitive&&sensitive){
     const actorLabel=event.category==='性侵害'?'疑似加害人':'疑似行為人';
     const reportingRows=[
-      ['事件關係',printText(relText(sensitive))],
-      ['疑似被害人',printText(`${sensitive.victim_name||'—'}（${SIT[sensitive.victim_identity_type]||'—'}）`)],
-      [actorLabel,printText(`${sensitive.actor_name||'—'}（${SIT[sensitive.actor_identity_type]||'—'}）`)],
-      ['外部通報狀態',printText(SRS[sensitive.external_reporting_status]||'尚未判定')]
+      ['事件關係',printText(printSensitiveRelation(sensitive))],
+      ['疑似被害人',printText(`${sensitive.victim_name||'—'}（${PRINT_IDENTITY_LABELS[sensitive.victim_identity_type]||'—'}）`)],
+      [actorLabel,printText(`${sensitive.actor_name||'—'}（${PRINT_IDENTITY_LABELS[sensitive.actor_identity_type]||'—'}）`)],
+      ['外部通報狀態',printText(PRINT_REPORT_STATUS_LABELS[sensitive.external_reporting_status]||'尚未判定')]
     ];
 
     if(sensitive.external_reporting_status==='reported'){
       reportingRows.push(
         ['外部通報時間',printText(printDateTime(sensitive.external_reported_at))],
         ['外部通報單位',printText(sensitive.external_reporting_agency||'—')],
-        ['外部通報方式',printText(SRM[sensitive.external_reporting_method]||'—')],
+        ['外部通報方式',printText(PRINT_REPORT_METHOD_LABELS[sensitive.external_reporting_method]||'—')],
         ['外部通報備註',printText(sensitive.external_reporting_note||'—')]
       );
     }
@@ -127,7 +147,7 @@ function buildEventPrintHtml(eventId){
         <table class="meta-table">
           <tbody>
             <tr>
-              <th>初報登錄人</th><td>${printText(staffName(initial.submitted_by_staff_id||event.registered_by_staff_id))}</td>
+              <th>初報登錄人</th><td>${printText(printStaffName(initial.submitted_by_staff_id||event.registered_by_staff_id))}</td>
               <th>初報時間</th><td>${printText(printDateTime(initial.submitted_at||initial.created_at))}</td>
             </tr>
             <tr>
@@ -155,7 +175,7 @@ function buildEventPrintHtml(eventId){
       ordered.map((followup,index)=>{
         const files=printAttachmentList(eventId,'followup',followup.id);
         const voidInfo=followup.is_voided
-          ?`<div class="void-box"><strong>本次續報已作廢</strong><br>作廢人：${printText(staffName(followup.voided_by_staff_id))}<br>作廢時間：${printText(printDateTime(followup.voided_at))}<br>作廢原因：${printText(followup.void_reason||'—')}</div>`
+          ?`<div class="void-box"><strong>本次續報已作廢</strong><br>作廢人：${printText(printStaffName(followup.voided_by_staff_id))}<br>作廢時間：${printText(printDateTime(followup.voided_at))}<br>作廢原因：${printText(followup.void_reason||'—')}</div>`
           :'';
 
         return `
@@ -168,8 +188,8 @@ function buildEventPrintHtml(eventId){
                   <th>追蹤時間</th><td>${printTime(followup.followup_time)}</td>
                 </tr>
                 <tr>
-                  <th>追蹤方式</th><td>${printText(FOLLOWUP_METHOD_LABELS[followup.followup_method]||followup.followup_method||'—')}</td>
-                  <th>追蹤人</th><td>${printText(staffName(followup.submitted_by_staff_id))}</td>
+                  <th>追蹤方式</th><td>${printText(PRINT_FOLLOWUP_METHOD_LABELS[followup.followup_method]||followup.followup_method||'—')}</td>
+                  <th>追蹤人</th><td>${printText(printStaffName(followup.submitted_by_staff_id))}</td>
                 </tr>
                 <tr>
                   <th>下次追蹤日期</th><td>${printDate(followup.next_followup_date)}</td>
@@ -205,7 +225,7 @@ function buildEventPrintHtml(eventId){
               <tbody>
                 <tr>
                   <th>結報日期</th><td>${printDate(closure.close_date)}</td>
-                  <th>結報人</th><td>${printText(staffName(closure.closed_by_staff_id))}</td>
+                  <th>結報人</th><td>${printText(printStaffName(closure.closed_by_staff_id))}</td>
                 </tr>
                 <tr>
                   <th>附件</th><td colspan="3">${printAttachmentNames(files)}</td>
@@ -220,7 +240,7 @@ function buildEventPrintHtml(eventId){
     );
   }
 
-  const allAttachments=getAttachments(eventId);
+  const allAttachments=printGetAttachments(eventId);
   const attachmentHtml=printSection(
     '四、附件紀錄',
     allAttachments.length
@@ -238,7 +258,7 @@ function buildEventPrintHtml(eventId){
   );
 
   const voidBanner=event.status==='voided'
-    ?`<div class="void-event-banner">本事件已作廢｜作廢人：${printText(staffName(event.voided_by_staff_id))}｜作廢時間：${printText(printDateTime(event.voided_at))}｜原因：${printText(event.void_reason||'—')}</div>`
+    ?`<div class="void-event-banner">本事件已作廢｜作廢人：${printText(printStaffName(event.voided_by_staff_id))}｜作廢時間：${printText(printDateTime(event.voided_at))}｜原因：${printText(event.void_reason||'—')}</div>`
     :'';
 
   return `<!doctype html>
