@@ -25,25 +25,38 @@
     ['nonrelative','與非親屬同住'],
     ['other','其他']
   ];
-  const RESOURCE_NATURE=[
-    ['formal','正式資源'],
-    ['informal','非正式支持']
-  ];
   const RESOURCE_TYPES=[
     ['long_term_care','長照服務'],
     ['medical','醫療／居家醫療'],
     ['welfare','社福補助／津貼'],
     ['disability','身心障礙資源'],
     ['assistive_device','輔具／無障礙資源'],
-    ['community','社區據點／里鄰'],
+    ['community','社區據點'],
     ['social_work','社工／個管資源'],
     ['transport','交通資源'],
     ['meal','餐食資源'],
     ['charity_religion','慈善／宗教團體'],
-    ['neighbor_friend','鄰居／朋友'],
+    ['neighbor_friend','里鄰／鄰居／朋友'],
     ['volunteer','志工／其他社會支持'],
-    ['other','其他']
+    ['other_formal','其他正式資源'],
+    ['other_informal','其他非正式支持']
   ];
+  const FORMAL_RESOURCE_TYPES=new Set([
+    'long_term_care','medical','welfare','disability','assistive_device',
+    'community','social_work','transport','meal','charity_religion','other_formal'
+  ]);
+  const INFORMAL_RESOURCE_TYPES=new Set([
+    'neighbor_friend','volunteer','other_informal'
+  ]);
+  function resourceNatureForType(type){
+    if(FORMAL_RESOURCE_TYPES.has(type))return 'formal';
+    if(INFORMAL_RESOURCE_TYPES.has(type))return 'informal';
+    return '';
+  }
+  function resourceNatureLabel(type){
+    const nature=resourceNatureForType(type);
+    return nature==='formal'?'正式資源':nature==='informal'?'非正式支持':'';
+  }
   const RESOURCE_USAGE=[
     ['stable','穩定使用'],
     ['occasional','偶爾使用'],
@@ -196,10 +209,14 @@
     }));
     local.supportDomains={...safe(local.record?.support_domains)};
     local.resources={...safe(local.record?.resources)};
-    local.resources.social_resources=safeArray(local.resources.social_resources).map((x,i)=>({
-      id:x?.id||('resource-'+i),nature:x?.nature||'',type:x?.type||'',name:x?.name||'',
-      assistance:x?.assistance||'',usage_status:x?.usage_status||'',sufficiency:x?.sufficiency||'',insufficiency_note:x?.insufficiency_note||''
-    }));
+    local.resources.social_resources=safeArray(local.resources.social_resources).map((x,i)=>{
+      let type=x?.type||'';
+      if(type==='other')type=x?.nature==='informal'?'other_informal':'other_formal';
+      return {
+        id:x?.id||('resource-'+i),nature:resourceNatureForType(type),type,name:x?.name||'',
+        assistance:x?.assistance||'',usage_status:x?.usage_status||'',sufficiency:x?.sufficiency||'',insufficiency_note:x?.insufficiency_note||''
+      };
+    });
     local.resources.unmet_needs=safeArray(local.resources.unmet_needs).map((x,i)=>({
       id:x?.id||('need-'+i),type:x?.type||'',need:x?.need||'',action:x?.action||'',status:x?.status||''
     }));
@@ -237,15 +254,17 @@
 
   function renderHousehold(){
     const h=local.household,c=caseById(eventById(local.eventId)?.case_id);
-    const welfareIdentity=c?.welfare_identity||'主檔未登錄';
-    const copayRate=(c?.copay_rate!==null&&c?.copay_rate!==undefined&&c?.copay_rate!=='')?`${Number(c.copay_rate)}%`:'主檔未登錄';
+    const welfareIdentity=({
+      '低收入戶':'第一類',
+      '中低收入戶':'第二類',
+      '一般戶':'第三類'
+    })[c?.welfare_identity]||c?.welfare_identity||'主檔未登錄';
     return `<section class="support-section">
       <div class="support-section-head"><div><strong>一、家庭與居住概況</strong><small>記錄會影響支持與照顧安排的家庭資訊。</small></div></div>
       <div class="support-grid">
         <div class="support-field"><label>居住安排 *</label><select data-support-household="living_arrangement">${options(LIVING_OPTIONS,h.living_arrangement)}</select></div>
         ${h.living_arrangement==='other'?`<div class="support-field"><label>其他居住安排</label><input data-support-household="living_other" value="${escapeHTML(h.living_other||'')}" placeholder="請說明"></div>`:''}
         <div class="support-field"><label>長照福利身分（個案主檔）</label><div class="support-readonly">${escapeHTML(welfareIdentity)}</div></div>
-        <div class="support-field"><label>自負額（個案主檔）</label><div class="support-readonly">${escapeHTML(copayRate)}</div></div>
         <div class="support-field"><label>近期是否有重大家庭變化 *</label><select data-support-household="family_change_status">
           <option value="">請選擇</option><option value="no" ${h.family_change_status==='no'?'selected':''}>無</option><option value="yes" ${h.family_change_status==='yes'?'selected':''}>有</option>
         </select></div>
@@ -326,12 +345,15 @@
   }
 
   function renderSocialResourceRow(item,index){
+    const natureLabel=resourceNatureLabel(item.type);
     return `<div class="support-row" data-support-resource-row="${escapeHTML(item.id)}">
-      <div class="support-row-head"><strong>資源 ${index+1}</strong><button type="button" class="btn sm" data-remove-support-resource="${escapeHTML(item.id)}">移除</button></div>
+      <div class="support-row-head">
+        <div><strong>資源 ${index+1}</strong>${natureLabel?`<span class="support-tag" style="margin-left:7px">${escapeHTML(natureLabel)}</span>`:''}</div>
+        <button type="button" class="btn sm" data-remove-support-resource="${escapeHTML(item.id)}">移除</button>
+      </div>
       <div class="support-row-grid">
-        <select data-support-resource-row-field="nature">${options(RESOURCE_NATURE,item.nature,'資源性質')}</select>
         <select data-support-resource-row-field="type">${options(RESOURCE_TYPES,item.type,'資源類型')}</select>
-        <input data-support-resource-row-field="name" value="${escapeHTML(item.name||'')}" placeholder="單位／資源名稱">
+        <input class="span2" data-support-resource-row-field="name" value="${escapeHTML(item.name||'')}" placeholder="單位／資源名稱">
         <input class="wide" data-support-resource-row-field="assistance" value="${escapeHTML(item.assistance||'')}" placeholder="目前提供什麼協助">
         <select data-support-resource-row-field="usage_status">${options(RESOURCE_USAGE,item.usage_status,'使用狀況')}</select>
         <select data-support-resource-row-field="sufficiency">${options(RESOURCE_SUFFICIENCY,item.sufficiency,'是否足夠')}</select>
@@ -426,6 +448,7 @@
     const items=[];document.querySelectorAll('[data-support-resource-row]').forEach(rowEl=>{
       const item={id:rowEl.dataset.supportResourceRow||newId('resource')};
       rowEl.querySelectorAll('[data-support-resource-row-field]').forEach(el=>item[el.dataset.supportResourceRowField]=el.value);
+      item.nature=resourceNatureForType(item.type);
       if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))items.push(item);
     });local.resources.social_resources=items;
   }
@@ -461,7 +484,7 @@
 
     $('supportAddSocialResource')?.addEventListener('click',()=>{syncDynamicRows();local.resources.social_resources=[...safeArray(local.resources.social_resources),{id:newId('resource'),nature:'',type:'',name:'',assistance:'',usage_status:'',sufficiency:'',insufficiency_note:''}];rerenderPreservingScroll();});
     document.querySelectorAll('[data-remove-support-resource]').forEach(btn=>btn.addEventListener('click',()=>{syncDynamicRows();local.resources.social_resources=safeArray(local.resources.social_resources).filter(x=>x.id!==btn.dataset.removeSupportResource);rerenderPreservingScroll();}));
-    document.querySelectorAll('[data-support-resource-row-field]').forEach(el=>el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{syncSocialResources();if(el.dataset.supportResourceRowField==='sufficiency')rerenderPreservingScroll();}));
+    document.querySelectorAll('[data-support-resource-row-field]').forEach(el=>el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{syncSocialResources();if(['type','sufficiency'].includes(el.dataset.supportResourceRowField))rerenderPreservingScroll();}));
 
     $('supportAddNeed')?.addEventListener('click',()=>{syncDynamicRows();local.resources.unmet_needs=[...safeArray(local.resources.unmet_needs),{id:newId('need'),type:'',need:'',action:'',status:''}];rerenderPreservingScroll();});
     document.querySelectorAll('[data-remove-support-need]').forEach(btn=>btn.addEventListener('click',()=>{syncDynamicRows();local.resources.unmet_needs=safeArray(local.resources.unmet_needs).filter(x=>x.id!==btn.dataset.removeSupportNeed);rerenderPreservingScroll();}));
@@ -479,7 +502,11 @@
       local.familyMembers=safeArray(local.previous.family_members).map(x=>({...safe(x),id:x?.id||newId('family')}));
       local.supportDomains=JSON.parse(JSON.stringify(safe(local.previous.support_domains)));
       local.resources=JSON.parse(JSON.stringify(safe(local.previous.resources)));
-      local.resources.social_resources=safeArray(local.resources.social_resources).map(x=>({...safe(x),id:x?.id||newId('resource')}));
+      local.resources.social_resources=safeArray(local.resources.social_resources).map(x=>{
+        let type=x?.type||'';
+        if(type==='other')type=x?.nature==='informal'?'other_informal':'other_formal';
+        return {...safe(x),id:x?.id||newId('resource'),type,nature:resourceNatureForType(type)};
+      });
       local.resources.unmet_needs=safeArray(local.resources.unmet_needs).map(x=>({...safe(x),id:x?.id||newId('need')}));
       local.summary={...safe(local.previous.summary)};
       local.pendingCopyFromId=local.previous.id;rerenderPreservingScroll();toast('已帶入前次支持系統資料，請確認本次狀況','success');
@@ -520,8 +547,8 @@
     if(!r.economic_care_impact)return '請選擇經濟因素是否影響照顧或醫療';
     if(r.economic_care_impact==='yes'&&!String(r.economic_care_impact_note||'').trim())return '請填寫經濟因素影響情形';
 
-    const incompleteResource=safeArray(r.social_resources).find(x=>!x.nature||!x.type||!String(x.name||'').trim()||!String(x.assistance||'').trim()||!x.usage_status||!x.sufficiency);
-    if(incompleteResource)return '請完整填寫目前社會資源的「性質、類型、名稱、提供協助、使用狀況、是否足夠」';
+    const incompleteResource=safeArray(r.social_resources).find(x=>!x.type||!resourceNatureForType(x.type)||!String(x.name||'').trim()||!String(x.assistance||'').trim()||!x.usage_status||!x.sufficiency);
+    if(incompleteResource)return '請完整填寫目前社會資源的「類型、名稱、提供協助、使用狀況、是否足夠」';
     const resourceNeedNote=safeArray(r.social_resources).find(x=>['partial','insufficient'].includes(x.sufficiency)&&!String(x.insufficiency_note||'').trim());
     if(resourceNeedNote)return '社會資源選擇「部分不足／不足」時，請填寫不足原因';
 
