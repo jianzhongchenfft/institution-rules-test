@@ -42,6 +42,8 @@ create index if not exists assessment_adl_records_event_id_idx
   on public.assessment_adl_records(assessment_event_id);
 create index if not exists assessment_adl_records_confirmed_at_idx
   on public.assessment_adl_records(confirmed_at);
+create index if not exists assessment_adl_records_copied_from_id_idx
+  on public.assessment_adl_records(copied_from_id);
 
 create table if not exists public.assessment_adl_history (
   id uuid primary key default gen_random_uuid(),
@@ -59,6 +61,8 @@ create index if not exists assessment_adl_history_record_idx
   on public.assessment_adl_history(adl_record_id, changed_at);
 create index if not exists assessment_adl_history_case_idx
   on public.assessment_adl_history(case_id, changed_at);
+create index if not exists assessment_adl_history_event_id_idx
+  on public.assessment_adl_history(assessment_event_id);
 
 alter table public.assessment_adl_records enable row level security;
 alter table public.assessment_adl_history enable row level security;
