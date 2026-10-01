@@ -349,8 +349,7 @@
       return;
     }
     const canEdit=canEditEvent(row)&&row.status!=='voided';
-    $('topTitle').textContent='評估管理';
-    $('crumb').textContent='ADL 日常生活活動功能量表';
+    window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'ADL 日常生活活動功能量表');
     $('content').innerHTML=`
       <div class="adl-page">
         <div class="page-head">
