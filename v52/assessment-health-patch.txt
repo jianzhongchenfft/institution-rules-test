@@ -107,7 +107,7 @@
   const local={
     eventId:null,record:null,previous:null,previousEvent:null,
     medicalInfo:{},medicationChecks:{},healthItems:{},healthNotes:{},
-    fixedMedicationBase:[],
+    fixedMedicationBaseEntries:[],
     pendingCopyFromId:null,hasLaterCompleted:false
   };
 
@@ -133,66 +133,153 @@
   },0);
 
   const emptyEvent=()=>({date:'',type:'',facility:'',department:'',reason:'',result:''});
+  const newId=prefix=>(globalThis.crypto?.randomUUID?.()||(prefix+'-'+Date.now()+'-'+Math.random().toString(36).slice(2)));
   const newMedicationChange=()=>({
-    id:(globalThis.crypto?.randomUUID?.()||('med-'+Date.now()+'-'+Math.random().toString(36).slice(2))),
+    id:newId('medchg'),
     action:'',
     duration_type:'',
+    medication_before_entry_id:'',
+    medication_before:'',
+    medication_after:'',
+    note:''
+  });
+  const newMedicationCorrection=()=>({
+    id:newId('medfix'),
+    action:'',
+    reason:'',
+    target_entry_id:'',
     medication_before:'',
     medication_after:'',
     note:''
   });
   const fixedMedicationLines=text=>String(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const cloneEntries=entries=>safeArray(entries).map(x=>({...x}));
+  const entryById=(entries,id)=>safeArray(entries).find(x=>x.id===id)||null;
+  const legacyEntriesFromText=(text,row,originType=null)=>fixedMedicationLines(text).map((medication,index)=>({
+    id:newId('medbase'),
+    medication,
+    origin_type:originType||(row?.assessment_type==='opening'?'opening_baseline':'legacy'),
+    origin_date:row?.assessment_type==='opening'?(row?.planned_date||null):null,
+    origin_event_id:row?.assessment_type==='opening'?(row?.id||null):null,
+    origin_note:'',
+    legacy_index:index
+  }));
+  const normalizeMedicationEntry=(x,row)=>({
+    id:x?.id||newId('medentry'),
+    medication:String(x?.medication||'').trim(),
+    origin_type:x?.origin_type||'legacy',
+    origin_date:x?.origin_date||null,
+    origin_event_id:x?.origin_event_id||null,
+    origin_note:x?.origin_note||''
+  });
+  const medicationEntryTag=entry=>{
+    if(entry?.origin_type==='opening_baseline')return entry.origin_note==='late_entry'?'接案時既有（後補）':'接案時既有';
+    if(entry?.origin_type==='service_change'){
+      return entry.origin_date?rocDate(entry.origin_date+'T00:00:00')+'新增':'服務期間新增';
+    }
+    if(entry?.origin_type==='correction_add')return '資料修正新增';
+    return '既有固定用藥';
+  };
   const isCompleteMedicationChange=item=>{
     if(!item?.action||!item?.duration_type)return false;
     if(item.action==='add')return !!String(item.medication_after||'').trim();
-    if(item.action==='stop')return !!String(item.medication_before||'').trim();
-    if(item.action==='adjust')return !!String(item.medication_before||'').trim()&&!!String(item.medication_after||'').trim();
+    if(item.action==='stop')return !!String(item.medication_before_entry_id||'').trim();
+    if(item.action==='adjust')return !!String(item.medication_before_entry_id||'').trim()&&!!String(item.medication_after||'').trim();
     return false;
   };
-  const addFixedLine=(lines,value)=>{
-    const v=String(value||'').trim();
-    if(v&&!lines.some(x=>x===v))lines.push(v);
+  const isCompleteMedicationCorrection=item=>{
+    if(!item?.action||!item?.reason)return false;
+    if(item.action==='add')return !!String(item.medication_after||'').trim();
+    if(item.action==='edit')return !!String(item.target_entry_id||'').trim()&&!!String(item.medication_after||'').trim();
+    if(item.action==='remove')return !!String(item.target_entry_id||'').trim();
+    return false;
   };
-  const removeFixedLine=(lines,value)=>{
-    const v=String(value||'').trim();
-    const i=lines.findIndex(x=>x===v);
-    if(i>=0)lines.splice(i,1);
-  };
-  const replaceFixedLine=(lines,from,to)=>{
-    const a=String(from||'').trim(),b=String(to||'').trim();
-    const i=lines.findIndex(x=>x===a);
-    if(i>=0){
-      if(b)lines[i]=b; else lines.splice(i,1);
-    }else if(b&&!lines.some(x=>x===b)){
-      lines.push(b);
+  const applyMedicationCorrection=(entries,item,row)=>{
+    if(!isCompleteMedicationCorrection(item))return;
+    if(item.action==='add'){
+      const med=String(item.medication_after||'').trim();
+      if(!med||entries.some(x=>x.medication===med))return;
+      entries.push({
+        id:'corr-'+item.id,
+        medication:med,
+        origin_type:item.reason==='opening_omission'?'opening_baseline':'correction_add',
+        origin_date:item.reason==='opening_omission'?null:(row?.planned_date||null),
+        origin_event_id:item.reason==='opening_omission'?null:(row?.id||null),
+        origin_note:item.reason==='opening_omission'?'late_entry':''
+      });
+      return;
+    }
+    const target=entryById(entries,item.target_entry_id);
+    if(!target)return;
+    item.medication_before=target.medication;
+    if(item.action==='remove'){
+      entries.splice(entries.indexOf(target),1);
+    }else if(item.action==='edit'){
+      target.medication=String(item.medication_after||'').trim();
+      target.corrected_at=row?.planned_date||null;
     }
   };
-  const reverseLongTermMedicationChange=(lines,item)=>{
+  const applyLongTermMedicationChange=(entries,item,row)=>{
     if(item?.duration_type!=='long_term'||!isCompleteMedicationChange(item))return;
-    if(item.action==='add')removeFixedLine(lines,item.medication_after);
-    else if(item.action==='stop')addFixedLine(lines,item.medication_before);
-    else if(item.action==='adjust')replaceFixedLine(lines,item.medication_after,item.medication_before);
+    if(item.action==='add'){
+      const med=String(item.medication_after||'').trim();
+      if(!med||entries.some(x=>x.medication===med))return;
+      entries.push({
+        id:'chg-'+item.id,
+        medication:med,
+        origin_type:'service_change',
+        origin_date:row?.planned_date||null,
+        origin_event_id:row?.id||null,
+        origin_note:''
+      });
+      return;
+    }
+    const target=entryById(entries,item.medication_before_entry_id);
+    if(!target)return;
+    item.medication_before=target.medication;
+    if(item.action==='stop'){
+      entries.splice(entries.indexOf(target),1);
+    }else if(item.action==='adjust'){
+      const idx=entries.indexOf(target);
+      entries[idx]={
+        id:'chg-'+item.id,
+        medication:String(item.medication_after||'').trim(),
+        origin_type:'service_change',
+        origin_date:row?.planned_date||null,
+        origin_event_id:row?.id||null,
+        origin_note:''
+      };
+    }
   };
-  const applyLongTermMedicationChange=(lines,item)=>{
-    if(item?.duration_type!=='long_term'||!isCompleteMedicationChange(item))return;
-    if(item.action==='add')addFixedLine(lines,item.medication_after);
-    else if(item.action==='stop')removeFixedLine(lines,item.medication_before);
-    else if(item.action==='adjust')replaceFixedLine(lines,item.medication_before,item.medication_after);
+  const activeMedicationChanges=()=>local.medicalInfo.no_medication_changes===true?[]:safeArray(local.medicalInfo.medication_changes);
+  const activeMedicationCorrections=()=>safeArray(local.medicalInfo.medication_corrections);
+  const rebuildFixedMedicationEntries=()=>{
+    const row=eventById(local.eventId);
+    const entries=cloneEntries(local.fixedMedicationBaseEntries);
+    activeMedicationCorrections().forEach(item=>applyMedicationCorrection(entries,item,row));
+    activeMedicationChanges().forEach(item=>applyLongTermMedicationChange(entries,item,row));
+    local.medicalInfo.fixed_medication_base_entries=cloneEntries(local.fixedMedicationBaseEntries);
+    local.medicalInfo.fixed_medication_entries=cloneEntries(entries);
+    local.medicalInfo.fixed_medications=entries.map(x=>x.medication).join('\n');
+    local.medicalInfo.no_fixed_medications=entries.length===0;
+    return entries;
   };
-  const activeMedicationChanges=()=>local.medicalInfo.no_medication_changes===true
-    ?[]
-    :safeArray(local.medicalInfo.medication_changes);
-  const rebuildFixedMedicationsFromChanges=()=>{
-    const lines=[...local.fixedMedicationBase];
-    activeMedicationChanges().forEach(item=>applyLongTermMedicationChange(lines,item));
-    local.medicalInfo.fixed_medications=lines.join('\n');
-    local.medicalInfo.no_fixed_medications=lines.length===0;
-    return lines;
-  };
-  const setFixedMedicationBaseFromCurrent=()=>{
-    const lines=fixedMedicationLines(local.medicalInfo.fixed_medications);
-    [...activeMedicationChanges()].reverse().forEach(item=>reverseLongTermMedicationChange(lines,item));
-    local.fixedMedicationBase=[...lines];
+  const setOpeningMedicationBaseline=text=>{
+    const row=eventById(local.eventId);
+    const previous=cloneEntries(local.fixedMedicationBaseEntries);
+    const byMedication=new Map(previous.map(x=>[x.medication,x]));
+    local.fixedMedicationBaseEntries=fixedMedicationLines(text).map(medication=>{
+      const found=byMedication.get(medication);
+      return found?{...found}:{
+        id:newId('medbase'),
+        medication,
+        origin_type:'opening_baseline',
+        origin_date:row?.planned_date||null,
+        origin_event_id:row?.id||null,
+        origin_note:''
+      };
+    });
+    rebuildFixedMedicationEntries();
   };
 
   async function load(eventId){
