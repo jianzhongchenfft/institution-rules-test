@@ -114,14 +114,14 @@
 
   const eventById=id=>state.assessmentEvents?.find(x=>x.id===id)||null;
   const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
-  const healthFormCode=section=>section==='baseline'?'health_baseline':section==='change'?'health_change':'health_status';
+  const healthFormCode=section=>section==='medication'?'health_medication':'health_status';
   const formById=(id,section=local.section)=>(state.assessmentEventForms||[])
     .find(x=>x.assessment_event_id===id&&x.form_code===healthFormCode(section))||null;
-  const sectionTitle=section=>({
-    baseline:'健康與用藥基本資料',
-    change:'近期健康與用藥變化',
-    status:'身體與健康狀況評估'
-  })[section]||'身體與健康狀況評估';
+  const healthSectionMode=(row,section=local.section)=>section==='status'?'status':row?.assessment_type==='opening'?'baseline':'change';
+  const sectionTitle=(section,row=eventById(local.eventId))=>{
+    if(section==='medication')return row?.assessment_type==='opening'?'健康與用藥初始評估':'健康與用藥追蹤評估';
+    return '身體與健康狀況評估';
+  };
   const safe=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   const safeArray=v=>Array.isArray(v)?v:[];
 
@@ -160,6 +160,14 @@
     medication_after:'',
     note:''
   });
+  const newOpeningTemporaryMedication=()=>({
+    id:newId('medtemp'),
+    medication:'',
+    reason:'',
+    planned_end_date:'',
+    note:''
+  });
+  const isCompleteOpeningTemporaryMedication=item=>!!String(item?.medication||'').trim();
   const fixedMedicationLines=text=>String(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
   const cloneEntries=entries=>safeArray(entries).map(x=>({...x}));
   const entryById=(entries,id)=>safeArray(entries).find(x=>x.id===id)||null;
@@ -344,6 +352,13 @@
       target_entry_id:x?.target_entry_id||'',
       medication_before:x?.medication_before||'',
       medication_after:x?.medication_after||'',
+      note:x?.note||''
+    }));
+    local.medicalInfo.opening_temporary_medications=safeArray(local.medicalInfo.opening_temporary_medications).map((x,i)=>({
+      id:x?.id||('legacy-temp-'+i),
+      medication:x?.medication||'',
+      reason:x?.reason||'',
+      planned_end_date:x?.planned_end_date||'',
       note:x?.note||''
     }));
     local.medicationChecks={...safe(local.record?.medication_checks)};
