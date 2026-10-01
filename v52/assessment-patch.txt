@@ -904,7 +904,7 @@
       </div>
 
       <div class="assessment-detail-note">
-        目前先完成「評估事件外殼」：可建立評估、選擇本次工具、管理預定日期與狀態。ADL、IADL 等實際量表填寫將在下一階段逐一接上。
+        評估工具會依評估類型顯示：開案先建立基準資料，後續評估追蹤期間變化；ADL、IADL、認知、情緒與身體健康等則記錄本次當下狀態。
       </div>
 
       <section class="panel">
