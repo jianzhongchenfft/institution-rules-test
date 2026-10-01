@@ -1150,6 +1150,31 @@
       if(target)target.innerHTML=renderFixedMedicationList(rebuildFixedMedicationEntries());
     });
 
+    $('openingNoTemporaryMedication')?.addEventListener('change',e=>{
+      local.medicalInfo.opening_no_temporary_medications=!!e.target.checked;
+      if(e.target.checked)local.medicalInfo.opening_temporary_medications=[];
+      render();
+    });
+
+    $('healthAddOpeningTemporaryMedication')?.addEventListener('click',()=>{
+      syncInputs();
+      local.medicalInfo.opening_no_temporary_medications=false;
+      local.medicalInfo.opening_temporary_medications=[
+        ...safeArray(local.medicalInfo.opening_temporary_medications),
+        newOpeningTemporaryMedication()
+      ];
+      render();
+    });
+
+    document.querySelectorAll('[data-remove-opening-temp-med]').forEach(btn=>btn.addEventListener('click',()=>{
+      syncInputs();
+      const index=Number(btn.dataset.removeOpeningTempMed);
+      const items=safeArray(local.medicalInfo.opening_temporary_medications);
+      items.splice(index,1);
+      local.medicalInfo.opening_temporary_medications=items;
+      render();
+    }));
+
     document.querySelectorAll('input[name^="health_med_"]').forEach(input=>input.addEventListener('change',()=>{
       syncInputs();
       const key=input.name.replace('health_med_','');
@@ -1258,6 +1283,7 @@
   async function save(finalize){
     const row=eventById(local.eventId);
     const section=local.section;
+    const mode=healthSectionMode(row,section);
     if(!row||!canEdit(row))return toast('您沒有此個案的評估編輯權限','error');
 
     syncInputs();
@@ -1270,10 +1296,18 @@
       return toast('尚有未完成項目：'+missing,'warn');
     }
 
-    if(finalize&&section==='baseline'){
+    if(finalize&&section==='medication'&&mode==='baseline'){
       const noFixed=local.medicalInfo.opening_no_fixed_medications===true;
       if(!noFixed&&local.fixedMedicationBaseEntries.length===0){
         return toast('請填寫接案時既有固定用藥，或勾選「接案時無固定用藥」','warn');
+      }
+      const noTemporary=local.medicalInfo.opening_no_temporary_medications===true;
+      const temporary=safeArray(local.medicalInfo.opening_temporary_medications);
+      if(!noTemporary&&temporary.length===0){
+        return toast('請填寫接案時短期／臨時用藥，或勾選「接案時無短期／臨時用藥」','warn');
+      }
+      if(temporary.some(x=>!isCompleteOpeningTemporaryMedication(x))){
+        return toast('短期／臨時用藥請至少填寫藥物名稱／用法','warn');
       }
     }
 
@@ -1291,7 +1325,7 @@
       ongoing_treatments:c?.ongoing_treatments||''
     };
     const healthMasterFieldsChanged=
-      section!=='status'
+      section==='medication'
       &&(
         String(medicalInfoForSave.baseline_important_conditions||'').trim()!==String(baselineReference.important_conditions||'').trim()
         ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(baselineReference.ongoing_treatments||'').trim()
@@ -1309,17 +1343,24 @@
         ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(c?.ongoing_treatments||'').trim()
       );
 
-    if(section==='baseline'){
+    if(section==='medication'&&mode==='baseline'){
       const fixedEntries=rebuildFixedMedicationEntries();
+      let temporary=safeArray(local.medicalInfo.opening_temporary_medications)
+        .map(x=>({...x}))
+        .filter(x=>Object.entries(x).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''));
+      if(local.medicalInfo.opening_no_temporary_medications===true)temporary=[];
+
       medicalInfoForSave.fixed_medication_base_entries=cloneEntries(local.fixedMedicationBaseEntries);
       medicalInfoForSave.fixed_medication_entries=cloneEntries(fixedEntries);
       medicalInfoForSave.fixed_medications=fixedEntries.map(x=>x.medication).join('\n');
       medicalInfoForSave.no_fixed_medications=fixedEntries.length===0;
       medicalInfoForSave.opening_no_fixed_medications=local.medicalInfo.opening_no_fixed_medications===true;
+      medicalInfoForSave.opening_temporary_medications=temporary;
+      medicalInfoForSave.opening_no_temporary_medications=local.medicalInfo.opening_no_temporary_medications===true;
       if(medicalInfoForSave.side_effect!=='present')medicalInfoForSave.side_effect_note='';
     }
 
-    if(section==='change'){
+    if(section==='medication'&&mode==='change'){
       if(medicalInfoForSave.no_healthcare_events===true){
         medicalInfoForSave.healthcare_events=[];
       }else{
@@ -1398,7 +1439,7 @@
         p_health_notes:local.healthNotes,
         p_finalize:!!finalize,
         p_copied_from_id:section==='status'?(local.pendingCopyFromId||null):null,
-        p_section:section
+        p_section:mode
       });
       if(error)throw error;
 
@@ -1406,7 +1447,7 @@
       await load(row.id);
       render();
 
-      const label=sectionTitle(section);
+      const label=sectionTitle(section,row);
       toast(
         masterWillChange
           ?(finalize?label+'已完成，個案健康資料已更新':label+'草稿已儲存，個案健康資料已更新')
@@ -1419,7 +1460,7 @@
       if(msg.includes('OPENING_MEDICATION_BASELINE_UNCONFIRMED')){
         toast('請確認接案時固定用藥情形','warn');
       }else{
-        toast('儲存'+sectionTitle(section)+'失敗：'+msg,'error');
+        toast('儲存'+sectionTitle(section,row)+'失敗：'+msg,'error');
       }
     }finally{
       showLoading(false);
@@ -1429,15 +1470,15 @@
   async function open(eventId,section='status'){
     const row=eventById(eventId);
     if(!row)return toast('找不到評估事件','error');
-    if(!['baseline','change','status'].includes(section))section='status';
+    if(!['medication','status'].includes(section))section='status';
     if(row.status==='pending')return toast('請先開始本次評估','warn');
 
     local.section=section;
-    if(!formById(eventId,section))return toast('本次評估未選用「'+sectionTitle(section)+'」','warn');
+    if(!formById(eventId,section))return toast('本次評估未選用「'+sectionTitle(section,row)+'」','warn');
 
     showLoading(true);
     try{await load(eventId);render();}
-    catch(err){console.error(err);toast('讀取'+sectionTitle(section)+'失敗：'+(err?.message||err),'error');}
+    catch(err){console.error(err);toast('讀取'+sectionTitle(section,row)+'失敗：'+(err?.message||err),'error');}
     finally{showLoading(false);}
   }
 
