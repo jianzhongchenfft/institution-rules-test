@@ -499,6 +499,13 @@
     }
     if(!h.backup_available)return '請選擇是否有替代照顧者／其他重要支持者';
 
+    const incompleteSupporter=local.familyMembers.find(x=>
+      !String(x.name||'').trim()
+      ||!String(x.relation||'').trim()
+      ||!String(x.support_role||'').trim()
+    );
+    if(incompleteSupporter)return '重要支持者請至少填寫「姓名／稱謂、與個案關係、可提供哪些協助」';
+
     const missingDomains=SUPPORT_DOMAINS.filter(([key])=>!domainStatus(key));
     if(missingDomains.length)return '尚有未完成支持面向：'+missingDomains.map(([,label])=>label).join('、');
     const missingNotes=SUPPORT_DOMAINS.filter(([key])=>['partial','insufficient','not_applicable'].includes(domainStatus(key))&&!String(local.supportDomains?.[key]?.note||'').trim());
