@@ -21,21 +21,25 @@
 
 健康三個片段由 part07.txt 依序串接後一次 eval，因此仍共享同一個 closure，不使用額外全域狀態。
 
-## 健康資料安全
-assessment_health_records 目前仍是一個 event 一筆紀錄，但後端 save_assessment_health 已依 p_section 局部更新：
-- baseline / change：只更新 medical_info、medication_checks。
-- status：只更新 health_items、health_notes、total_score、copied_from。
-因此不同健康表單同時開啟時，不應以舊快照覆蓋另一區塊的新資料。
+## 健康與用藥工具
+assessment_health_records 仍是一個 event 一筆紀錄；使用者介面只保留一個 health_medication 工具。
+同一份表單一次處理：
+- 開案／後續健康現況
+- 身體健康狀態10項
+- 固定與短期用藥
+- 用藥管理與安全
+- 後續健康／就醫／用藥變化
+
+完成確認時前端以 p_section='all' 一次儲存，後端同時寫入健康、用藥與10項狀態，避免同一評估被拆成兩個完成狀態。
 
 ## SQL
 - assessment-health-current.sql：現行測試版健康儲存函式，後續修改以此為準。
-- assessment-health-supabase-20261001.sql：2026-10-01 開發過程與舊 form_code 轉換歷史，不再作為現行定義來源。
+- 舊版 SQL 不留在主分支，需追溯時使用 Git 歷史或備份分支。
 
 ## 目前 form_code
 - adl
 - iadl
 - health_medication
-- health_status
 - home_safety（尚待完成）
 - support（尚待完成）
 - spmsq
@@ -47,5 +51,5 @@ assessment_health_records 目前仍是一個 event 一筆紀錄，但後端 save
 1. 不再把新量表直接寫進 assessment-patch.txt。
 2. 新量表應有自己的 patch / RPC / history（如需要）。
 3. 前次資料一律以「本次 planned_date 以前最近一筆已完成同類評估」判定，不依建立時間。
-4. 開案基準型資料與後續變化型資料可共用同一工具名稱，但 UI 依 assessment_type 切換。
+4. 健康與用藥維持單一工具；UI 依 assessment_type 切換開案初始版／後續追蹤版，身體健康10項包含在同一張表單。
 5. 紙本列印讀取當次已儲存快照；歷史修改軌跡另由 history 保留。
