@@ -124,7 +124,7 @@
     try{
       const {error}=await db.rpc('save_assessment_spmsq',{
         p_event_id:row.id,p_responses:local.responses,p_judgments:local.judgments,p_finalize:!!finalize,
-        p_unable:!!local.isUnable,p_unable_reason:local.unableReason||null,p_copied_from_id:local.pendingCopyFromId||null
+        p_unable:!!local.isUnable,p_unable_reason:local.isUnable?(local.unableReason||null):null,p_copied_from_id:local.pendingCopyFromId||null
       });
       if(error)throw error;
       await window.v52AssessmentApi?.loadAssessmentData?.(false);await load(row.id);render();
