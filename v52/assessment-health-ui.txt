@@ -562,7 +562,10 @@
           <div class="health-subsection">
             <div class="health-subtitle">
               <strong>5. 用藥安全現況</strong>
-              <small>前次資料會自動沿用，請依本次實際狀況確認</small>
+              <div style="display:flex;align-items:center;gap:8px">
+                <small>請依本次實際狀況重新評估</small>
+                ${local.previous?'<button id="healthCopyMedicationSafety" type="button" class="btn sm">帶入前次</button>':''}
+              </div>
             </div>
             <div class="health-med-checks">${MED_CHECKS.map(renderMedCheck).join('')}</div>
           </div>
@@ -666,6 +669,7 @@
     });
 
     $('healthAddOpeningFixedMedication')?.addEventListener('click',()=>{
+      const y=window.scrollY;
       syncInputs();
       local.medicalInfo.opening_no_fixed_medications=false;
       local.fixedMedicationBaseEntries=[
@@ -674,6 +678,7 @@
       ];
       rebuildFixedMedicationEntries();
       render();
+      window.scrollTo({top:y,behavior:'auto'});
     });
 
     document.querySelectorAll('[data-remove-opening-fixed-med]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -691,6 +696,7 @@
     });
 
     $('healthAddOpeningTemporaryMedication')?.addEventListener('click',()=>{
+      const y=window.scrollY;
       syncInputs();
       local.medicalInfo.opening_no_temporary_medications=false;
       local.medicalInfo.opening_temporary_medications=[
@@ -698,6 +704,7 @@
         newOpeningTemporaryMedication()
       ];
       render();
+      window.scrollTo({top:y,behavior:'auto'});
     });
 
     document.querySelectorAll('[data-remove-opening-temp-med]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -802,11 +809,22 @@
 
     $('healthCopyPrevious')?.addEventListener('click',()=>{
       if(!local.previous)return;
+      const y=window.scrollY;
       local.healthItems={...safe(local.previous.health_items)};
       local.healthNotes={...safe(local.previous.health_notes)};
       local.pendingCopyFromId=local.previous.id;
       render();
+      window.scrollTo({top:y,behavior:'auto'});
       toast('已帶入前次身體與健康狀況','success');
+    });
+
+    $('healthCopyMedicationSafety')?.addEventListener('click',()=>{
+      if(!local.previous)return;
+      const y=window.scrollY;
+      local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
+      render();
+      window.scrollTo({top:y,behavior:'auto'});
+      toast('已帶入前次用藥安全現況','success');
     });
 
     $('healthDraft')?.addEventListener('click',()=>save(false));
