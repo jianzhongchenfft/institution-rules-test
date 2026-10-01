@@ -147,6 +147,13 @@
     local.eventId=eventId;
     local.record=cur.data||null;
     local.medicalInfo={...safe(local.record?.medical_info)};
+    const currentCase=caseById(row.case_id);
+    if(!Object.prototype.hasOwnProperty.call(local.medicalInfo,'baseline_important_conditions')){
+      local.medicalInfo.baseline_important_conditions=currentCase?.important_conditions||'';
+    }
+    if(!Object.prototype.hasOwnProperty.call(local.medicalInfo,'baseline_ongoing_treatments')){
+      local.medicalInfo.baseline_ongoing_treatments=currentCase?.ongoing_treatments||'';
+    }
     local.medicalInfo.healthcare_events=safeArray(local.medicalInfo.healthcare_events).map(x=>({...safe(x)}));
     local.medicationChecks={...safe(local.record?.medication_checks)};
     local.healthItems={...safe(local.record?.health_items)};
@@ -332,6 +339,27 @@
             <p>「本評估期間」原則上指自上次正式評估日至本次評估日；開案評估則記錄目前可掌握之近期健康與就醫情形。</p>
           </div>
           <div class="health-section-body">
+
+            <div class="health-subsection">
+              <div class="health-subtitle">
+                <strong>0. 個案健康基本資料（本次評估快照）</strong>
+                <small>新評估預設帶入個案主檔；此處修改只影響本次評估紀錄</small>
+              </div>
+
+              <div class="health-grid">
+                <div class="health-field">
+                  <label>目前重要疾病／慢性病史</label>
+                  <textarea data-health-medical="baseline_important_conditions" placeholder="例如：高血壓、末期腎臟病">${escapeHTML(local.medicalInfo.baseline_important_conditions||'')}</textarea>
+                </div>
+                <div class="health-field">
+                  <label>固定治療／特殊醫療安排</label>
+                  <textarea data-health-medical="baseline_ongoing_treatments" placeholder="例如：每週一、三、五固定血液透析">${escapeHTML(local.medicalInfo.baseline_ongoing_treatments||'')}</textarea>
+                </div>
+              </div>
+              <div class="health-notice" style="margin:10px 0 0;background:#f7fbff;border-color:#d9e9f7;color:#175cd3">
+                這兩欄是本次評估的歷史快照。若要修改「現在的」個案健康基本資料，請到個案管理 → 基本資料 → 編輯個案。
+              </div>
+            </div>
 
             <div class="health-subsection">
               <div class="health-subtitle">
@@ -551,6 +579,8 @@
       const prevMed=safe(local.previous.medical_info);
 
       local.medicalInfo={
+        baseline_important_conditions:c.important_conditions||'',
+        baseline_ongoing_treatments:c.ongoing_treatments||'',
         healthcare_events:[],
         no_healthcare_events:false,
         diagnosis_change:'',
