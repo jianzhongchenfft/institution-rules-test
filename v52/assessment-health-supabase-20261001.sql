@@ -128,6 +128,7 @@ declare
   v_key text;
   v_status text;
   v_change jsonb;
+  v_entry jsonb;
   v_total integer:=0;
   v_health_keys text[]:=array[
     'consciousness','eating','elimination','mobility','upper_limb',
@@ -181,6 +182,79 @@ begin
     raise exception 'INVALID_NO_MEDICATION_CHANGES';
   end if;
 
+  if p_medical_info ? 'fixed_medication_base_entries'
+     and jsonb_typeof(p_medical_info->'fixed_medication_base_entries')<>'array' then
+    raise exception 'INVALID_FIXED_MEDICATION_BASE_ENTRIES';
+  end if;
+
+  if p_medical_info ? 'fixed_medication_entries'
+     and jsonb_typeof(p_medical_info->'fixed_medication_entries')<>'array' then
+    raise exception 'INVALID_FIXED_MEDICATION_ENTRIES';
+  end if;
+
+  for v_entry in
+    select value
+    from jsonb_array_elements(coalesce(p_medical_info->'fixed_medication_entries','[]'::jsonb))
+  loop
+    if jsonb_typeof(v_entry)<>'object'
+       or nullif(btrim(v_entry->>'id'),'') is null
+       or nullif(btrim(v_entry->>'medication'),'') is null then
+      raise exception 'INVALID_FIXED_MEDICATION_ENTRY';
+    end if;
+    if nullif(btrim(v_entry->>'origin_type'),'') is not null
+       and v_entry->>'origin_type' not in ('opening_baseline','service_change','correction_add','legacy') then
+      raise exception 'INVALID_FIXED_MEDICATION_ORIGIN';
+    end if;
+  end loop;
+
+  if p_medical_info ? 'medication_corrections'
+     and jsonb_typeof(p_medical_info->'medication_corrections')<>'array' then
+    raise exception 'INVALID_MEDICATION_CORRECTIONS';
+  end if;
+
+  if p_medical_info ? 'medication_corrections' then
+    for v_change in
+      select value from jsonb_array_elements(p_medical_info->'medication_corrections')
+    loop
+      if jsonb_typeof(v_change)<>'object' then
+        raise exception 'INVALID_MEDICATION_CORRECTION_ITEM';
+      end if;
+
+      if nullif(btrim(v_change->>'action'),'') is not null
+         and v_change->>'action' not in ('add','edit','remove') then
+        raise exception 'INVALID_MEDICATION_CORRECTION_ACTION';
+      end if;
+
+      if nullif(btrim(v_change->>'reason'),'') is not null
+         and v_change->>'reason' not in ('opening_omission','previous_record_error','other') then
+        raise exception 'INVALID_MEDICATION_CORRECTION_REASON';
+      end if;
+
+      if p_finalize then
+        if nullif(btrim(v_change->>'action'),'') is null
+           or nullif(btrim(v_change->>'reason'),'') is null then
+          raise exception 'MEDICATION_CORRECTION_INCOMPLETE';
+        end if;
+
+        if v_change->>'action'='add'
+           and nullif(btrim(v_change->>'medication_after'),'') is null then
+          raise exception 'MEDICATION_CORRECTION_ADD_INCOMPLETE';
+        elsif v_change->>'action' in ('edit','remove')
+           and nullif(btrim(v_change->>'target_entry_id'),'') is null then
+          raise exception 'MEDICATION_CORRECTION_TARGET_INCOMPLETE';
+        elsif v_change->>'action'='edit'
+           and nullif(btrim(v_change->>'medication_after'),'') is null then
+          raise exception 'MEDICATION_CORRECTION_EDIT_INCOMPLETE';
+        end if;
+
+        if v_change->>'reason'='other'
+           and nullif(btrim(v_change->>'note'),'') is null then
+          raise exception 'MEDICATION_CORRECTION_OTHER_NOTE_REQUIRED';
+        end if;
+      end if;
+    end loop;
+  end if;
+
   if p_medical_info ? 'medication_changes'
      and jsonb_typeof(p_medical_info->'medication_changes')<>'array' then
     raise exception 'INVALID_MEDICATION_CHANGES';
@@ -214,12 +288,23 @@ begin
            and nullif(btrim(v_change->>'medication_after'),'') is null then
           raise exception 'MEDICATION_CHANGE_ADD_INCOMPLETE';
         elsif v_change->>'action'='stop'
-           and nullif(btrim(v_change->>'medication_before'),'') is null then
+           and (
+             (v_change->>'duration_type'='long_term'
+              and nullif(btrim(v_change->>'medication_before_entry_id'),'') is null)
+             or
+             (v_change->>'duration_type'='short_term'
+              and nullif(btrim(v_change->>'medication_before'),'') is null)
+           ) then
           raise exception 'MEDICATION_CHANGE_STOP_INCOMPLETE';
         elsif v_change->>'action'='adjust'
            and (
-             nullif(btrim(v_change->>'medication_before'),'') is null
-             or nullif(btrim(v_change->>'medication_after'),'') is null
+             nullif(btrim(v_change->>'medication_after'),'') is null
+             or
+             (v_change->>'duration_type'='long_term'
+              and nullif(btrim(v_change->>'medication_before_entry_id'),'') is null)
+             or
+             (v_change->>'duration_type'='short_term'
+              and nullif(btrim(v_change->>'medication_before'),'') is null)
            ) then
           raise exception 'MEDICATION_CHANGE_ADJUST_INCOMPLETE';
         end if;
