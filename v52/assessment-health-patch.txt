@@ -370,7 +370,9 @@
       .filter(x=>x.event?.planned_date);
     const relevantCompleted=dated.filter(x=>{
       if(local.section==='status')return !!x.record.status_confirmed_at;
-      return !!(x.record.baseline_confirmed_at||x.record.change_confirmed_at);
+      return x.event.assessment_type==='opening'
+        ?!!x.record.baseline_confirmed_at
+        :!!x.record.change_confirmed_at;
     });
     local.hasLaterCompleted=relevantCompleted.some(x=>x.event.planned_date>row.planned_date);
     const candidates=relevantCompleted
@@ -381,21 +383,34 @@
     local.previousEvent=candidates[0]?.event||null;
     local.pendingCopyFromId=(local.record?.copied_from_id&&local.record.copied_from_id===local.previous?.id)?local.record.copied_from_id:null;
 
-    if(!local.record&&local.previous){
-      const prevMed=safe(local.previous.medical_info);
-      local.medicalInfo.regular_followup=prevMed.regular_followup||'';
-      local.medicalInfo.regular_followup_reason=prevMed.regular_followup_reason||'';
-      local.medicalInfo.medication_method=prevMed.medication_method||'';
-      local.medicalInfo.medication_assisted_by=prevMed.medication_assisted_by||'';
-      local.medicalInfo.medication_regular=prevMed.medication_regular||'';
-      local.medicalInfo.medication_followup=prevMed.medication_followup||'';
-      local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
-      local.medicalInfo.medication_changes=[];
-      local.medicalInfo.medication_corrections=[];
-      local.medicalInfo.no_medication_changes=false;
+    const mode=healthSectionMode(row,local.section);
+    const prevMed=safe(local.previous?.medical_info);
+
+    if(local.section==='medication'&&mode==='change'&&local.previous){
+      const hasSubstantiveChangeData=
+        !!local.record?.change_confirmed_at
+        ||safeArray(local.medicalInfo.healthcare_events).length>0
+        ||safeArray(local.medicalInfo.medication_changes).length>0
+        ||safeArray(local.medicalInfo.medication_corrections).length>0
+        ||!!local.medicalInfo.unvisited_health_change
+        ||!!local.medicalInfo.care_impact;
+
+      if(!hasSubstantiveChangeData){
+        for(const key of [
+          'regular_followup','regular_followup_reason','medication_method',
+          'medication_assisted_by','medication_regular','medication_followup'
+        ]){
+          if(!String(local.medicalInfo[key]||'').trim())local.medicalInfo[key]=prevMed[key]||'';
+        }
+        if(!Object.keys(local.medicationChecks).length){
+          local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
+        }
+        local.medicalInfo.medication_changes=[];
+        local.medicalInfo.medication_corrections=[];
+        local.medicalInfo.no_medication_changes=false;
+      }
     }
 
-    const prevMed=safe(local.previous?.medical_info);
     const savedBase=safeArray(local.medicalInfo.fixed_medication_base_entries);
     const savedEffective=safeArray(local.medicalInfo.fixed_medication_entries);
     const previousEffective=safeArray(prevMed.fixed_medication_entries);
@@ -404,19 +419,31 @@
     const hasPreviousEffective=Object.prototype.hasOwnProperty.call(prevMed,'fixed_medication_entries')
       &&Array.isArray(prevMed.fixed_medication_entries);
 
-    if(hasSavedBase){
+    if(local.section==='medication'&&mode==='change'&&local.previous){
+      local.fixedMedicationBaseEntries=hasPreviousEffective
+        ?previousEffective.map(x=>normalizeMedicationEntry(x,local.previousEvent))
+        :legacyEntriesFromText(prevMed.fixed_medications||'',local.previousEvent,'legacy');
+    }else if(mode==='baseline'){
+      if(hasSavedBase){
+        local.fixedMedicationBaseEntries=savedBase.map(x=>normalizeMedicationEntry(x,row));
+      }else{
+        local.fixedMedicationBaseEntries=legacyEntriesFromText(
+          local.medicalInfo.fixed_medications||'',
+          row,
+          'opening_baseline'
+        );
+      }
+    }else if(hasSavedBase){
       local.fixedMedicationBaseEntries=savedBase.map(x=>normalizeMedicationEntry(x,row));
-    }else if(!local.record&&hasPreviousEffective){
-      local.fixedMedicationBaseEntries=previousEffective.map(x=>normalizeMedicationEntry(x,local.previousEvent));
-    }else if(!local.record&&local.previous){
-      local.fixedMedicationBaseEntries=legacyEntriesFromText(prevMed.fixed_medications||'',local.previousEvent,'legacy');
-    }else if(savedEffective.length&&row.assessment_type!=='opening'){
+    }else if(savedEffective.length){
       local.fixedMedicationBaseEntries=savedEffective.map(x=>normalizeMedicationEntry(x,row));
+    }else if(hasPreviousEffective){
+      local.fixedMedicationBaseEntries=previousEffective.map(x=>normalizeMedicationEntry(x,local.previousEvent));
     }else{
       local.fixedMedicationBaseEntries=legacyEntriesFromText(
         local.medicalInfo.fixed_medications||'',
         row,
-        row.assessment_type==='opening'?'opening_baseline':'legacy'
+        'legacy'
       );
     }
 
@@ -435,6 +462,14 @@
       if(Object.values(item).some(v=>String(v||'').trim()!==''))events.push(item);
     });
     local.medicalInfo.healthcare_events=events;
+
+    const openingTemporaryMedications=[];
+    document.querySelectorAll('[data-opening-temp-med]').forEach(rowEl=>{
+      const item={id:rowEl.dataset.openingTempMed||newOpeningTemporaryMedication().id};
+      rowEl.querySelectorAll('[data-opening-temp-med-field]').forEach(el=>item[el.dataset.openingTempMedField]=el.value);
+      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))openingTemporaryMedications.push(item);
+    });
+    local.medicalInfo.opening_temporary_medications=openingTemporaryMedications;
 
     const medicationChanges=[];
     document.querySelectorAll('[data-med-change]').forEach(rowEl=>{
