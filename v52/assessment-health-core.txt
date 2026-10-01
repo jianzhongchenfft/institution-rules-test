@@ -159,6 +159,14 @@
     medication_after:'',
     note:''
   });
+  const newOpeningFixedMedication=()=>({
+    id:newId('medbase'),
+    medication:'',
+    origin_type:'opening_baseline',
+    origin_date:eventById(local.eventId)?.planned_date||null,
+    origin_event_id:local.eventId||null,
+    origin_note:''
+  });
   const newOpeningTemporaryMedication=()=>({
     id:newId('medtemp'),
     medication:'',
@@ -295,24 +303,6 @@
     local.medicalInfo.no_fixed_medications=entries.length===0;
     return entries;
   };
-  const setOpeningMedicationBaseline=text=>{
-    const row=eventById(local.eventId);
-    const previous=cloneEntries(local.fixedMedicationBaseEntries);
-    const byMedication=new Map(previous.map(x=>[x.medication,x]));
-    local.fixedMedicationBaseEntries=fixedMedicationLines(text).map(medication=>{
-      const found=byMedication.get(medication);
-      return found?{...found}:{
-        id:newId('medbase'),
-        medication,
-        origin_type:'opening_baseline',
-        origin_date:row?.planned_date||null,
-        origin_event_id:row?.id||null,
-        origin_note:''
-      };
-    });
-    rebuildFixedMedicationEntries();
-  };
-
   async function load(eventId){
     const row=eventById(eventId);
     if(!row)throw new Error('找不到評估事件');
@@ -461,6 +451,27 @@
       if(Object.values(item).some(v=>String(v||'').trim()!==''))events.push(item);
     });
     local.medicalInfo.healthcare_events=events;
+
+    const openingFixedMedications=[];
+    document.querySelectorAll('[data-opening-fixed-med]').forEach(rowEl=>{
+      const id=rowEl.dataset.openingFixedMed||newOpeningFixedMedication().id;
+      const existing=entryById(local.fixedMedicationBaseEntries,id);
+      const medication=rowEl.querySelector('[data-opening-fixed-med-field="medication"]')?.value||'';
+      if(String(medication).trim()){
+        openingFixedMedications.push(existing
+          ?{...existing,medication:String(medication).trim()}
+          :{
+            ...newOpeningFixedMedication(),
+            id,
+            medication:String(medication).trim()
+          });
+      }
+    });
+    if(document.querySelector('[data-opening-fixed-med]')){
+      local.fixedMedicationBaseEntries=openingFixedMedications;
+      local.medicalInfo.opening_no_fixed_medications=false;
+      rebuildFixedMedicationEntries();
+    }
 
     const openingTemporaryMedications=[];
     document.querySelectorAll('[data-opening-temp-med]').forEach(rowEl=>{
