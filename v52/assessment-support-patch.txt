@@ -237,13 +237,15 @@
 
   function renderHousehold(){
     const h=local.household,c=caseById(eventById(local.eventId)?.case_id);
-    const identity=[c?.welfare_identity,c?.identity_type].filter(Boolean).join('／')||'主檔未登錄';
+    const welfareIdentity=c?.welfare_identity||'主檔未登錄';
+    const copayRate=(c?.copay_rate!==null&&c?.copay_rate!==undefined&&c?.copay_rate!=='')?`${Number(c.copay_rate)}%`:'主檔未登錄';
     return `<section class="support-section">
       <div class="support-section-head"><div><strong>一、家庭與居住概況</strong><small>記錄會影響支持與照顧安排的家庭資訊。</small></div></div>
       <div class="support-grid">
         <div class="support-field"><label>居住安排 *</label><select data-support-household="living_arrangement">${options(LIVING_OPTIONS,h.living_arrangement)}</select></div>
         ${h.living_arrangement==='other'?`<div class="support-field"><label>其他居住安排</label><input data-support-household="living_other" value="${escapeHTML(h.living_other||'')}" placeholder="請說明"></div>`:''}
-        <div class="support-field"><label>長照／福利身分（個案主檔）</label><div class="support-readonly">${escapeHTML(identity)}</div></div>
+        <div class="support-field"><label>長照福利身分（個案主檔）</label><div class="support-readonly">${escapeHTML(welfareIdentity)}</div></div>
+        <div class="support-field"><label>自負額（個案主檔）</label><div class="support-readonly">${escapeHTML(copayRate)}</div></div>
         <div class="support-field"><label>近期是否有重大家庭變化 *</label><select data-support-household="family_change_status">
           <option value="">請選擇</option><option value="no" ${h.family_change_status==='no'?'selected':''}>無</option><option value="yes" ${h.family_change_status==='yes'?'selected':''}>有</option>
         </select></div>
