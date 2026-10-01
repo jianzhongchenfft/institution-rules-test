@@ -331,10 +331,17 @@
 
     showLoading(true);
     try{
+      const medicalInfoForSave=local.medicalInfo.no_recent_medical
+        ?{no_recent_medical:true}
+        :local.medicalInfo;
+      const medicationChecksForSave=local.medicalInfo.no_recent_medical
+        ?{}
+        :local.medicationChecks;
+
       const {error}=await db.rpc('save_assessment_health',{
         p_event_id:row.id,
-        p_medical_info:local.medicalInfo,
-        p_medication_checks:local.medicationChecks,
+        p_medical_info:medicalInfoForSave,
+        p_medication_checks:medicationChecksForSave,
         p_health_items:local.healthItems,
         p_health_notes:local.healthNotes,
         p_finalize:!!finalize,
