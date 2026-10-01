@@ -227,7 +227,7 @@ begin
       copied_from_id, copied_at, confirmed_at, created_by, updated_by
     ) values (
       p_event_id, v_event.case_id, p_answers, p_notes,
-      case when jsonb_object_length(p_answers) > 0 then v_total else null end,
+      case when p_answers <> '{}'::jsonb then v_total else null end,
       v_level, p_copied_from_id,
       case when p_copied_from_id is not null then now() else null end,
       case when p_finalize then now() else null end,
@@ -264,7 +264,7 @@ begin
     set
       answers = p_answers,
       notes = p_notes,
-      total_score = case when jsonb_object_length(p_answers) > 0 then v_total else null end,
+      total_score = case when p_answers <> '{}'::jsonb then v_total else null end,
       dependency_level = case when p_finalize then v_level else dependency_level end,
       copied_from_id = coalesce(copied_from_id, p_copied_from_id),
       copied_at = case
