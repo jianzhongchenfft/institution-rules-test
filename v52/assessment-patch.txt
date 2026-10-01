@@ -196,6 +196,13 @@
     `;
   }
 
+  function setAssessmentFormHeader(row,c,formLabel){
+    $('topTitle').textContent='評估管理';
+    const date=row?.planned_date?rocDate(row.planned_date+'T00:00:00'):'—';
+    const caseName=c?.case_name||'未知個案';
+    $('crumb').textContent=`${caseName}｜${date}｜${formLabel||'評估表單'}`;
+  }
+
   function assessmentMonthBounds(){
     const d=new Date();
     const y=d.getFullYear(),m=d.getMonth();
@@ -920,7 +927,8 @@
     renderAssessmentPage,
     renderAssessmentDetail,
     openAssessmentEventModal,
-    renderAssessmentContextBar
+    renderAssessmentContextBar,
+    setAssessmentFormHeader
   };
 
   const assessmentBaseNavigate=navigate;
