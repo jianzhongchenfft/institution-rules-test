@@ -872,7 +872,9 @@
                     ?'<button class="btn sm primary" data-open-adl="'+row.id+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
                     :form.form_code==='iadl'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentIadl
                       ?'<button class="btn sm primary" data-open-iadl="'+row.id+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
-                      :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
+                      :form.form_code==='spmsq'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentSpmsq
+                        ?'<button class="btn sm primary" data-open-spmsq="'+row.id+'">'+(['completed','unable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
+                        :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
                 </div>
               `).join('')}
             </div>
@@ -890,6 +892,9 @@
     });
     document.querySelectorAll('[data-open-iadl]').forEach(btn=>{
       btn.addEventListener('click',()=>window.v52AssessmentIadl?.open(btn.dataset.openIadl));
+    });
+    document.querySelectorAll('[data-open-spmsq]').forEach(btn=>{
+      btn.addEventListener('click',()=>window.v52AssessmentSpmsq?.open(btn.dataset.openSpmsq));
     });
     window.scrollTo({top:0,behavior:'auto'});
   }
