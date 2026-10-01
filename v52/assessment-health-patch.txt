@@ -191,8 +191,17 @@
   const isCompleteMedicationChange=item=>{
     if(!item?.action||!item?.duration_type)return false;
     if(item.action==='add')return !!String(item.medication_after||'').trim();
-    if(item.action==='stop')return !!String(item.medication_before_entry_id||'').trim();
-    if(item.action==='adjust')return !!String(item.medication_before_entry_id||'').trim()&&!!String(item.medication_after||'').trim();
+    if(item.action==='stop'){
+      return item.duration_type==='long_term'
+        ?!!String(item.medication_before_entry_id||'').trim()
+        :!!String(item.medication_before||'').trim();
+    }
+    if(item.action==='adjust'){
+      const beforeOk=item.duration_type==='long_term'
+        ?!!String(item.medication_before_entry_id||'').trim()
+        :!!String(item.medication_before||'').trim();
+      return beforeOk&&!!String(item.medication_after||'').trim();
+    }
     return false;
   };
   const isCompleteMedicationCorrection=item=>{
