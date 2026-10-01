@@ -566,9 +566,7 @@
       return;
     }
     const initialType=existing?.assessment_type||'opening';
-    const selectedCase=existing?.case_id||(state.profile.role==='supervisor'
-      ?cases.find(c=>c.supervisor_id===state.profile.id)?.id
-      :cases[0]?.id)||'';
+    const selectedCase=existing?.case_id||'';
     const selectedReason=existing?.reason_code||defaultAssessmentReasonForType(initialType);
 
     openModal({
