@@ -583,6 +583,35 @@
     `;
   }
 
+  function renderOpeningTemporaryMedication(item,index){
+    return `
+      <div class="health-event" data-opening-temp-med="${escapeHTML(item.id||'')}">
+        <div class="health-event-head">
+          <strong>短期／臨時用藥 ${index+1}</strong>
+          <button type="button" class="btn sm" data-remove-opening-temp-med="${index}">移除</button>
+        </div>
+        <div class="health-event-grid">
+          <div class="wide">
+            <label>藥物名稱／用法 *</label>
+            <input data-opening-temp-med-field="medication" value="${escapeHTML(item.medication||'')}" placeholder="例如：感冒藥，每日3次">
+          </div>
+          <div>
+            <label>用藥原因</label>
+            <input data-opening-temp-med-field="reason" value="${escapeHTML(item.reason||'')}" placeholder="例如：感冒">
+          </div>
+          <div>
+            <label>預計服用至</label>
+            <input type="date" data-opening-temp-med-field="planned_end_date" value="${escapeHTML(item.planned_end_date||'')}">
+          </div>
+          <div class="wide">
+            <label>備註（選填）</label>
+            <textarea data-opening-temp-med-field="note">${escapeHTML(item.note||'')}</textarea>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderFixedMedicationList(entries){
     if(!entries.length){
       return '<div class="health-notice" style="margin:0;background:#f9fafb;border-color:#eaecf0;color:#667085">目前無固定用藥</div>';
@@ -751,10 +780,13 @@
     if(!row||!c||!form)return window.v52AssessmentApi?.renderAssessmentPage?.();
 
     const canEditRow=canEdit(row)&&row.status!=='voided';
-    const title=sectionTitle(local.section);
+    const mode=healthSectionMode(row,local.section);
+    const title=sectionTitle(local.section,row);
     const events=safeArray(local.medicalInfo.healthcare_events);
     const noEvents=local.medicalInfo.no_healthcare_events===true;
     const openingNoFixed=local.medicalInfo.opening_no_fixed_medications===true;
+    const openingNoTemporary=local.medicalInfo.opening_no_temporary_medications===true;
+    const openingTemporaryMedications=safeArray(local.medicalInfo.opening_temporary_medications);
     const currentFixedEntries=rebuildFixedMedicationEntries();
     const unvisitedHealthChanged=local.medicalInfo.unvisited_health_change==='yes';
     const hasSideEffect=local.medicalInfo.side_effect==='present';
@@ -764,8 +796,8 @@
     const baselineHtml=`
       <section class="health-section">
         <div class="health-section-head">
-          <h3>健康與用藥基本資料</h3>
-          <p>建立開案當下的健康、固定治療與用藥基準；不記錄「本期新增／變化」。</p>
+          <h3>健康與用藥初始評估</h3>
+          <p>建立接案當下的健康與用藥基準；長期用藥與短期／臨時用藥分開記錄。</p>
         </div>
         <div class="health-section-body">
           <div class="health-subsection">
@@ -812,6 +844,25 @@
       :(openingNoFixed
         ?renderFixedMedicationList([])
         :'<div class="health-notice" style="margin:0;background:#f9fafb;border-color:#eaecf0;color:#667085">尚未填寫固定用藥基準</div>')}</div>
+          </div>
+
+          <div class="health-subsection">
+            <div class="health-subtitle">
+              <strong>接案時短期／臨時用藥</strong>
+              <small>例如感冒藥、短期抗生素、臨時止痛藥；不會自動延續到後續評估</small>
+            </div>
+            <div class="health-field" style="margin-bottom:10px">
+              <label style="display:flex;align-items:center;gap:6px">
+                <input id="openingNoTemporaryMedication" type="checkbox" ${openingNoTemporary?'checked':''} style="width:auto">
+                接案時無短期／臨時用藥
+              </label>
+            </div>
+            <div id="openingTemporaryMedicationWrap" style="${openingNoTemporary?'display:none':''}">
+              <div class="health-event-list">
+                ${(openingTemporaryMedications.length?openingTemporaryMedications:[newOpeningTemporaryMedication()]).map(renderOpeningTemporaryMedication).join('')}
+              </div>
+              <button id="healthAddOpeningTemporaryMedication" type="button" class="btn sm" style="margin-top:8px">＋ 新增一筆短期／臨時用藥</button>
+            </div>
           </div>
 
           <div class="health-subsection">
@@ -870,8 +921,8 @@
     const changeHtml=`
       <section class="health-section">
         <div class="health-section-head">
-          <h3>近期健康與用藥變化</h3>
-          <p>只記錄自前次正式評估後至本次評估期間的重要事件與變化。</p>
+          <h3>健康與用藥追蹤評估</h3>
+          <p>記錄自前次正式評估後至本次評估期間的健康事件、用藥變化與目前管理狀況。</p>
         </div>
         <div class="health-section-body">
           <div class="health-subsection">
@@ -1052,17 +1103,15 @@
         <div class="page-head">
           <div>
             <h1>${escapeHTML(c.case_name)}｜${escapeHTML(title)}</h1>
-            <p>${local.section==='baseline'
-              ?'建立開案健康與用藥基準。'
-              :local.section==='change'
-                ?'追蹤前次評估後的健康、就醫與用藥變化。'
-                :'記錄本次身體與健康狀況。'}</p>
+            <p>${local.section==='medication'
+              ?(mode==='baseline'?'建立接案當下的健康與用藥基準。':'追蹤前次評估後的健康、就醫與用藥變化。')
+              :'記錄本次身體與健康狀況。'}</p>
           </div>
           <div class="assessment-head-actions"><button id="healthBack" class="btn">← 返回評估事件</button></div>
         </div>
 
         ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
-        ${local.section==='baseline'?baselineHtml:local.section==='change'?changeHtml:statusHtml}
+        ${local.section==='medication'?(mode==='baseline'?baselineHtml:changeHtml):statusHtml}
 
         ${canEditRow?`
           <div class="health-actions">
