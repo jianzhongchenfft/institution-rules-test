@@ -409,7 +409,7 @@
             </label>
           `).join('')}
         </div>
-        ${current==='safe'&&!showNote&&!disabled
+        ${!showNote&&!disabled&&!['needs_improvement','not_applicable'].includes(current)
           ?`<button type="button" class="btn sm" data-hs-add-note="${key}">＋ 補充備註</button>`
           :''}
         ${showNote?`
