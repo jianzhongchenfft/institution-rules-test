@@ -145,7 +145,7 @@ begin
   p_judgments:=coalesce(p_judgments,'{}'::jsonb);
   p_unable_reason:=nullif(btrim(p_unable_reason),'');
 
-  if p_finalize and p_unable and p_unable_reason is null then
+  if p_unable and p_unable_reason is null then
     raise exception 'SPMSQ_UNABLE_REASON_REQUIRED';
   end if;
 
