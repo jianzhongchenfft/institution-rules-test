@@ -1,28 +1,26 @@
 
 (()=>{
   const ITEMS=[
-    {key:'q1',label:'1. 您對目前的生活是否基本滿意？',scored:false},
-    {key:'q2',label:'2. 您是否放棄了許多以前的活動與興趣？',scored:true},
-    {key:'q3',label:'3. 您覺得生活空虛嗎？',scored:true},
-    {key:'q4',label:'4. 您是否常感到無聊？',scored:true},
-    {key:'q5',label:'5. 您是否常常覺得心情愉快？',scored:false},
-    {key:'q6',label:'6. 您是否常覺得無助？',scored:true},
-    {key:'q7',label:'7. 您是否喜歡待在家裡而不願外出？',scored:true},
-    {key:'q8',label:'8. 您是否覺得記憶力比以前差？',scored:true},
-    {key:'q9',label:'9. 您覺得目前的生活快樂嗎？',scored:false},
-    {key:'q10',label:'10. 您覺得現在的情況無望嗎？',scored:true},
-    {key:'q11',label:'11. 您覺得多數人比您過得好嗎？',scored:true},
-    {key:'q12',label:'12. 您常覺得沒有活力嗎？',scored:true},
-    {key:'q13',label:'13. 您是否覺得自己的狀況不錯？',scored:false},
-    {key:'q14',label:'14. 您是否覺得目前的生活沒有意義？',scored:true},
-    {key:'q15',label:'15. 您是否覺得自己很快樂？',scored:false}
+    {key:'q1', label:'1. 基本上，您對您的生活滿意嗎？', reverse:true},
+    {key:'q2', label:'2. 您是否減少很多的活動和興趣的事？', reverse:false},
+    {key:'q3', label:'3. 您是否覺得您的生活很空虛？', reverse:false},
+    {key:'q4', label:'4. 您是否常常感到厭煩？', reverse:false},
+    {key:'q5', label:'5. 您是否大部份時間精神都很好？', reverse:true},
+    {key:'q6', label:'6. 您會常常害怕將有不幸的事情發生在您身上嗎？', reverse:false},
+    {key:'q7', label:'7. 您是否大部份的時間都感到快樂？', reverse:true},
+    {key:'q8', label:'8. 您是否常常感到無論做什麼事，都沒有用？', reverse:false},
+    {key:'q9', label:'9. 您是否比較喜歡待在家裡而較不喜歡外出及不喜歡做新的事？', reverse:false},
+    {key:'q10',label:'10. 您是否覺得現在有記憶力不好的困擾？', reverse:false},
+    {key:'q11',label:'11. 您是否覺得「現在還能活著」是很好的事？', reverse:true},
+    {key:'q12',label:'12. 您是否覺得您現在活得很沒有價值？', reverse:false},
+    {key:'q13',label:'13. 您是否覺得精力很充沛？', reverse:true},
+    {key:'q14',label:'14. 您是否感覺您現在的情況是沒有希望的？', reverse:false},
+    {key:'q15',label:'15. 您是否覺得大部份的人都比您更幸福？', reverse:false}
   ];
 
   const OPTIONS=[
-    ['never','從不',0],
-    ['sometimes','偶爾',1],
-    ['often','經常',2],
-    ['always','總是',3]
+    ['yes','是'],
+    ['no','否']
   ];
 
   const MODE_LABELS={
@@ -58,12 +56,12 @@
     .gds15-tag{display:inline-flex;border-radius:999px;padding:3px 7px;font-size:9.5px;font-weight:900;white-space:nowrap;background:#f2f4f7;color:#667085}
     .gds15-tag.prev{background:#eff8ff;color:#175cd3}
     .gds15-tag.change{background:#fff1eb;color:#a45d49}
-    .gds15-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:11px 12px}
-    .gds15-option{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:10px;padding:9px 10px;cursor:pointer;font-size:11.5px;font-weight:800}
+    .gds15-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:11px 12px}
+    .gds15-option{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:12px;font-weight:900}
     .gds15-option.selected{border-color:#dc9479;background:#fff8f5}
     .gds15-option input{width:auto}
     .gds15-score{margin-left:auto;font-size:9.5px;color:#667085}
-    .gds15-help{font-size:10.5px;color:#667085;line-height:1.6;margin:10px 0 2px}
+    .gds15-help{font-size:10.5px;color:#667085;line-height:1.65;margin:10px 0 2px}
     .gds15-actions{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding:11px 0;background:linear-gradient(to bottom,rgba(250,248,247,0),#faf8f7 24%)}
     @media(max-width:720px){
       .gds15-summary{grid-template-columns:1fr}
@@ -98,22 +96,24 @@
       ||(state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id);
   };
 
-  const optionLabel=value=>OPTIONS.find(x=>x[0]===value)?.[1]||'—';
-  const answerCount=()=>ITEMS.filter(x=>OPTIONS.some(o=>o[0]===local.answers[x.key])).length;
-  const currentScore=()=>ITEMS.reduce((sum,item)=>{
-    if(!item.scored)return sum;
-    const found=OPTIONS.find(x=>x[0]===local.answers[item.key]);
-    return sum+(found?found[2]:0);
-  },0);
+  const optionLabel=value=>value==='yes'?'是':value==='no'?'否':'—';
+  const answerCount=()=>ITEMS.filter(x=>['yes','no'].includes(local.answers[x.key])).length;
+  const itemScore=item=>{
+    const value=local.answers[item.key];
+    if(!['yes','no'].includes(value))return 0;
+    return item.reverse ? (value==='no'?1:0) : (value==='yes'?1:0);
+  };
+  const currentScore=()=>ITEMS.reduce((sum,item)=>sum+itemScore(item),0);
+
   const resultText=score=>{
-    if(score<=15)return '適應狀況良好';
-    if(score<=25)return '輕度憂鬱傾向';
-    return '需積極關懷';
+    if(score<=6)return '適應狀況良好';
+    if(score<=10)return '中度情緒困擾';
+    return '高度情緒困擾';
   };
   const resultHelp=score=>{
-    if(score<=15)return '依本機構現行表單之得分說明';
-    if(score<=25)return '建議找家人或朋友傾訴';
-    return '建議進一步社工或心理師評估';
+    if(score<=6)return '維持良好心理健康並持續觀察';
+    if(score<=10)return '建議進一步需求評估、心理支持或諮詢';
+    return '建議積極關懷並評估轉介心理衛生或醫療資源';
   };
 
   async function load(eventId){
@@ -173,7 +173,7 @@
           <strong>${local.completionMode==='completed'?(count?score:'—'):'—'}</strong>
           <small>${local.completionMode!=='completed'
             ?escapeHTML(MODE_LABELS[local.completionMode])
-            :(complete?'正式總分（滿分30分）':'暫計｜已填 '+count+'/15 題')}</small>
+            :(complete?'正式總分（滿分15分）':'暫計｜已填 '+count+'/15 題')}</small>
         </div>
         <div class="gds15-summary-card">
           <label>前次得分</label>
@@ -181,7 +181,7 @@
           <small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small>
         </div>
         <div class="gds15-summary-card">
-          <label>結果說明</label>
+          <label>篩檢結果</label>
           <strong style="font-size:14px">${local.completionMode!=='completed'
             ?escapeHTML(MODE_LABELS[local.completionMode])
             :(!complete?'尚未完成':escapeHTML(resultText(score)))}</strong>
@@ -202,17 +202,18 @@
         <div class="gds15-head">
           <div class="gds15-title">${escapeHTML(item.label)}</div>
           <div class="gds15-tags">
-            ${!item.scored?'<span class="gds15-tag">本題不計分</span>':''}
             ${prev?'<span class="gds15-tag prev">前次：'+escapeHTML(optionLabel(prev))+'</span>':''}
             ${changed?'<span class="gds15-tag change">本次有變化</span>':''}
           </div>
         </div>
         <div class="gds15-options">
-          ${OPTIONS.map(([value,label,score])=>`
+          ${OPTIONS.map(([value,label])=>`
             <label class="gds15-option ${now===value?'selected':''}">
               <input type="radio" name="gds15_${item.key}" value="${value}" ${now===value?'checked':''}>
               <span>${escapeHTML(label)}</span>
-              ${item.scored?'<span class="gds15-score">'+score+'分</span>':''}
+              <span class="gds15-score">${item.reverse
+                ?(value==='no'?'1分':'0分')
+                :(value==='yes'?'1分':'0分')}</span>
             </label>
           `).join('')}
         </div>
@@ -228,14 +229,14 @@
 
     const canEditRow=canEdit(row)&&row.status!=='voided';
 
-    window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'GDS-15 憂鬱評估表（改良版）');
+    window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'GDS-15 老人心理健康評估表');
 
     $('content').innerHTML=`
       <div class="gds15-page">
         <div class="page-head">
           <div>
             <h1>${escapeHTML(c.case_name)}｜GDS-15</h1>
-            <p>請依最近兩週的實際感受，勾選符合的發生頻率。</p>
+            <p>在過去一星期當中，您是否有下列感受？請回答「是」或「否」。</p>
           </div>
           <div class="assessment-head-actions">
             <button id="gds15Back" class="btn">← 返回評估事件</button>
@@ -268,8 +269,8 @@
         </div>
 
         <div class="gds15-help">
-          第1、5、9、13、15題不予記分；其餘題目依「從不0分、偶爾1分、經常2分、總是3分」計分。
-          GDS-15為篩檢工具，結果供照顧評估與後續關懷參考，不作為疾病診斷。
+          計分：第1、5、7、11、13題答「否」計1分；第2、3、4、6、8、9、10、12、14、15題答「是」計1分，其餘0分。
+          本量表為情緒篩檢工具，結果供照顧評估、關懷與轉介參考，不作為疾病診斷。
         </div>
 
         ${canEditRow?`
@@ -319,7 +320,7 @@
     }else{
       const count=answerCount();
       if(finalize&&count!==15){
-        const missing=ITEMS.filter(x=>!OPTIONS.some(o=>o[0]===local.answers[x.key])).map(x=>x.label).join('、');
+        const missing=ITEMS.filter(x=>!['yes','no'].includes(local.answers[x.key])).map(x=>x.label).join('、');
         return toast('尚有未完成項目：'+missing,'warn');
       }
       if(!finalize&&count===0)return toast('至少填寫一題後再儲存草稿','warn');
