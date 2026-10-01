@@ -760,3 +760,65 @@ revoke all on function public.set_preferred_care_plan_version(uuid) from public;
 grant execute on function public.set_preferred_care_plan_version(uuid) to authenticated;
 
 commit;
+
+
+CREATE OR REPLACE FUNCTION public.update_case_health_profile(
+  p_case_id uuid,
+  p_important_conditions text,
+  p_ongoing_treatments text
+)
+RETURNS public.care_cases
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path=''
+AS $function$
+declare
+  v_case public.care_cases;
+  v_old_conditions text;
+  v_old_treatments text;
+  v_new_conditions text:=nullif(btrim(p_important_conditions),'');
+  v_new_treatments text:=nullif(btrim(p_ongoing_treatments),'');
+begin
+  if (select auth.uid()) is null then raise exception 'AUTH_REQUIRED'; end if;
+
+  select * into v_case
+  from public.care_cases
+  where id=p_case_id
+  for update;
+
+  if v_case.id is null then raise exception 'CASE_NOT_FOUND'; end if;
+  if not private.can_edit_case(v_case.supervisor_id) then raise exception 'CASE_EDIT_FORBIDDEN'; end if;
+
+  v_old_conditions:=v_case.important_conditions;
+  v_old_treatments:=v_case.ongoing_treatments;
+
+  if v_old_conditions is distinct from v_new_conditions then
+    insert into public.case_health_profile_history(
+      case_id,field_name,old_value,new_value,changed_by
+    ) values(
+      p_case_id,'important_conditions',v_old_conditions,v_new_conditions,(select auth.uid())
+    );
+  end if;
+
+  if v_old_treatments is distinct from v_new_treatments then
+    insert into public.case_health_profile_history(
+      case_id,field_name,old_value,new_value,changed_by
+    ) values(
+      p_case_id,'ongoing_treatments',v_old_treatments,v_new_treatments,(select auth.uid())
+    );
+  end if;
+
+  update public.care_cases
+  set important_conditions=v_new_conditions,
+      ongoing_treatments=v_new_treatments,
+      updated_at=now()
+  where id=p_case_id
+  returning * into v_case;
+
+  return v_case;
+end;
+$function$;
+
+revoke all on function public.update_case_health_profile(uuid,text,text) from public, anon;
+grant execute on function public.update_case_health_profile(uuid,text,text) to authenticated;
+
