@@ -1,8 +1,9 @@
--- V5.2 評估管理：GDS-15 改良版
+-- V5.2 評估管理：GDS-15 公版
 -- 測試環境：LiuXinZi-TEST
 -- 日期：2026-10-01
--- 依機構現行表單：最近兩週、15題、四級頻率。
--- 第1、5、9、13、15題不計分；其餘10題從不0、偶爾1、經常2、總是3。
+-- 題目與計分邏輯採桃園市政府衛生局老人心理健康評估表(GDS-15)／衛福部公版。
+-- 最近一週、15題、是／否。
+-- 第1、5、7、11、13題答「否」計1分；其餘10題答「是」計1分；總分0–15。
 -- 支援正常評估、無法評估、不適用；後兩者需填原因。
 
 begin;
@@ -12,7 +13,7 @@ create table if not exists public.assessment_gds15_records (
   assessment_event_id uuid not null unique references public.assessment_events(id) on delete cascade,
   case_id uuid not null references public.care_cases(id) on delete cascade,
   answers jsonb not null default '{}'::jsonb,
-  total_score integer check (total_score between 0 and 30),
+  total_score integer check (total_score between 0 and 15),
   completion_mode text not null default 'completed'
     check (completion_mode in ('completed','unable','not_applicable')),
   exception_reason text,
@@ -125,7 +126,7 @@ declare
   v_old public.assessment_gds15_records;
   v_key text;
   v_keys text[]:=array['q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','q11','q12','q13','q14','q15'];
-  v_scored text[]:=array['q2','q3','q4','q6','q7','q8','q10','q11','q12','q14'];
+  v_reverse text[]:=array['q1','q5','q7','q11','q13'];
   v_value text;
   v_total integer:=0;
 begin
@@ -158,19 +159,21 @@ begin
 
   foreach v_key in array v_keys loop
     v_value:=p_answers->>v_key;
-    if v_value is not null and v_value not in ('never','sometimes','often','always') then
+
+    if v_value is not null and v_value not in ('yes','no') then
       raise exception 'INVALID_GDS15_ANSWER:%',v_key;
     end if;
+
     if p_finalize and p_completion_mode='completed' and v_value is null then
       raise exception 'GDS15_INCOMPLETE:%',v_key;
     end if;
-  end loop;
 
-  foreach v_key in array v_scored loop
-    v_value:=p_answers->>v_key;
-    if v_value='sometimes' then v_total:=v_total+1;
-    elsif v_value='often' then v_total:=v_total+2;
-    elsif v_value='always' then v_total:=v_total+3;
+    if p_completion_mode='completed' and v_value is not null then
+      if v_key=any(v_reverse) then
+        if v_value='no' then v_total:=v_total+1; end if;
+      else
+        if v_value='yes' then v_total:=v_total+1; end if;
+      end if;
     end if;
   end loop;
 
