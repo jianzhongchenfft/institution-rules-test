@@ -170,6 +170,7 @@
     answers:{},
     notes:{},
     summary:{},
+    expandedNotes:new Set(),
     pendingCopyFromId:null,
     hasLaterCompleted:false
   };
@@ -206,6 +207,10 @@
     return null;
   }
   function countChange(kind){return HOME_SAFETY_ITEMS.filter(item=>changeKind(item.key)?.key===kind).length;}
+  function isAutoNotApplicable(key){
+    return (STAIR_KEYS.includes(key)&&local.homeProfile.uses_stairs==='no')
+      ||(KITCHEN_KEYS.includes(key)&&local.homeProfile.uses_kitchen==='no');
+  }
 
   async function loadHomeSafety(eventId){
     const row=eventById(eventId);
@@ -232,6 +237,7 @@
     local.answers={...safeObj(local.record?.answers)};
     local.notes={...safeObj(local.record?.notes)};
     local.summary={...safeObj(local.record?.summary)};
+    local.expandedNotes=new Set();
 
     const dated=(historyRes.data||[])
       .map(record=>({record,event:eventById(record.assessment_event_id)}))
@@ -340,7 +346,7 @@
           ${local.homeProfile.has_level_difference==='yes'?`
             <div class="hs-field full">
               <label>門檻／高低差位置與情形</label>
-              <input data-hs-profile="level_difference_note" value="${escapeHTML(local.homeProfile.level_difference_note||'')}" placeholder="例如：浴室入口約有明顯門檻">
+              <input data-hs-profile="level_difference_note" value="${escapeHTML(local.homeProfile.level_difference_note||'')}" placeholder="例如：浴室入口有明顯門檻，高約5公分">
             </div>
           `:''}
           <div class="hs-field full">
@@ -377,6 +383,15 @@
     const current=answerStatus(key);
     const prev=previousStatus(key);
     const change=changeKind(key);
+    const noteValue=String(local.notes?.[key]||'');
+    const manualNotApplicable=current==='not_applicable'&&!isAutoNotApplicable(key);
+    const noteRequired=current==='needs_improvement'||manualNotApplicable;
+    const showNote=noteRequired||!!noteValue||local.expandedNotes.has(key);
+    const notePlaceholder=current==='needs_improvement'
+      ?'請說明需改善的狀況'
+      :manualNotApplicable
+        ?'請說明不適用原因'
+        :'補充備註（選填）';
     return `
       <div class="hs-item ${current==='needs_improvement'?'risk':''}" data-hs-item="${key}">
         <div class="hs-item-top">
@@ -394,7 +409,15 @@
             </label>
           `).join('')}
         </div>
-        <input class="hs-item-note" data-hs-note="${key}" value="${escapeHTML(local.notes?.[key]||'')}" placeholder="備註（位置、狀況或改善需求；選填）">
+        ${current==='safe'&&!showNote&&!disabled
+          ?`<button type="button" class="btn sm" data-hs-add-note="${key}">＋ 補充備註</button>`
+          :''}
+        ${showNote?`
+          <div style="margin-top:7px">
+            <label style="display:block;font-size:10px;font-weight:850;color:#667085;margin-bottom:4px">備註${noteRequired?' *':''}</label>
+            <input class="hs-item-note" data-hs-note="${key}" value="${escapeHTML(noteValue)}" placeholder="${escapeHTML(notePlaceholder)}">
+          </div>
+        `:''}
       </div>
     `;
   }
@@ -604,6 +627,13 @@
       });
     });
 
+    document.querySelectorAll('[data-hs-add-note]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        local.expandedNotes.add(btn.dataset.hsAddNote);
+        rerenderPreservingScroll();
+      });
+    });
+
     document.querySelectorAll('[data-hs-note]').forEach(input=>{
       input.addEventListener('input',()=>{
         local.notes[input.dataset.hsNote]=input.value;
@@ -646,6 +676,19 @@
 
     const missing=HOME_SAFETY_ITEMS.filter(item=>!answerStatus(item.key));
     if(missing.length)return '尚有未完成項目：'+missing.map(x=>x.label).join('、');
+
+    const missingRiskNotes=HOME_SAFETY_ITEMS.filter(item=>
+      answerStatus(item.key)==='needs_improvement'
+      && !String(local.notes?.[item.key]||'').trim()
+    );
+    if(missingRiskNotes.length)return '以下項目選擇「需改善」，請填寫備註：'+missingRiskNotes.map(x=>x.label).join('、');
+
+    const missingNaNotes=HOME_SAFETY_ITEMS.filter(item=>
+      answerStatus(item.key)==='not_applicable'
+      && !isAutoNotApplicable(item.key)
+      && !String(local.notes?.[item.key]||'').trim()
+    );
+    if(missingNaNotes.length)return '以下項目選擇「不適用」，請填寫原因：'+missingNaNotes.map(x=>x.label).join('、');
 
     if(riskKeys().length){
       if(!String(local.summary.recommendations||'').trim())return '本次有需改善項目，請填寫主要環境安全問題／改善建議';
