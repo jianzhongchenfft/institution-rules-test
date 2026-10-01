@@ -355,9 +355,6 @@
                   <textarea data-health-medical="baseline_ongoing_treatments" placeholder="例如：每週一、三、五固定血液透析">${escapeHTML(local.medicalInfo.baseline_ongoing_treatments||'')}</textarea>
                 </div>
               </div>
-              <div class="health-notice" style="margin:10px 0 0;background:#f7fbff;border-color:#d9e9f7;color:#175cd3">
-                儲存本次評估時，若這兩欄有修改，系統會自動同步更新個案主檔；本次評估仍會保留當次內容作為歷史快照。
-              </div>
             </div>
 
             <div class="health-subsection">
@@ -635,6 +632,31 @@
     delete medicalInfoForSave.diagnosis_change;
     delete medicalInfoForSave.diagnosis_change_note;
 
+    const c=caseById(row.case_id);
+    const savedMedical=safe(local.record?.medical_info);
+    const baselineReference=local.record?{
+      important_conditions:savedMedical.baseline_important_conditions||'',
+      ongoing_treatments:savedMedical.baseline_ongoing_treatments||''
+    }:{
+      important_conditions:c?.important_conditions||'',
+      ongoing_treatments:c?.ongoing_treatments||''
+    };
+    const healthMasterFieldsChanged=
+      String(medicalInfoForSave.baseline_important_conditions||'').trim()!==String(baselineReference.important_conditions||'').trim()
+      ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(baselineReference.ongoing_treatments||'').trim();
+
+    if(local.hasLaterCompleted&&healthMasterFieldsChanged){
+      const ok=window.confirm('你正在修改較早日期的健康評估，此項修改也會同步更新目前個案主檔，確定儲存嗎？');
+      if(!ok)return;
+    }
+
+    const masterWillChange=
+      healthMasterFieldsChanged
+      &&(
+        String(medicalInfoForSave.baseline_important_conditions||'').trim()!==String(c?.important_conditions||'').trim()
+        ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(c?.ongoing_treatments||'').trim()
+      );
+
     if(medicalInfoForSave.no_healthcare_events===true){
       medicalInfoForSave.healthcare_events=[];
     }else{
@@ -674,7 +696,12 @@
       await window.v52AssessmentApi?.loadAssessmentData?.(false);
       await load(row.id);
       render();
-      toast(finalize?'身體與健康狀況評估已完成':'健康評估草稿已儲存','success');
+      toast(
+        masterWillChange
+          ?(finalize?'身體與健康狀況評估已完成，個案健康資料已更新':'健康評估草稿已儲存，個案健康資料已更新')
+          :(finalize?'身體與健康狀況評估已完成':'健康評估草稿已儲存'),
+        'success'
+      );
     }catch(err){
       console.error(err);
       toast('儲存健康評估失敗：'+(err?.message||err),'error');
