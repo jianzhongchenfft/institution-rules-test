@@ -24,38 +24,23 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!caseHtmlRes.ok) throw new Error(`v52/case-html-import.txt 載入失敗（${caseHtmlRes.status}）`);
       eval(await caseHtmlRes.text());
 
-      const assessmentRes = await fetch('v52/assessment-patch.txt?v=assessment-health-medication-unified-v2-20261001',{cache:'no-store'});
-      if(!assessmentRes.ok) throw new Error(`v52/assessment-patch.txt 載入失敗（${assessmentRes.status}）`);
-      eval(await assessmentRes.text());
-
-      const assessmentAdlRes = await fetch('v52/assessment-adl-patch.txt?v=assessment-health-medication-unified-v2-20261001',{cache:'no-store'});
-      if(!assessmentAdlRes.ok) throw new Error(`v52/assessment-adl-patch.txt 載入失敗（${assessmentAdlRes.status}）`);
-      eval(await assessmentAdlRes.text());
-
-      const assessmentIadlRes = await fetch('v52/assessment-iadl-patch.txt?v=assessment-health-medication-unified-v2-20261001',{cache:'no-store'});
-      if(!assessmentIadlRes.ok) throw new Error(`v52/assessment-iadl-patch.txt 載入失敗（${assessmentIadlRes.status}）`);
-      eval(await assessmentIadlRes.text());
-
-      const assessmentSpmsqRes = await fetch('v52/assessment-spmsq-patch.txt?v=assessment-health-medication-unified-v2-20261001',{cache:'no-store'});
-      if(!assessmentSpmsqRes.ok) throw new Error(`v52/assessment-spmsq-patch.txt 載入失敗（${assessmentSpmsqRes.status}）`);
-      eval(await assessmentSpmsqRes.text());
-
-      const assessmentGds15Res = await fetch('v52/assessment-gds15-patch.txt?v=assessment-health-medication-unified-v2-20261001',{cache:'no-store'});
-      if(!assessmentGds15Res.ok) throw new Error(`v52/assessment-gds15-patch.txt 載入失敗（${assessmentGds15Res.status}）`);
-      eval(await assessmentGds15Res.text());
-
-      const assessmentHealthFiles=[
+      const assessmentModuleFiles=[
+        'v52/assessment-patch.txt',
+        'v52/assessment-adl-patch.txt',
+        'v52/assessment-iadl-patch.txt',
+        'v52/assessment-spmsq-patch.txt',
+        'v52/assessment-gds15-patch.txt',
         'v52/assessment-health-core.txt',
         'v52/assessment-health-ui.txt',
         'v52/assessment-health-save.txt'
       ];
-      let assessmentHealthCode='';
-      for(const path of assessmentHealthFiles){
+      let assessmentModuleCode='';
+      for(const path of assessmentModuleFiles){
         const res=await fetch(`${path}?v=assessment-refactor-20261002`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
-        assessmentHealthCode+='\n'+await res.text();
+        assessmentModuleCode+='\n'+await res.text();
       }
-      eval(assessmentHealthCode);
+      eval(assessmentModuleCode);
 
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
