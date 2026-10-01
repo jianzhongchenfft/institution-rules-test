@@ -308,6 +308,16 @@
       id:x?.id||('legacy-med-'+i),
       action:x?.action||'',
       duration_type:x?.duration_type||'',
+      medication_before_entry_id:x?.medication_before_entry_id||'',
+      medication_before:x?.medication_before||'',
+      medication_after:x?.medication_after||'',
+      note:x?.note||''
+    }));
+    local.medicalInfo.medication_corrections=safeArray(local.medicalInfo.medication_corrections).map((x,i)=>({
+      id:x?.id||('legacy-fix-'+i),
+      action:x?.action||'',
+      reason:x?.reason||'',
+      target_entry_id:x?.target_entry_id||'',
       medication_before:x?.medication_before||'',
       medication_after:x?.medication_after||'',
       note:x?.note||''
@@ -328,21 +338,37 @@
 
     if(!local.record&&local.previous){
       const prevMed=safe(local.previous.medical_info);
-      local.medicalInfo.no_fixed_medications=prevMed.no_fixed_medications===true;
-      local.medicalInfo.fixed_medications=prevMed.fixed_medications||'';
       local.medicalInfo.medication_method=prevMed.medication_method||'';
       local.medicalInfo.medication_assisted_by=prevMed.medication_assisted_by||'';
       local.medicalInfo.medication_regular=prevMed.medication_regular||'';
       local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
+      local.medicalInfo.medication_changes=[];
+      local.medicalInfo.medication_corrections=[];
+      local.medicalInfo.no_medication_changes=false;
     }
 
-    const medicationBase=fixedMedicationLines(local.medicalInfo.fixed_medications);
-    if(local.record){
-      [...safeArray(local.medicalInfo.medication_changes)].reverse()
-        .forEach(item=>reverseLongTermMedicationChange(medicationBase,item));
+    const prevMed=safe(local.previous?.medical_info);
+    const savedBase=safeArray(local.medicalInfo.fixed_medication_base_entries);
+    const savedEffective=safeArray(local.medicalInfo.fixed_medication_entries);
+    const previousEffective=safeArray(prevMed.fixed_medication_entries);
+
+    if(savedBase.length){
+      local.fixedMedicationBaseEntries=savedBase.map(x=>normalizeMedicationEntry(x,row));
+    }else if(!local.record&&previousEffective.length){
+      local.fixedMedicationBaseEntries=previousEffective.map(x=>normalizeMedicationEntry(x,local.previousEvent));
+    }else if(!local.record&&local.previous){
+      local.fixedMedicationBaseEntries=legacyEntriesFromText(prevMed.fixed_medications||'',local.previousEvent,'legacy');
+    }else if(savedEffective.length&&row.assessment_type!=='opening'){
+      local.fixedMedicationBaseEntries=savedEffective.map(x=>normalizeMedicationEntry(x,row));
+    }else{
+      local.fixedMedicationBaseEntries=legacyEntriesFromText(
+        local.medicalInfo.fixed_medications||'',
+        row,
+        row.assessment_type==='opening'?'opening_baseline':'legacy'
+      );
     }
-    local.fixedMedicationBase=[...medicationBase];
-    rebuildFixedMedicationsFromChanges();
+
+    rebuildFixedMedicationEntries();
   }
 
   function syncInputs(){
@@ -359,12 +385,29 @@
     local.medicalInfo.healthcare_events=events;
 
     const medicationChanges=[];
-    document.querySelectorAll('[data-med-change]').forEach(row=>{
-      const item={id:row.dataset.medChange||newMedicationChange().id};
-      row.querySelectorAll('[data-med-change-field]').forEach(el=>item[el.dataset.medChangeField]=el.value);
+    document.querySelectorAll('[data-med-change]').forEach(rowEl=>{
+      const item={id:rowEl.dataset.medChange||newMedicationChange().id};
+      rowEl.querySelectorAll('[data-med-change-field]').forEach(el=>item[el.dataset.medChangeField]=el.value);
+      if(item.medication_before_entry_id){
+        const target=entryById(rebuildFixedMedicationEntries(),item.medication_before_entry_id);
+        if(target)item.medication_before=target.medication;
+      }
       if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))medicationChanges.push(item);
     });
     local.medicalInfo.medication_changes=medicationChanges;
+
+    const medicationCorrections=[];
+    document.querySelectorAll('[data-med-correction]').forEach(rowEl=>{
+      const item={id:rowEl.dataset.medCorrection||newMedicationCorrection().id};
+      rowEl.querySelectorAll('[data-med-correction-field]').forEach(el=>item[el.dataset.medCorrectionField]=el.value);
+      if(item.target_entry_id){
+        const target=entryById(local.fixedMedicationBaseEntries,item.target_entry_id)
+          ||entryById(rebuildFixedMedicationEntries(),item.target_entry_id);
+        if(target)item.medication_before=target.medication;
+      }
+      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))medicationCorrections.push(item);
+    });
+    local.medicalInfo.medication_corrections=medicationCorrections;
 
     document.querySelectorAll('[data-health-med-note]').forEach(el=>{
       const key=el.dataset.healthMedNote;
