@@ -570,6 +570,11 @@
         if(!plannedDate)return toast('請填寫預定評估日期','warn');
         if(!reasonCode)return toast('請選擇評估原因','warn');
 
+        if(!$('assessmentWithVisit')?.checked){
+          const ok=window.confirm('本次評估未勾選「與家訪同日進行」。\n\n機構原則上評估與家訪同日進行，確定仍要繼續儲存嗎？');
+          if(!ok)return false;
+        }
+
         const selectedCodes=[...document.querySelectorAll('[data-assessment-form]')]
           .filter(x=>x.checked)
           .map(x=>x.dataset.assessmentForm);
