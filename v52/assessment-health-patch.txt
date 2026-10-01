@@ -343,7 +343,6 @@
             <div class="health-subsection">
               <div class="health-subtitle">
                 <strong>目前重要健康狀況</strong>
-                <small>可直接在評估頁修正，不必離開本頁</small>
               </div>
 
               <div class="health-grid">
@@ -357,8 +356,7 @@
                 </div>
               </div>
               <div class="health-notice" style="margin:10px 0 0;background:#f7fbff;border-color:#d9e9f7;color:#175cd3">
-                本次會保存成評估快照。若內容與個案主檔不同，完成目前評估時可選擇是否同步；補登較早日期的評估預設只保留歷史快照。
-                <div style="margin-top:8px"><button id="healthSyncMasterNow" type="button" class="btn sm">同步更新個案主檔</button></div>
+                儲存本次評估時，若這兩欄有修改，系統會自動同步更新個案主檔；本次評估仍會保留當次內容作為歷史快照。
               </div>
             </div>
 
@@ -610,28 +608,6 @@
       toast('已帶入前次現況；本期事件與變化欄位已保留空白，請重新確認','success');
     });
 
-    $('healthSyncMasterNow')?.addEventListener('click',async()=>{
-      syncInputs();
-      const ok=window.confirm('確定要把目前填寫的「重要疾病／慢性病史」與「固定治療／特殊醫療安排」同步更新到個案主檔嗎？');
-      if(!ok)return;
-      showLoading(true);
-      try{
-        const {error}=await db.rpc('update_case_health_profile',{
-          p_case_id:row.case_id,
-          p_important_conditions:local.medicalInfo.baseline_important_conditions||null,
-          p_ongoing_treatments:local.medicalInfo.baseline_ongoing_treatments||null
-        });
-        if(error)throw error;
-        await window.v52AssessmentApi?.loadAssessmentData?.(false);
-        toast('個案健康基本資料已同步更新','success');
-      }catch(err){
-        console.error(err);
-        toast('更新個案健康基本資料失敗：'+(err?.message||err),'error');
-      }finally{
-        showLoading(false);
-      }
-    });
-
     $('healthDraft')?.addEventListener('click',()=>save(false));
     $('healthConfirm')?.addEventListener('click',()=>save(true));
     window.scrollTo({top:0,behavior:'auto'});
@@ -658,19 +634,6 @@
     const medicalInfoForSave={...local.medicalInfo};
     delete medicalInfoForSave.diagnosis_change;
     delete medicalInfoForSave.diagnosis_change_note;
-
-    const c=caseById(row.case_id);
-    const profileDiffers=
-      String(medicalInfoForSave.baseline_important_conditions||'').trim()!==String(c?.important_conditions||'').trim()
-      ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(c?.ongoing_treatments||'').trim();
-
-    let syncMaster=false;
-    if(finalize&&profileDiffers&&!local.hasLaterCompleted){
-      syncMaster=window.confirm(
-        '本次填寫的健康基本資料與個案主檔不同。\n\n按「確定」：完成評估並同步更新個案主檔。\n按「取消」：只保留在本次評估，不修改個案主檔。'
-      );
-    }
-    medicalInfoForSave._sync_case_health_profile=!!syncMaster;
 
     if(medicalInfoForSave.no_healthcare_events===true){
       medicalInfoForSave.healthcare_events=[];
