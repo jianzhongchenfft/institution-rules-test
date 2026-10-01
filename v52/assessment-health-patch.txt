@@ -341,10 +341,6 @@
           <div class="health-section-body">
 
             <div class="health-subsection">
-              <div class="health-subtitle">
-                <strong>目前重要健康狀況</strong>
-              </div>
-
               <div class="health-grid">
                 <div class="health-field">
                   <label>目前重要疾病／慢性病史</label>
