@@ -106,6 +106,63 @@ grant all on public.assessment_health_history to service_role;
 
 commit;
 
+-- 2026-10-01: split health assessment into baseline / change / current-status forms.
+alter table public.assessment_health_records
+  add column if not exists baseline_confirmed_at timestamptz,
+  add column if not exists change_confirmed_at timestamptz,
+  add column if not exists status_confirmed_at timestamptz;
+
+update public.assessment_health_records h
+set baseline_confirmed_at=case
+      when e.assessment_type='opening' then coalesce(h.baseline_confirmed_at,h.confirmed_at)
+      else h.baseline_confirmed_at
+    end,
+    change_confirmed_at=case
+      when e.assessment_type<>'opening' then coalesce(h.change_confirmed_at,h.confirmed_at)
+      else h.change_confirmed_at
+    end,
+    status_confirmed_at=coalesce(h.status_confirmed_at,h.confirmed_at)
+from public.assessment_events e
+where e.id=h.assessment_event_id
+  and h.confirmed_at is not null;
+
+insert into public.assessment_event_forms(
+  assessment_event_id,form_code,form_name,sort_order,is_required,status,created_at,updated_at
+)
+select f.assessment_event_id,
+       case when e.assessment_type='opening' then 'health_baseline' else 'health_change' end,
+       case when e.assessment_type='opening' then '健康與用藥基本資料' else '近期健康與用藥變化' end,
+       3,
+       e.assessment_type in ('opening','periodic'),
+       f.status,f.created_at,now()
+from public.assessment_event_forms f
+join public.assessment_events e on e.id=f.assessment_event_id
+where f.form_code='health'
+on conflict (assessment_event_id,form_code) do update
+set form_name=excluded.form_name,
+    sort_order=excluded.sort_order,
+    is_required=excluded.is_required,
+    status=case when public.assessment_event_forms.status='completed' then 'completed' else excluded.status end,
+    updated_at=now();
+
+insert into public.assessment_event_forms(
+  assessment_event_id,form_code,form_name,sort_order,is_required,status,created_at,updated_at
+)
+select f.assessment_event_id,'health_status','身體與健康狀況評估',4,
+       e.assessment_type in ('opening','periodic'),
+       f.status,f.created_at,now()
+from public.assessment_event_forms f
+join public.assessment_events e on e.id=f.assessment_event_id
+where f.form_code='health'
+on conflict (assessment_event_id,form_code) do update
+set form_name=excluded.form_name,
+    sort_order=excluded.sort_order,
+    is_required=excluded.is_required,
+    status=case when public.assessment_event_forms.status='completed' then 'completed' else excluded.status end,
+    updated_at=now();
+
+delete from public.assessment_event_forms where form_code='health';
+
 create or replace function public.save_assessment_health(
   p_event_id uuid,
   p_medical_info jsonb,
@@ -113,7 +170,8 @@ create or replace function public.save_assessment_health(
   p_health_items jsonb,
   p_health_notes jsonb,
   p_finalize boolean default false,
-  p_copied_from_id uuid default null
+  p_copied_from_id uuid default null,
+  p_section text default 'all'
 )
 returns public.assessment_health_records
 language plpgsql
@@ -141,6 +199,7 @@ declare
   v_sync_master boolean:=false;
   v_new_conditions text;
   v_new_treatments text;
+  v_form_code text;
 begin
   if (select auth.uid()) is null then raise exception 'AUTH_REQUIRED'; end if;
 
@@ -152,15 +211,38 @@ begin
     raise exception 'ASSESSMENT_EDIT_FORBIDDEN';
   end if;
 
-  if not exists (
+  if p_section not in ('baseline','change','status','all') then
+    raise exception 'INVALID_HEALTH_SECTION';
+  end if;
+
+  v_form_code:=case p_section
+    when 'baseline' then 'health_baseline'
+    when 'change' then 'health_change'
+    when 'status' then 'health_status'
+    else null
+  end;
+
+  if p_section<>'all' and not exists (
     select 1 from public.assessment_event_forms f
-    where f.assessment_event_id=p_event_id and f.form_code='health'
-  ) then raise exception 'HEALTH_FORM_NOT_SELECTED'; end if;
+    where f.assessment_event_id=p_event_id and f.form_code=v_form_code
+  ) then raise exception 'HEALTH_FORM_NOT_SELECTED:%',v_form_code; end if;
 
   p_medical_info:=coalesce(p_medical_info,'{}'::jsonb);
   p_medication_checks:=coalesce(p_medication_checks,'{}'::jsonb);
   p_health_items:=coalesce(p_health_items,'{}'::jsonb);
   p_health_notes:=coalesce(p_health_notes,'{}'::jsonb);
+
+  if p_medical_info ? 'opening_no_fixed_medications'
+     and jsonb_typeof(p_medical_info->'opening_no_fixed_medications')<>'boolean' then
+    raise exception 'INVALID_OPENING_NO_FIXED_MEDICATIONS';
+  end if;
+
+  if p_finalize and p_section in ('baseline','all') and v_event.assessment_type='opening' then
+    if coalesce((p_medical_info->>'opening_no_fixed_medications')::boolean,false)=false
+       and jsonb_array_length(coalesce(p_medical_info->'fixed_medication_base_entries','[]'::jsonb))=0 then
+      raise exception 'OPENING_MEDICATION_BASELINE_UNCONFIRMED';
+    end if;
+  end if;
 
   if p_medical_info ? 'healthcare_events'
      and jsonb_typeof(p_medical_info->'healthcare_events')<>'array' then
@@ -245,7 +327,7 @@ begin
         raise exception 'INVALID_MEDICATION_CORRECTION_REASON';
       end if;
 
-      if p_finalize then
+      if p_finalize and p_section in ('change','all') then
         if nullif(btrim(v_change->>'action'),'') is null
            or nullif(btrim(v_change->>'reason'),'') is null then
           raise exception 'MEDICATION_CORRECTION_INCOMPLETE';
@@ -293,7 +375,7 @@ begin
         raise exception 'INVALID_MEDICATION_CHANGE_DURATION';
       end if;
 
-      if p_finalize then
+      if p_finalize and p_section in ('change','all') then
         if nullif(btrim(v_change->>'action'),'') is null
            or nullif(btrim(v_change->>'duration_type'),'') is null then
           raise exception 'MEDICATION_CHANGE_INCOMPLETE';
@@ -378,7 +460,7 @@ begin
       raise exception 'INVALID_HEALTH_STATUS:%',v_key;
     end if;
 
-    if p_finalize and v_status is null then
+    if p_finalize and p_section in ('status','all') and v_status is null then
       raise exception 'HEALTH_INCOMPLETE:%',v_key;
     end if;
 
@@ -395,7 +477,7 @@ begin
   v_new_conditions:=nullif(btrim(p_medical_info->>'baseline_important_conditions'),'');
   v_new_treatments:=nullif(btrim(p_medical_info->>'baseline_ongoing_treatments'),'');
 
-  if v_old.id is null then
+  if p_section in ('baseline','change','all') and v_old.id is null then
     v_sync_master:=
       (
         p_medical_info ? 'baseline_important_conditions'
@@ -406,7 +488,7 @@ begin
         p_medical_info ? 'baseline_ongoing_treatments'
         and v_case.ongoing_treatments is distinct from v_new_treatments
       );
-  else
+  elsif p_section in ('baseline','change','all') then
     v_sync_master:=
       (
         p_medical_info ? 'baseline_important_conditions'
@@ -419,6 +501,8 @@ begin
         and nullif(btrim(v_old.medical_info->>'baseline_ongoing_treatments'),'')
             is distinct from v_new_treatments
       );
+  else
+    v_sync_master:=false;
   end if;
 
   if v_sync_master then
@@ -449,7 +533,7 @@ begin
     insert into public.assessment_health_records(
       assessment_event_id,case_id,medical_info,medication_checks,
       health_items,health_notes,total_score,copied_from_id,copied_at,
-      confirmed_at,created_by,updated_by
+      confirmed_at,baseline_confirmed_at,change_confirmed_at,status_confirmed_at,created_by,updated_by
     ) values (
       p_event_id,v_event.case_id,p_medical_info,p_medication_checks,
       p_health_items,p_health_notes,
@@ -457,6 +541,9 @@ begin
       p_copied_from_id,
       case when p_copied_from_id is not null then now() else null end,
       case when p_finalize then now() else null end,
+      case when p_finalize and p_section in ('baseline','all') then now() else null end,
+      case when p_finalize and p_section in ('change','all') then now() else null end,
+      case when p_finalize and p_section in ('status','all') then now() else null end,
       (select auth.uid()),(select auth.uid())
     )
     returning * into v_record;
@@ -526,6 +613,9 @@ begin
           else null
         end,
         confirmed_at=case when p_finalize then now() else confirmed_at end,
+        baseline_confirmed_at=case when p_finalize and p_section in ('baseline','all') then now() else baseline_confirmed_at end,
+        change_confirmed_at=case when p_finalize and p_section in ('change','all') then now() else change_confirmed_at end,
+        status_confirmed_at=case when p_finalize and p_section in ('status','all') then now() else status_confirmed_at end,
         updated_by=(select auth.uid()),
         updated_at=now()
     where id=v_old.id
@@ -536,7 +626,10 @@ begin
   set status=case when p_finalize then 'completed' else 'in_progress' end,
       updated_at=now()
   where assessment_event_id=p_event_id
-    and form_code='health'
+    and (
+      (p_section='all' and form_code in ('health_baseline','health_change','health_status'))
+      or form_code=v_form_code
+    )
     and (p_finalize or status<>'completed');
 
   update public.assessment_events
@@ -566,5 +659,5 @@ begin
 end;
 $$;
 
-revoke all on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid) from public, anon;
-grant execute on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid) to authenticated;
+revoke all on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid,text) from public, anon;
+grant execute on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid,text) to authenticated;
