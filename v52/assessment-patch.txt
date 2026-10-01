@@ -53,7 +53,8 @@
     iadl:{api:'v52AssessmentIadl',done:['completed']},
     spmsq:{api:'v52AssessmentSpmsq',done:['completed','unable']},
     gds15:{api:'v52AssessmentGds15',done:['completed','unable','not_applicable']},
-    health_medication:{api:'v52AssessmentHealth',done:['completed']}
+    health_medication:{api:'v52AssessmentHealth',done:['completed']},
+    home_safety:{api:'v52AssessmentHomeSafety',done:['completed']}
   };
 
   const existingModule=modules.find(m=>m.id==='assessments');
