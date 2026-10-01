@@ -54,6 +54,14 @@
     const cur=local.medicationChecks[key]||{};
     const prev=local.previous?.medication_checks?.[key]||{};
     const changed=cur.status&&prev.status&&cur.status!==prev.status;
+    const noteValue=String(cur.note||'');
+    const noteRequired=cur.status==='improve'||cur.status==='not_applicable';
+    const showNote=noteRequired||!!noteValue||local.expandedMedicationNotes.has(key);
+    const notePlaceholder=cur.status==='improve'
+      ?'請說明需改善的狀況'
+      :cur.status==='not_applicable'
+        ?'請說明不適用原因'
+        :'補充備註（選填）';
 
     return `
       <div class="health-card ${changed?'changed':''}">
@@ -71,7 +79,13 @@
             </label>
           `).join('')}
         </div>
-        <div class="health-note"><textarea data-health-med-note="${key}" placeholder="備註（選填）">${escapeHTML(cur.note||'')}</textarea></div>
+        ${cur.status==='good'&&!showNote
+          ?`<div class="health-note"><button type="button" class="btn sm" data-health-med-add-note="${key}">＋ 補充備註</button></div>`
+          :''}
+        ${showNote?`<div class="health-note">
+          <label style="display:block;font-size:10px;font-weight:850;color:#667085;margin-bottom:4px">備註${noteRequired?' *':''}</label>
+          <textarea data-health-med-note="${key}" placeholder="${escapeHTML(notePlaceholder)}">${escapeHTML(noteValue)}</textarea>
+        </div>`:''}
       </div>
     `;
   }
@@ -266,6 +280,14 @@
 
   function renderHealthItem([key,label]){
     const cur=local.healthItems[key],prev=local.previous?.health_items?.[key],changed=cur&&prev&&cur!==prev;
+    const noteValue=String(local.healthNotes[key]||'');
+    const noteRequired=cur==='observe'||cur==='refer';
+    const showNote=noteRequired||!!noteValue||local.expandedHealthNotes.has(key);
+    const notePlaceholder=cur==='observe'
+      ?'請說明需觀察的狀況'
+      :cur==='refer'
+        ?'請說明異常狀況及轉介／處置情形'
+        :'補充備註（選填）';
     return `
       <div class="health-card ${changed?'changed':''}">
         <div class="health-card-head">
@@ -283,7 +305,13 @@
             </label>
           `).join('')}
         </div>
-        <div class="health-note"><textarea data-health-note="${key}" placeholder="備註（選填）">${escapeHTML(local.healthNotes[key]||'')}</textarea></div>
+        ${cur==='good'&&!showNote
+          ?`<div class="health-note"><button type="button" class="btn sm" data-health-add-note="${key}">＋ 補充備註</button></div>`
+          :''}
+        ${showNote?`<div class="health-note">
+          <label style="display:block;font-size:10px;font-weight:850;color:#667085;margin-bottom:4px">備註${noteRequired?' *':''}</label>
+          <textarea data-health-note="${key}" placeholder="${escapeHTML(notePlaceholder)}">${escapeHTML(noteValue)}</textarea>
+        </div>`:''}
       </div>
     `;
   }
@@ -726,6 +754,16 @@
     document.querySelectorAll('input[name^="health_item_"]').forEach(input=>input.addEventListener('change',()=>{
       syncInputs();
       local.healthItems[input.name.replace('health_item_','')]=input.value;
+      const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
+    }));
+
+    document.querySelectorAll('[data-health-med-add-note]').forEach(btn=>btn.addEventListener('click',()=>{
+      local.expandedMedicationNotes.add(btn.dataset.healthMedAddNote);
+      const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
+    }));
+
+    document.querySelectorAll('[data-health-add-note]').forEach(btn=>btn.addEventListener('click',()=>{
+      local.expandedHealthNotes.add(btn.dataset.healthAddNote);
       const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
     }));
 
