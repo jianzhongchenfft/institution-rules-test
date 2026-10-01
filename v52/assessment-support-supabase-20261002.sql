@@ -162,6 +162,9 @@ begin
       if v_status is not null and v_status not in ('adequate','partial','insufficient','not_applicable') then
         raise exception 'INVALID_SUPPORT_DOMAIN:%',v_key;
       end if;
+      if p_finalize and v_status is null then
+        raise exception 'SUPPORT_DOMAIN_INCOMPLETE:%',v_key;
+      end if;
       if p_finalize
          and v_status in ('partial','insufficient','not_applicable')
          and nullif(btrim(coalesce(p_support_domains->v_key->>'note','')),'') is null then
