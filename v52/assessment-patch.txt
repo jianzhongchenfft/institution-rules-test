@@ -39,8 +39,7 @@
   const ASSESSMENT_FORMS=[
     {code:'adl',name:'ADL 日常生活活動功能量表',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:10},
     {code:'iadl',name:'IADL 工具性日常生活活動量表',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:20},
-    {code:'health_baseline',name:'健康與用藥基本資料',requiredFor:['opening'],availableFor:['opening'],kind:'baseline',sort:30},
-    {code:'health_change',name:'近期健康與用藥變化',requiredFor:['periodic'],availableFor:['periodic','condition_change','specific_problem'],kind:'change',sort:30},
+    {code:'health_medication',name:'健康與用藥評估',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'health_medication',sort:30},
     {code:'health_status',name:'身體與健康狀況評估',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:40},
     {code:'home_safety',name:'居家環境安全評估',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:50},
     {code:'support',name:'支持系統',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'baseline_carry',sort:60},
@@ -460,12 +459,11 @@
 
   function assessmentFormKindLabel(def,type){
     if(assessmentFormRequired(def,type)){
-      if(def.kind==='baseline')return '開案基準資料';
-      if(def.kind==='change')return '本期變化追蹤';
+      if(def.kind==='health_medication')return type==='opening'?'開案初始版':'後續追蹤版';
       if(def.kind==='baseline_carry')return type==='opening'?'開案建立基準':'沿用現況並確認';
       return '完整評估核心工具';
     }
-    if(def.kind==='change')return '依本次問題選用';
+    if(def.kind==='health_medication')return '依本次問題選用';
     return '依個案狀況選用';
   }
 
@@ -608,7 +606,7 @@
           </div>
           <div class="field full">
             <label>本次評估工具 *</label>
-            <div style="font-size:10.5px;color:#667085;margin-bottom:8px">開案評估建立基準資料；定期再評估追蹤本期變化；當下狀態量表依評估類型固定或選用。</div>
+            <div style="font-size:10.5px;color:#667085;margin-bottom:8px">健康與用藥評估會依評估類型自動切換「開案初始版／後續追蹤版」；當下狀態量表則依評估類型固定或選用。</div>
             <div class="assessment-form-grid" id="assessmentFormGrid">
               ${renderAssessmentFormOptions(existing,initialType)}
             </div>
@@ -928,9 +926,9 @@
                         ?'<button class="btn sm primary" data-open-spmsq="'+row.id+'">'+(['completed','unable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
                         :form.form_code==='gds15'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentGds15
                           ?'<button class="btn sm primary" data-open-gds15="'+row.id+'">'+(['completed','unable','not_applicable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
-                          :['health_baseline','health_change','health_status'].includes(form.form_code)&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentHealth
+                          :['health_medication','health_status'].includes(form.form_code)&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentHealth
                             ?'<button class="btn sm primary" data-open-health="'+row.id+'" data-health-section="'+(
-                              form.form_code==='health_baseline'?'baseline':form.form_code==='health_change'?'change':'status'
+                              form.form_code==='health_medication'?'medication':'status'
                             )+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
                             :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
                 </div>
