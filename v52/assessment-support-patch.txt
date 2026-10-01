@@ -585,7 +585,7 @@
 
     $('supportCopyPrevious')?.addEventListener('click',()=>{
       if(!local.previous)return;
-      const hasCurrent=Object.keys(local.household||{}).length||local.familyMembers.length||Object.keys(local.supportDomains||{}).length;
+      const hasCurrent=Object.keys(local.household||{}).length||local.familyMembers.length||Object.keys(local.supportDomains||{}).length||Object.keys(local.resources||{}).length||Object.keys(local.summary||{}).length;
       if(hasCurrent&&!confirm('帶入前次資料會覆蓋目前尚未儲存的支持系統內容，是否繼續？'))return;
       local.household={...safe(local.previous.household)};
       local.familyMembers=safeArray(local.previous.family_members).map(x=>({...safe(x),id:x?.id||newId('family')}));
