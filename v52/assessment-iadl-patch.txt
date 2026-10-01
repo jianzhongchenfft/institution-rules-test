@@ -342,9 +342,14 @@
       if(error)throw error;
 
       await window.v52AssessmentApi?.loadAssessmentData?.(false);
-      await loadIadl(row.id);
-      renderIadlPage();
-      toast(finalize?'IADL本次確認已完成':'IADL草稿已儲存','success');
+      if(finalize){
+        window.v52AssessmentApi?.renderAssessmentDetail?.(row.id);
+        toast('IADL本次確認已完成','success');
+      }else{
+        await loadIadl(row.id);
+        renderIadlPage();
+        toast('IADL草稿已儲存','success');
+      }
     }catch(err){
       console.error(err);
       const msg=String(err?.message||err);
