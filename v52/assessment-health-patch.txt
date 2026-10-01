@@ -359,9 +359,12 @@
 
     if(!local.record&&local.previous){
       const prevMed=safe(local.previous.medical_info);
+      local.medicalInfo.regular_followup=prevMed.regular_followup||'';
+      local.medicalInfo.regular_followup_reason=prevMed.regular_followup_reason||'';
       local.medicalInfo.medication_method=prevMed.medication_method||'';
       local.medicalInfo.medication_assisted_by=prevMed.medication_assisted_by||'';
       local.medicalInfo.medication_regular=prevMed.medication_regular||'';
+      local.medicalInfo.medication_followup=prevMed.medication_followup||'';
       local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
       local.medicalInfo.medication_changes=[];
       local.medicalInfo.medication_corrections=[];
@@ -745,7 +748,11 @@
               <textarea id="openingFixedMedicationBaseline" placeholder="例如：\n高血壓藥A：每日1次\n阿斯匹靈：心血管用藥">${escapeHTML(local.fixedMedicationBaseEntries.map(x=>x.medication).join('\n'))}</textarea>
             </div>
             <div class="health-subtitle"><strong>目前固定用藥</strong></div>
-            <div id="currentFixedMedicationList">${renderFixedMedicationList(currentFixedEntries)}</div>
+            <div id="currentFixedMedicationList">${currentFixedEntries.length
+      ?renderFixedMedicationList(currentFixedEntries)
+      :(openingNoFixed
+        ?renderFixedMedicationList([])
+        :'<div class="health-notice" style="margin:0;background:#f9fafb;border-color:#eaecf0;color:#667085">尚未填寫固定用藥基準</div>')}</div>
           </div>
 
           <div class="health-subsection">
