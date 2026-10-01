@@ -302,7 +302,7 @@
     const events=safeArray(local.medicalInfo.healthcare_events);
     const noEvents=local.medicalInfo.no_healthcare_events===true;
     const noFixedMeds=local.medicalInfo.no_fixed_medications===true;
-    const diagnosisChanged=local.medicalInfo.diagnosis_change==='yes';
+    const unvisitedHealthChanged=local.medicalInfo.unvisited_health_change==='yes';
     const medicationChanged=local.medicalInfo.medication_change==='changed';
     const hasSideEffect=local.medicalInfo.side_effect==='present';
 
@@ -325,7 +325,7 @@
           <div class="health-copy">
             <div>
               <strong>前次健康評估：${local.previous.total_score??'—'} 分</strong>
-              <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):''}｜只帶入可延續的目前狀況；本期就醫、診斷變化、用藥異動與後續處置不會複製。</span>
+              <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):''}｜只帶入可延續的目前狀況；本期就醫、未就醫的重要變化、用藥異動與後續處置不會複製。</span>
             </div>
             <button id="healthCopyPrevious" class="btn sm">帶入前次現況</button>
           </div>
@@ -342,8 +342,8 @@
 
             <div class="health-subsection">
               <div class="health-subtitle">
-                <strong>個案健康基本資料（本次評估快照）</strong>
-                <small>新評估預設帶入個案主檔；此處修改只影響本次評估紀錄</small>
+                <strong>目前重要健康狀況</strong>
+                <small>可直接在評估頁修正，不必離開本頁</small>
               </div>
 
               <div class="health-grid">
@@ -357,7 +357,8 @@
                 </div>
               </div>
               <div class="health-notice" style="margin:10px 0 0;background:#f7fbff;border-color:#d9e9f7;color:#175cd3">
-                這兩欄是本次評估的歷史快照。若要修改「現在的」個案健康基本資料，請到個案管理 → 基本資料 → 編輯個案。
+                本次會保存成評估快照。若內容與個案主檔不同，完成目前評估時可選擇是否同步；補登較早日期的評估預設只保留歷史快照。
+                <div style="margin-top:8px"><button id="healthSyncMasterNow" type="button" class="btn sm">同步更新個案主檔</button></div>
               </div>
             </div>
 
@@ -381,22 +382,22 @@
 
             <div class="health-subsection">
               <div class="health-subtitle">
-                <strong>2. 診斷／健康狀況變化</strong>
-                <small>既有慢性病不必每次重抄，只記錄本期新增或變更</small>
+                <strong>2. 未就醫的重要健康變化</strong>
+                <small>只記錄未看醫生、但需要機構特別追蹤的明顯變化</small>
               </div>
 
               <div class="health-grid">
                 <div class="health-field">
-                  <label>本期診斷是否有新增或變更</label>
-                  <select data-health-medical="diagnosis_change">
+                  <label>本期是否有未就醫但需特別追蹤的重要健康變化</label>
+                  <select data-health-medical="unvisited_health_change">
                     <option value="">請選擇</option>
-                    <option value="no" ${local.medicalInfo.diagnosis_change==='no'?'selected':''}>無新增或變更</option>
-                    <option value="yes" ${diagnosisChanged?'selected':''}>有新增或變更</option>
+                    <option value="no" ${local.medicalInfo.unvisited_health_change==='no'?'selected':''}>無</option>
+                    <option value="yes" ${unvisitedHealthChanged?'selected':''}>有</option>
                   </select>
                 </div>
-                <div class="health-field" style="${diagnosisChanged?'':'display:none'}">
-                  <label>新增／變更內容</label>
-                  <textarea data-health-medical="diagnosis_change_note">${escapeHTML(local.medicalInfo.diagnosis_change_note||'')}</textarea>
+                <div class="health-field" style="${unvisitedHealthChanged?'':'display:none'}">
+                  <label>變化與需追蹤事項</label>
+                  <textarea data-health-medical="unvisited_health_change_note" placeholder="例如：近兩週走路穩定度明顯下降，目前尚未就醫。">${escapeHTML(local.medicalInfo.unvisited_health_change_note||'')}</textarea>
                 </div>
                 <div class="health-field">
                   <label>是否定期回診</label>
@@ -407,7 +408,7 @@
                   </select>
                 </div>
                 <div class="health-field">
-                  <label>未定期回診原因／需追蹤事項</label>
+                  <label>未定期回診原因／其他需追蹤事項</label>
                   <textarea data-health-medical="regular_followup_reason">${escapeHTML(local.medicalInfo.regular_followup_reason||'')}</textarea>
                 </div>
               </div>
@@ -536,7 +537,7 @@
       el.addEventListener(evt,()=>{
         syncInputs();
         const key=el.dataset.healthMedical;
-        if(['no_healthcare_events','no_fixed_medications','diagnosis_change','medication_change','side_effect'].includes(key)){
+        if(['no_healthcare_events','no_fixed_medications','unvisited_health_change','medication_change','side_effect'].includes(key)){
           const y=window.scrollY;
           render();
           window.scrollTo({top:y,behavior:'auto'});
@@ -583,8 +584,8 @@
         baseline_ongoing_treatments:c.ongoing_treatments||'',
         healthcare_events:[],
         no_healthcare_events:false,
-        diagnosis_change:'',
-        diagnosis_change_note:'',
+        unvisited_health_change:'',
+        unvisited_health_change_note:'',
         regular_followup:prevMed.regular_followup||'',
         regular_followup_reason:prevMed.regular_followup_reason||'',
         no_fixed_medications:prevMed.no_fixed_medications===true,
@@ -607,6 +608,28 @@
       local.pendingCopyFromId=local.previous.id;
       render();
       toast('已帶入前次現況；本期事件與變化欄位已保留空白，請重新確認','success');
+    });
+
+    $('healthSyncMasterNow')?.addEventListener('click',async()=>{
+      syncInputs();
+      const ok=window.confirm('確定要把目前填寫的「重要疾病／慢性病史」與「固定治療／特殊醫療安排」同步更新到個案主檔嗎？');
+      if(!ok)return;
+      showLoading(true);
+      try{
+        const {error}=await db.rpc('update_case_health_profile',{
+          p_case_id:row.case_id,
+          p_important_conditions:local.medicalInfo.baseline_important_conditions||null,
+          p_ongoing_treatments:local.medicalInfo.baseline_ongoing_treatments||null
+        });
+        if(error)throw error;
+        await window.v52AssessmentApi?.loadAssessmentData?.(false);
+        toast('個案健康基本資料已同步更新','success');
+      }catch(err){
+        console.error(err);
+        toast('更新個案健康基本資料失敗：'+(err?.message||err),'error');
+      }finally{
+        showLoading(false);
+      }
     });
 
     $('healthDraft')?.addEventListener('click',()=>save(false));
@@ -634,6 +657,19 @@
 
     const medicalInfoForSave={...local.medicalInfo};
 
+    const c=caseById(row.case_id);
+    const profileDiffers=
+      String(medicalInfoForSave.baseline_important_conditions||'').trim()!==String(c?.important_conditions||'').trim()
+      ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(c?.ongoing_treatments||'').trim();
+
+    let syncMaster=false;
+    if(finalize&&profileDiffers&&!local.hasLaterCompleted){
+      syncMaster=window.confirm(
+        '本次填寫的健康基本資料與個案主檔不同。\n\n按「確定」：完成評估並同步更新個案主檔。\n按「取消」：只保留在本次評估，不修改個案主檔。'
+      );
+    }
+    medicalInfoForSave._sync_case_health_profile=!!syncMaster;
+
     if(medicalInfoForSave.no_healthcare_events===true){
       medicalInfoForSave.healthcare_events=[];
     }else{
@@ -641,8 +677,8 @@
         .filter(item=>Object.values(safe(item)).some(v=>String(v||'').trim()!==''));
     }
 
-    if(medicalInfoForSave.diagnosis_change!=='yes'){
-      medicalInfoForSave.diagnosis_change_note='';
+    if(medicalInfoForSave.unvisited_health_change!=='yes'){
+      medicalInfoForSave.unvisited_health_change_note='';
     }
 
     if(medicalInfoForSave.no_fixed_medications===true){
