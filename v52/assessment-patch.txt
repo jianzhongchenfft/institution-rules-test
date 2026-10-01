@@ -112,6 +112,10 @@
     .assessment-form-card strong{font-size:12px}
     .assessment-form-card small{display:block;font-size:10.5px;color:#667085;margin-top:3px}
     .assessment-detail-note{padding:11px 12px;border-radius:10px;background:#fff8f5;border:1px solid #f0ded7;color:#765548;font-size:11.5px;line-height:1.6;margin-bottom:12px}
+    .assessment-context-bar{position:sticky;top:72px;z-index:15;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-4px 0 12px;padding:9px 11px;border:1px solid #edc9bb;border-radius:11px;background:rgba(255,248,245,.97);backdrop-filter:blur(8px);box-shadow:0 4px 12px rgba(52,64,84,.06)}
+    .assessment-context-bar .assessment-context-name{font-size:13px;font-weight:900;color:#7b3f2d}
+    .assessment-context-bar .assessment-context-item{font-size:11px;font-weight:800;color:#475467;padding-left:8px;border-left:1px solid #e7cfc6}
+    .assessment-context-bar .assessment-context-label{font-size:9.5px;color:#98a2b3;margin-right:4px}
     .assessment-reason{white-space:pre-wrap;line-height:1.55}
     .assessment-empty{padding:34px 16px;text-align:center;color:#667085}
     @media(max-width:820px){
@@ -178,6 +182,18 @@
   function assessmentReasonText(row){
     const base=assessmentReasonLabel(row.reason_code);
     return row.reason_note?base+'｜'+row.reason_note:base;
+  }
+
+  function renderAssessmentContextBar(row,c){
+    if(!row||!c)return '';
+    const date=row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—';
+    return `
+      <div class="assessment-context-bar">
+        <span class="assessment-context-name">${escapeHTML(c.case_name||'未知個案')}</span>
+        <span class="assessment-context-item"><span class="assessment-context-label">評估日期</span>${escapeHTML(date)}</span>
+        <span class="assessment-context-item"><span class="assessment-context-label">評估類型</span>${escapeHTML(assessmentTypeLabel(row.assessment_type))}</span>
+      </div>
+    `;
   }
 
   function assessmentMonthBounds(){
@@ -903,7 +919,8 @@
     loadAssessmentData,
     renderAssessmentPage,
     renderAssessmentDetail,
-    openAssessmentEventModal
+    openAssessmentEventModal,
+    renderAssessmentContextBar
   };
 
   const assessmentBaseNavigate=navigate;
