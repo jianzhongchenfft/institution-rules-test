@@ -231,7 +231,6 @@
         .not('confirmed_at','is',null)
         .neq('assessment_event_id',eventId)
         .order('confirmed_at',{ascending:false})
-        .limit(20)
     ]);
     if(currentRes.error)throw currentRes.error;
     if(historyRes.error)throw historyRes.error;
