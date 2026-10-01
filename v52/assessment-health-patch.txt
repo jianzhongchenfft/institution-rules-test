@@ -496,15 +496,44 @@
     `;
   }
 
+  function renderFixedMedicationList(entries){
+    if(!entries.length){
+      return '<div class="health-notice" style="margin:0;background:#f9fafb;border-color:#eaecf0;color:#667085">目前無固定用藥</div>';
+    }
+    return `
+      <div class="health-med-checks">
+        ${entries.map(entry=>`
+          <div class="health-card">
+            <div class="health-card-head">
+              <div class="health-card-title">${escapeHTML(entry.medication||'')}</div>
+              <div class="health-tags"><span class="health-tag prev">${escapeHTML(medicationEntryTag(entry))}</span></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function renderMedicationChange(item,index){
-    const fixedLines=fixedMedicationLines(local.medicalInfo.fixed_medications);
+    const entries=rebuildFixedMedicationEntries();
     const action=item.action||'',duration=item.duration_type||'';
-    const beforeOptions=[...new Set([item.medication_before,...fixedLines].filter(Boolean))];
+    const selectedId=item.medication_before_entry_id||'';
+    const beforeOptions=[...entries];
+    if(selectedId&&!beforeOptions.some(x=>x.id===selectedId)&&item.medication_before){
+      beforeOptions.push({
+        id:selectedId,
+        medication:item.medication_before,
+        origin_type:'legacy',
+        origin_date:null,
+        origin_event_id:null,
+        origin_note:''
+      });
+    }
     const beforeField=action==='stop'||action==='adjust'
       ?(duration==='long_term'
-        ?`<select data-med-change-field="medication_before">
+        ?`<select data-med-change-field="medication_before_entry_id">
             <option value="">請選擇目前固定用藥</option>
-            ${beforeOptions.map(v=>`<option value="${escapeHTML(v)}" ${item.medication_before===v?'selected':''}>${escapeHTML(v)}</option>`).join('')}
+            ${beforeOptions.map(entry=>`<option value="${escapeHTML(entry.id)}" ${selectedId===entry.id?'selected':''}>${escapeHTML(entry.medication)}｜${escapeHTML(medicationEntryTag(entry))}</option>`).join('')}
           </select>`
         :`<input data-med-change-field="medication_before" value="${escapeHTML(item.medication_before||'')}" placeholder="例如：感冒藥A">`)
       :'';
@@ -549,6 +578,57 @@
           <div class="wide">
             <label>備註（選填）</label>
             <textarea data-med-change-field="note">${escapeHTML(item.note||'')}</textarea>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMedicationCorrection(item,index){
+    const entries=cloneEntries(local.fixedMedicationBaseEntries);
+    safeArray(local.medicalInfo.medication_corrections).slice(0,index).forEach(x=>applyMedicationCorrection(entries,x,eventById(local.eventId)));
+    const action=item.action||'',reason=item.reason||'',selected=item.target_entry_id||'';
+    return `
+      <div class="health-event" data-med-correction="${escapeHTML(item.id||'')}">
+        <div class="health-event-head">
+          <strong>既有固定用藥修正 ${index+1}</strong>
+          <button type="button" class="btn sm" data-remove-med-correction="${index}">移除</button>
+        </div>
+        <div class="health-event-grid">
+          <div>
+            <label>修正方式</label>
+            <select data-med-correction-field="action">
+              <option value="">請選擇</option>
+              <option value="add" ${action==='add'?'selected':''}>補登既有藥物</option>
+              <option value="edit" ${action==='edit'?'selected':''}>更正既有藥物</option>
+              <option value="remove" ${action==='remove'?'selected':''}>移除誤載藥物</option>
+            </select>
+          </div>
+          <div>
+            <label>修正原因</label>
+            <select data-med-correction-field="reason">
+              <option value="">請選擇</option>
+              <option value="opening_omission" ${reason==='opening_omission'?'selected':''}>接案時漏登</option>
+              <option value="previous_record_error" ${reason==='previous_record_error'?'selected':''}>前次紀錄有誤</option>
+              <option value="other" ${reason==='other'?'selected':''}>其他</option>
+            </select>
+          </div>
+          ${(action==='edit'||action==='remove')?`
+            <div class="wide">
+              <label>${action==='edit'?'要更正的固定用藥':'要移除的固定用藥'}</label>
+              <select data-med-correction-field="target_entry_id">
+                <option value="">請選擇</option>
+                ${entries.map(entry=>`<option value="${escapeHTML(entry.id)}" ${selected===entry.id?'selected':''}>${escapeHTML(entry.medication)}｜${escapeHTML(medicationEntryTag(entry))}</option>`).join('')}
+              </select>
+            </div>`:''}
+          ${(action==='add'||action==='edit')?`
+            <div class="wide">
+              <label>${action==='add'?'補登藥物／用法':'更正後藥物／用法'}</label>
+              <input data-med-correction-field="medication_after" value="${escapeHTML(item.medication_after||'')}" placeholder="請填藥物名稱與用途／用法">
+            </div>`:''}
+          <div class="wide">
+            <label>補充說明（選填）</label>
+            <textarea data-med-correction-field="note">${escapeHTML(item.note||'')}</textarea>
           </div>
         </div>
       </div>
