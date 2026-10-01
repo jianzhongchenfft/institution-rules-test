@@ -279,8 +279,8 @@
         </div>
         <div class="adl-summary-card">
           <label>與前次差異</label>
-          <strong style="font-size:15px">${prevTotal===null||prevTotal===undefined||!count?'—':escapeHTML(diffText(total,Number(prevTotal)))}</strong>
-          <small>${prevTotal===null||prevTotal===undefined?'首次評估或無可比較資料':'僅供督導比較，不替代專業判斷'}</small>
+          <strong style="font-size:15px">${prevTotal===null||prevTotal===undefined||!complete?'—':escapeHTML(diffText(total,Number(prevTotal)))}</strong>
+          <small>${prevTotal===null||prevTotal===undefined?'首次評估或無可比較資料':(complete?'僅供督導比較，不替代專業判斷':'完成10項後顯示差異')}</small>
         </div>
       </section>
     `;
