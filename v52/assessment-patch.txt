@@ -42,7 +42,7 @@
     {code:'home_safety',name:'居家環境安全評估',core:true,sort:4},
     {code:'support',name:'支持系統',core:true,sort:5},
     {code:'spmsq',name:'SPMSQ 簡易心智狀態問卷',core:true,sort:6},
-    {code:'gds15',name:'GDS-15 老人憂鬱量表',core:true,sort:7},
+    {code:'gds15',name:'GDS-15 老人心理健康評估表',core:true,sort:7},
     {code:'caregiver_burden',name:'主要照顧者負荷量表',core:false,sort:8},
     {code:'bsrs5',name:'BSRS-5 簡式健康量表',core:false,sort:9}
   ];
