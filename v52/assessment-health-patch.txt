@@ -168,6 +168,17 @@
     local.previous=candidates[0]?.record||null;
     local.previousEvent=candidates[0]?.event||null;
     local.pendingCopyFromId=(local.record?.copied_from_id&&local.record.copied_from_id===local.previous?.id)?local.record.copied_from_id:null;
+
+    if(!local.record&&local.previous){
+      const prevMed=safe(local.previous.medical_info);
+      local.medicalInfo.no_fixed_medications=prevMed.no_fixed_medications===true;
+      local.medicalInfo.fixed_medications=prevMed.fixed_medications||'';
+      local.medicalInfo.medication_method=prevMed.medication_method||'';
+      local.medicalInfo.medication_assisted_by=prevMed.medication_assisted_by||'';
+      local.medicalInfo.medication_regular=prevMed.medication_regular||'';
+      local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
+      local.pendingCopyFromId=local.previous.id;
+    }
   }
 
   function syncInputs(){
