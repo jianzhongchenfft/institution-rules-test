@@ -901,7 +901,9 @@
                         ?'<button class="btn sm primary" data-open-spmsq="'+row.id+'">'+(['completed','unable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
                         :form.form_code==='gds15'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentGds15
                           ?'<button class="btn sm primary" data-open-gds15="'+row.id+'">'+(['completed','unable','not_applicable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
-                          :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
+                          :form.form_code==='health'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentHealth
+                            ?'<button class="btn sm primary" data-open-health="'+row.id+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
+                            :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
                 </div>
               `).join('')}
             </div>
@@ -925,6 +927,9 @@
     });
     document.querySelectorAll('[data-open-gds15]').forEach(btn=>{
       btn.addEventListener('click',()=>window.v52AssessmentGds15?.open(btn.dataset.openGds15));
+    });
+    document.querySelectorAll('[data-open-health]').forEach(btn=>{
+      btn.addEventListener('click',()=>window.v52AssessmentHealth?.open(btn.dataset.openHealth));
     });
     window.scrollTo({top:0,behavior:'auto'});
   }
