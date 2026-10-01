@@ -15,6 +15,25 @@
       return toast('尚有未完成項目：'+missing,'warn');
     }
 
+    if(finalize){
+      const missingHealthNotes=HEALTH_ITEMS.filter(([key])=>
+        ['observe','refer'].includes(local.healthItems[key])
+        && !String(local.healthNotes[key]||'').trim()
+      );
+      if(missingHealthNotes.length){
+        return toast('以下健康項目選擇「需觀察／異常轉介」，請填寫備註：'+missingHealthNotes.map(([,label])=>label).join('、'),'warn');
+      }
+
+      const missingMedicationNotes=MED_CHECKS.filter(([key])=>{
+        const item=local.medicationChecks[key]||{};
+        return ['improve','not_applicable'].includes(item.status)
+          && !String(item.note||'').trim();
+      });
+      if(missingMedicationNotes.length){
+        return toast('以下用藥安全項目選擇「需改善／不適用」，請填寫備註：'+missingMedicationNotes.map(([,label])=>label).join('、'),'warn');
+      }
+    }
+
     if(finalize&&mode==='baseline'){
       const noFixed=local.medicalInfo.opening_no_fixed_medications===true;
       if(!noFixed&&local.fixedMedicationBaseEntries.length===0){
