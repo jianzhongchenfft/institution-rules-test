@@ -228,7 +228,7 @@
             </label>
           `).join('')}
         </div>
-        ${current!==null&&!showNote?`
+        ${!showNote?`
           <div class="iadl-note"><button type="button" class="btn sm" data-iadl-add-note="${item.key}">＋ 補充備註</button></div>
         `:''}
         ${showNote?`
