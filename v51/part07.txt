@@ -44,9 +44,18 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!assessmentGds15Res.ok) throw new Error(`v52/assessment-gds15-patch.txt 載入失敗（${assessmentGds15Res.status}）`);
       eval(await assessmentGds15Res.text());
 
-      const assessmentHealthRes = await fetch('v52/assessment-health-patch.txt?v=assessment-health-medication-unified-v2-20261001',{cache:'no-store'});
-      if(!assessmentHealthRes.ok) throw new Error(`v52/assessment-health-patch.txt 載入失敗（${assessmentHealthRes.status}）`);
-      eval(await assessmentHealthRes.text());
+      const assessmentHealthFiles=[
+        'v52/assessment-health-core.txt',
+        'v52/assessment-health-ui.txt',
+        'v52/assessment-health-save.txt'
+      ];
+      let assessmentHealthCode='';
+      for(const path of assessmentHealthFiles){
+        const res=await fetch(`${path}?v=assessment-refactor-20261002`,{cache:'no-store'});
+        if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
+        assessmentHealthCode+='\n'+await res.text();
+      }
+      eval(assessmentHealthCode);
 
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
