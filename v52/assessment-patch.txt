@@ -642,7 +642,7 @@
             reason_code:reasonCode,
             reason_note:$('assessmentReasonNote')?.value.trim()||null,
             combined_with_home_visit:!!$('assessmentWithVisit')?.checked,
-            responsible_staff_id:c.supervisor_id||state.profile.id,
+            responsible_staff_id:c.supervisor_id||null,
             status:'pending',
             created_by:state.user.id,
             updated_by:state.user.id
