@@ -209,6 +209,12 @@ begin
     if coalesce(p_household->>'backup_available','') not in ('yes','no') then
       raise exception 'SUPPORT_BACKUP_STATUS_REQUIRED';
     end if;
+    if p_household->>'backup_available'='yes' and jsonb_array_length(p_family_members)=0 then
+      raise exception 'SUPPORT_BACKUP_MEMBER_REQUIRED';
+    end if;
+    if p_household->>'backup_available'='no' and jsonb_array_length(p_family_members)>0 then
+      raise exception 'SUPPORT_BACKUP_MEMBER_CONFLICT';
+    end if;
 
     for v_item in select value from jsonb_array_elements(p_family_members) loop
       if jsonb_typeof(v_item)<>'object' then raise exception 'INVALID_SUPPORT_FAMILY_MEMBER_ITEM'; end if;
