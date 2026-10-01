@@ -125,6 +125,7 @@ declare
   v_key text;
   v_status text;
   v_item jsonb;
+  v_expected_nature text;
   v_domain_keys text[]:=array[
     'daily_care','meal_housework','medical_transport','medication_health',
     'financial','emotional','decision_contact'
@@ -247,11 +248,25 @@ begin
 
     for v_item in select value from jsonb_array_elements(coalesce(p_resources->'social_resources','[]'::jsonb)) loop
       if jsonb_typeof(v_item)<>'object' then raise exception 'INVALID_SUPPORT_RESOURCE_ITEM'; end if;
-      if v_item->>'nature' not in ('formal','informal') then raise exception 'INVALID_SUPPORT_RESOURCE_NATURE'; end if;
       if v_item->>'type' not in (
         'long_term_care','medical','welfare','disability','assistive_device','community',
-        'social_work','transport','meal','charity_religion','neighbor_friend','volunteer','other'
+        'social_work','transport','meal','charity_religion','neighbor_friend','volunteer',
+        'other_formal','other_informal'
       ) then raise exception 'INVALID_SUPPORT_RESOURCE_TYPE'; end if;
+
+      v_expected_nature:=case
+        when v_item->>'type' in (
+          'long_term_care','medical','welfare','disability','assistive_device','community',
+          'social_work','transport','meal','charity_religion','other_formal'
+        ) then 'formal'
+        when v_item->>'type' in ('neighbor_friend','volunteer','other_informal') then 'informal'
+        else null
+      end;
+
+      if v_item->>'nature' is distinct from v_expected_nature then
+        raise exception 'INVALID_SUPPORT_RESOURCE_NATURE';
+      end if;
+
       if nullif(btrim(coalesce(v_item->>'name','')),'') is null
          or nullif(btrim(coalesce(v_item->>'assistance','')),'') is null then
         raise exception 'SUPPORT_RESOURCE_INFO_REQUIRED';
@@ -296,7 +311,8 @@ begin
       if jsonb_typeof(v_item)<>'object' then raise exception 'INVALID_SUPPORT_UNMET_NEED_ITEM'; end if;
       if v_item->>'type' not in (
         'long_term_care','medical','welfare','disability','assistive_device','community',
-        'social_work','transport','meal','charity_religion','neighbor_friend','volunteer','other'
+        'social_work','transport','meal','charity_religion','neighbor_friend','volunteer',
+        'other_formal','other_informal'
       ) then raise exception 'INVALID_SUPPORT_UNMET_NEED_TYPE'; end if;
       if nullif(btrim(coalesce(v_item->>'need','')),'') is null
          or nullif(btrim(coalesce(v_item->>'action','')),'') is null then
