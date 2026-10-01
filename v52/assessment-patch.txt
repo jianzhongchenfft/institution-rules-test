@@ -858,6 +858,8 @@
         </div>
       </div>
 
+      ${renderAssessmentContextBar(row,c)}
+
       <div class="assessment-detail-grid">
         <div class="assessment-detail-cell"><label>個案</label><div>${escapeHTML(c?.case_name||'—')}</div></div>
         <div class="assessment-detail-cell"><label>評估類型</label><div>${escapeHTML(assessmentTypeLabel(row.assessment_type))}</div></div>
