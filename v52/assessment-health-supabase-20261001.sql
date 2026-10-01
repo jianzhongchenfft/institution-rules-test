@@ -1,3 +1,7 @@
+-- HISTORICAL DEVELOPMENT SQL — 2026-10-01
+-- 本檔保留當日架構演進與資料轉換歷史，不再作為現行定義來源。
+-- 現行健康／用藥儲存函式請以 v52/assessment-health-current.sql 為準。
+
 -- V5.2 評估管理：身體與健康狀況評估
 -- 測試環境：LiuXinZi-TEST
 -- 日期：2026-10-01
