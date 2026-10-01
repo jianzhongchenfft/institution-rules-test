@@ -28,9 +28,13 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!assessmentRes.ok) throw new Error(`v52/assessment-patch.txt 載入失敗（${assessmentRes.status}）`);
       eval(await assessmentRes.text());
 
-      const assessmentAdlRes = await fetch('v52/assessment-adl-patch.txt?v=assessment-adl-20261001',{cache:'no-store'});
+      const assessmentAdlRes = await fetch('v52/assessment-adl-patch.txt?v=assessment-iadl-20261001',{cache:'no-store'});
       if(!assessmentAdlRes.ok) throw new Error(`v52/assessment-adl-patch.txt 載入失敗（${assessmentAdlRes.status}）`);
       eval(await assessmentAdlRes.text());
+
+      const assessmentIadlRes = await fetch('v52/assessment-iadl-patch.txt?v=assessment-iadl-20261001',{cache:'no-store'});
+      if(!assessmentIadlRes.ok) throw new Error(`v52/assessment-iadl-patch.txt 載入失敗（${assessmentIadlRes.status}）`);
+      eval(await assessmentIadlRes.text());
 
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
