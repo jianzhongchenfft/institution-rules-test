@@ -36,9 +36,13 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!assessmentIadlRes.ok) throw new Error(`v52/assessment-iadl-patch.txt 載入失敗（${assessmentIadlRes.status}）`);
       eval(await assessmentIadlRes.text());
 
-      const assessmentSpmsqRes = await fetch('v52/assessment-spmsq-patch.txt?v=assessment-detail-context-20261001',{cache:'no-store'});
+      const assessmentSpmsqRes = await fetch('v52/assessment-spmsq-patch.txt?v=assessment-gds15-20261001',{cache:'no-store'});
       if(!assessmentSpmsqRes.ok) throw new Error(`v52/assessment-spmsq-patch.txt 載入失敗（${assessmentSpmsqRes.status}）`);
       eval(await assessmentSpmsqRes.text());
+
+      const assessmentGds15Res = await fetch('v52/assessment-gds15-patch.txt?v=assessment-gds15-20261001',{cache:'no-store'});
+      if(!assessmentGds15Res.ok) throw new Error(`v52/assessment-gds15-patch.txt 載入失敗（${assessmentGds15Res.status}）`);
+      eval(await assessmentGds15Res.text());
 
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
