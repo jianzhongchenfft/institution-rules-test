@@ -1459,6 +1459,10 @@
       const msg=err?.message||String(err);
       if(msg.includes('OPENING_MEDICATION_BASELINE_UNCONFIRMED')){
         toast('請確認接案時固定用藥情形','warn');
+      }else if(msg.includes('OPENING_TEMPORARY_MEDICATIONS_UNCONFIRMED')){
+        toast('請確認接案時短期／臨時用藥情形','warn');
+      }else if(msg.includes('OPENING_TEMPORARY_MEDICATION_INCOMPLETE')){
+        toast('短期／臨時用藥請至少填寫藥物名稱／用法','warn');
       }else{
         toast('儲存'+sectionTitle(section,row)+'失敗：'+msg,'error');
       }
