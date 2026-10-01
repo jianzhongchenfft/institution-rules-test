@@ -24,6 +24,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!caseHtmlRes.ok) throw new Error(`v52/case-html-import.txt 載入失敗（${caseHtmlRes.status}）`);
       eval(await caseHtmlRes.text());
 
+      const assessmentRes = await fetch('v52/assessment-patch.txt?v=assessment-shell-20261001',{cache:'no-store'});
+      if(!assessmentRes.ok) throw new Error(`v52/assessment-patch.txt 載入失敗（${assessmentRes.status}）`);
+      eval(await assessmentRes.text());
+
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
       eval(await scheduleRes.text());
@@ -114,6 +118,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       else if(state.profile && state.page==='schedule') navigate('schedule');
       else if(state.profile && state.page==='overtime') navigate('overtime');
       else if(state.profile && state.page==='events') navigate('events');
+      else if(state.profile && state.page==='assessments') navigate('assessments');
     }catch(err){
       console.error('系統功能模組載入失敗',err);
       if(state.profile) toast('系統功能模組載入失敗，請重新整理頁面。','error');
