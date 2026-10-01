@@ -656,6 +656,8 @@
     }
 
     const medicalInfoForSave={...local.medicalInfo};
+    delete medicalInfoForSave.diagnosis_change;
+    delete medicalInfoForSave.diagnosis_change_note;
 
     const c=caseById(row.case_id);
     const profileDiffers=
