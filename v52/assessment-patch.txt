@@ -49,6 +49,15 @@
     {code:'bsrs5',name:'BSRS-5 簡式健康量表',requiredFor:[],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:100}
   ];
 
+  const ASSESSMENT_FORM_HANDLERS={
+    adl:{api:'v52AssessmentAdl',done:['completed']},
+    iadl:{api:'v52AssessmentIadl',done:['completed']},
+    spmsq:{api:'v52AssessmentSpmsq',done:['completed','unable']},
+    gds15:{api:'v52AssessmentGds15',done:['completed','unable','not_applicable']},
+    health_medication:{api:'v52AssessmentHealth',section:'medication',done:['completed']},
+    health_status:{api:'v52AssessmentHealth',section:'status',done:['completed']}
+  };
+
   const existingModule=modules.find(m=>m.id==='assessments');
   if(existingModule){
     existingModule.ready=true;
@@ -857,6 +866,31 @@
     });
   }
 
+  function assessmentFormActionButton(row,form){
+    const config=ASSESSMENT_FORM_HANDLERS[form.form_code];
+    if(row.status==='pending')return '<button class="btn sm" disabled>待開始</button>';
+    if(row.status==='voided')return '<button class="btn sm" disabled>下一階段開放</button>';
+    if(!config||!window[config.api])return '<button class="btn sm" disabled>下一階段開放</button>';
+
+    const done=(config.done||['completed']).includes(form.status);
+    return '<button class="btn sm primary" data-assessment-open="'+escapeHTML(form.form_code)+'">'
+      +(done?'查看／修正':'開始／繼續')
+      +'</button>';
+  }
+
+  function bindAssessmentFormActions(row){
+    document.querySelectorAll('[data-assessment-open]').forEach(btn=>{
+      const code=btn.dataset.assessmentOpen;
+      const config=ASSESSMENT_FORM_HANDLERS[code];
+      const api=config?window[config.api]:null;
+      if(!api?.open)return;
+      btn.addEventListener('click',()=>{
+        if(config.section)api.open(row.id,config.section);
+        else api.open(row.id);
+      });
+    });
+  }
+
   function renderAssessmentDetail(id){
     const row=state.assessmentEvents.find(x=>x.id===id);
     if(!row){
@@ -918,19 +952,7 @@
                     <strong>${escapeHTML(form.form_name)}</strong>
                     <small>${form.is_required?'核心工具｜':''}${escapeHTML(assessmentFormStatusLabel(form.status))}</small>
                   </div>
-                  ${form.form_code==='adl'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentAdl
-                    ?'<button class="btn sm primary" data-open-adl="'+row.id+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
-                    :form.form_code==='iadl'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentIadl
-                      ?'<button class="btn sm primary" data-open-iadl="'+row.id+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
-                      :form.form_code==='spmsq'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentSpmsq
-                        ?'<button class="btn sm primary" data-open-spmsq="'+row.id+'">'+(['completed','unable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
-                        :form.form_code==='gds15'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentGds15
-                          ?'<button class="btn sm primary" data-open-gds15="'+row.id+'">'+(['completed','unable','not_applicable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
-                          :['health_medication','health_status'].includes(form.form_code)&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentHealth
-                            ?'<button class="btn sm primary" data-open-health="'+row.id+'" data-health-section="'+(
-                              form.form_code==='health_medication'?'medication':'status'
-                            )+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
-                            :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
+                  ${assessmentFormActionButton(row,form)}
                 </div>
               `).join('')}
             </div>
@@ -943,21 +965,7 @@
     $('assessmentEdit')?.addEventListener('click',()=>openAssessmentEventModal(row));
     $('assessmentStart')?.addEventListener('click',()=>startAssessment(row));
     $('assessmentVoid')?.addEventListener('click',()=>voidAssessment(row));
-    document.querySelectorAll('[data-open-adl]').forEach(btn=>{
-      btn.addEventListener('click',()=>window.v52AssessmentAdl?.open(btn.dataset.openAdl));
-    });
-    document.querySelectorAll('[data-open-iadl]').forEach(btn=>{
-      btn.addEventListener('click',()=>window.v52AssessmentIadl?.open(btn.dataset.openIadl));
-    });
-    document.querySelectorAll('[data-open-spmsq]').forEach(btn=>{
-      btn.addEventListener('click',()=>window.v52AssessmentSpmsq?.open(btn.dataset.openSpmsq));
-    });
-    document.querySelectorAll('[data-open-gds15]').forEach(btn=>{
-      btn.addEventListener('click',()=>window.v52AssessmentGds15?.open(btn.dataset.openGds15));
-    });
-    document.querySelectorAll('[data-open-health]').forEach(btn=>{
-      btn.addEventListener('click',()=>window.v52AssessmentHealth?.open(btn.dataset.openHealth,btn.dataset.healthSection));
-    });
+    bindAssessmentFormActions(row);
     window.scrollTo({top:0,behavior:'auto'});
   }
 
