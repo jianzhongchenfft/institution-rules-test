@@ -452,24 +452,29 @@
     });
     local.medicalInfo.healthcare_events=events;
 
-    const openingFixedMedications=[];
-    document.querySelectorAll('[data-opening-fixed-med]').forEach(rowEl=>{
-      const id=rowEl.dataset.openingFixedMed||newOpeningFixedMedication().id;
-      const existing=entryById(local.fixedMedicationBaseEntries,id);
-      const medication=rowEl.querySelector('[data-opening-fixed-med-field="medication"]')?.value||'';
-      if(String(medication).trim()){
-        openingFixedMedications.push(existing
-          ?{...existing,medication:String(medication).trim()}
-          :{
-            ...newOpeningFixedMedication(),
-            id,
-            medication:String(medication).trim()
-          });
+    const openingNoFixedEl=document.getElementById('openingNoFixedMedication');
+    if(openingNoFixedEl){
+      local.medicalInfo.opening_no_fixed_medications=!!openingNoFixedEl.checked;
+      if(openingNoFixedEl.checked){
+        local.fixedMedicationBaseEntries=[];
+      }else{
+        const openingFixedMedications=[];
+        document.querySelectorAll('[data-opening-fixed-med]').forEach(rowEl=>{
+          const id=rowEl.dataset.openingFixedMed||newOpeningFixedMedication().id;
+          const existing=entryById(local.fixedMedicationBaseEntries,id);
+          const medication=rowEl.querySelector('[data-opening-fixed-med-field="medication"]')?.value||'';
+          if(String(medication).trim()){
+            openingFixedMedications.push(existing
+              ?{...existing,medication:String(medication).trim()}
+              :{
+                ...newOpeningFixedMedication(),
+                id,
+                medication:String(medication).trim()
+              });
+          }
+        });
+        local.fixedMedicationBaseEntries=openingFixedMedications;
       }
-    });
-    if(document.querySelector('[data-opening-fixed-med]')){
-      local.fixedMedicationBaseEntries=openingFixedMedications;
-      local.medicalInfo.opening_no_fixed_medications=false;
       rebuildFixedMedicationEntries();
     }
 
