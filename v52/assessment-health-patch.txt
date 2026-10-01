@@ -345,8 +345,8 @@
       .map(record=>({record,event:eventById(record.assessment_event_id)}))
       .filter(x=>x.event?.planned_date);
     const relevantCompleted=dated.filter(x=>{
-      if(local.section==='status')return !!(x.record.status_confirmed_at||x.record.confirmed_at);
-      return !!(x.record.baseline_confirmed_at||x.record.change_confirmed_at||x.record.confirmed_at);
+      if(local.section==='status')return !!x.record.status_confirmed_at;
+      return !!(x.record.baseline_confirmed_at||x.record.change_confirmed_at);
     });
     local.hasLaterCompleted=relevantCompleted.some(x=>x.event.planned_date>row.planned_date);
     const candidates=relevantCompleted
