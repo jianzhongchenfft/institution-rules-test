@@ -118,7 +118,7 @@
     .assessment-detail-cell div{font-size:12px;font-weight:800;color:#344054;line-height:1.55;word-break:break-word}
     .assessment-form-cards{display:grid;gap:8px}
     .assessment-form-card{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fff;transition:.15s;border-left-width:4px}
-    .assessment-form-card.pending{border-left-color:transparent}
+    .assessment-form-card.pending{border-left-color:var(--line)}
     .assessment-form-card.in_progress{background:#fff8f3;border-color:#f2c7b7;border-left-color:#dc9479}
     .assessment-form-card.completed{background:#f3faf6;border-color:#b8dfc7;border-left-color:#4f9d69}
     .assessment-form-card.unable,.assessment-form-card.not_applicable{background:#f8f9fb;border-color:#d8dde6;border-left-color:#98a2b3}
