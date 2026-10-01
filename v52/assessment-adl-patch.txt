@@ -168,6 +168,7 @@
     answers:{},
     notes:{},
     pendingCopyFromId:null,
+    hasLaterCompleted:false,
     loading:false
   };
 
@@ -239,18 +240,28 @@
     local.record=currentRes.data||null;
     local.answers={...safeObj(local.record?.answers)};
     local.notes={...safeObj(local.record?.notes)};
-    local.pendingCopyFromId=local.record?.copied_from_id||null;
 
-    const candidates=historyRes.data||[];
-    candidates.sort((a,b)=>{
-      const ea=eventById(a.assessment_event_id);
-      const eb=eventById(b.assessment_event_id);
-      const da=ea?.planned_date||a.confirmed_at||'';
-      const dbb=eb?.planned_date||b.confirmed_at||'';
-      return String(dbb).localeCompare(String(da));
-    });
-    local.previous=candidates[0]||null;
-    local.previousEvent=local.previous?eventById(local.previous.assessment_event_id):null;
+    const allCompleted=historyRes.data||[];
+    const dated=allCompleted
+      .map(record=>({record,event:eventById(record.assessment_event_id)}))
+      .filter(x=>x.event?.planned_date);
+
+    local.hasLaterCompleted=dated.some(x=>x.event.planned_date>row.planned_date);
+
+    const candidates=dated
+      .filter(x=>x.event.planned_date<row.planned_date)
+      .sort((a,b)=>{
+        const byDate=String(b.event.planned_date).localeCompare(String(a.event.planned_date));
+        if(byDate!==0)return byDate;
+        return String(b.record.confirmed_at||'').localeCompare(String(a.record.confirmed_at||''));
+      });
+
+    local.previous=candidates[0]?.record||null;
+    local.previousEvent=candidates[0]?.event||null;
+
+    const copiedSourceIsValid=!!local.record?.copied_from_id
+      && local.record.copied_from_id===local.previous?.id;
+    local.pendingCopyFromId=copiedSourceIsValid?local.record.copied_from_id:null;
   }
 
   function renderSummary(){
@@ -355,7 +366,10 @@
 
         ${renderSummary()}
         ${renderCopyBox()}
-        ${(local.record?.copied_at&&!local.record?.confirmed_at)||(!local.record&&local.pendingCopyFromId)
+        ${local.hasLaterCompleted
+          ?'<div class="adl-copy-notice">此筆評估日期早於個案較新的已完成 ADL 紀錄；系統只會將本次日期以前最近一筆已完成 ADL 視為「前次評估」。</div>'
+          :''}
+        ${(local.record?.copied_at&&!local.record?.confirmed_at&&local.pendingCopyFromId)||(!local.record&&local.pendingCopyFromId)
           ?'<div class="adl-copy-notice">已帶入前次資料，尚未完成本次確認。請逐項確認後再按「完成本次確認」。</div>'
           :''}
 
