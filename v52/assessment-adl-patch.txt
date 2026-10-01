@@ -336,7 +336,7 @@
             </label>
           `).join('')}
         </div>
-        ${current!==null&&!showNote?`
+        ${!showNote?`
           <div class="adl-note"><button type="button" class="btn sm" data-adl-add-note="${item.key}">＋ 補充備註</button></div>
         `:''}
         ${showNote?`
