@@ -194,6 +194,21 @@ begin
 
   for v_entry in
     select value
+    from jsonb_array_elements(coalesce(p_medical_info->'fixed_medication_base_entries','[]'::jsonb))
+  loop
+    if jsonb_typeof(v_entry)<>'object'
+       or nullif(btrim(v_entry->>'id'),'') is null
+       or nullif(btrim(v_entry->>'medication'),'') is null then
+      raise exception 'INVALID_FIXED_MEDICATION_BASE_ENTRY';
+    end if;
+    if nullif(btrim(v_entry->>'origin_type'),'') is not null
+       and v_entry->>'origin_type' not in ('opening_baseline','service_change','correction_add','legacy') then
+      raise exception 'INVALID_FIXED_MEDICATION_BASE_ORIGIN';
+    end if;
+  end loop;
+
+  for v_entry in
+    select value
     from jsonb_array_elements(coalesce(p_medical_info->'fixed_medication_entries','[]'::jsonb))
   loop
     if jsonb_typeof(v_entry)<>'object'
