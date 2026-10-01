@@ -163,6 +163,28 @@ set form_name=excluded.form_name,
 
 delete from public.assessment_event_forms where form_code='health';
 
+
+update public.assessment_event_forms
+set sort_order=case form_code
+  when 'adl' then 10
+  when 'iadl' then 20
+  when 'health_baseline' then 30
+  when 'health_change' then 30
+  when 'health_status' then 40
+  when 'home_safety' then 50
+  when 'support' then 60
+  when 'spmsq' then 70
+  when 'gds15' then 80
+  when 'caregiver_burden' then 90
+  when 'bsrs5' then 100
+  else sort_order
+end,
+updated_at=now()
+where form_code in (
+  'adl','iadl','health_baseline','health_change','health_status',
+  'home_safety','support','spmsq','gds15','caregiver_burden','bsrs5'
+);
+
 create or replace function public.save_assessment_health(
   p_event_id uuid,
   p_medical_info jsonb,
