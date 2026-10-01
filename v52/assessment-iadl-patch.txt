@@ -73,6 +73,7 @@
     previousEvent:null,
     answers:{},
     notes:{},
+    expandedNotes:new Set(),
     pendingCopyFromId:null,
     hasLaterCompleted:false
   };
@@ -139,6 +140,7 @@
     local.record=currentRes.data||null;
     local.answers={...safeObj(local.record?.answers)};
     local.notes={...safeObj(local.record?.notes)};
+    local.expandedNotes=new Set();
 
     const dated=(historyRes.data||[])
       .map(record=>({record,event:eventById(record.assessment_event_id)}))
@@ -205,6 +207,8 @@
     const current=selectedScore(item.key);
     const prev=previousScore(item.key);
     const changed=isChanged(item.key);
+    const noteValue=String(local.notes?.[item.key]||'');
+    const showNote=changed||!!noteValue||local.expandedNotes.has(item.key);
     return `
       <section class="iadl-card ${changed?'changed':''}" data-iadl-card="${item.key}">
         <div class="iadl-card-head">
@@ -224,10 +228,15 @@
             </label>
           `).join('')}
         </div>
-        <div class="iadl-note">
-          <label>${changed?'本項較前次有變化，可補充原因或觀察：':'備註（選填）：'}</label>
-          <textarea data-iadl-note="${item.key}" placeholder="可補充實際協助內容或本次觀察">${escapeHTML(local.notes?.[item.key]||'')}</textarea>
-        </div>
+        ${current!==null&&!showNote?`
+          <div class="iadl-note"><button type="button" class="btn sm" data-iadl-add-note="${item.key}">＋ 補充備註</button></div>
+        `:''}
+        ${showNote?`
+          <div class="iadl-note">
+            <label>${changed?'本項較前次有變化，可補充原因或觀察：':'備註（選填）：'}</label>
+            <textarea data-iadl-note="${item.key}" placeholder="可補充實際協助內容或本次觀察">${escapeHTML(noteValue)}</textarea>
+          </div>
+        `:''}
       </section>
     `;
   }
@@ -290,6 +299,15 @@
         const scrollY=window.scrollY;
         renderIadlPage();
         window.scrollTo({top:scrollY,behavior:'auto'});
+      });
+    });
+
+    document.querySelectorAll('[data-iadl-add-note]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        local.expandedNotes.add(btn.dataset.iadlAddNote);
+        const y=window.scrollY;
+        renderIadlPage();
+        window.scrollTo({top:y,behavior:'auto'});
       });
     });
 
