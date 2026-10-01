@@ -38,7 +38,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       ];
       let assessmentModuleCode='';
       for(const path of assessmentModuleFiles){
-        const res=await fetch(`${path}?v=assessment-support-v1-20261002`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=assessment-note-default-20261002`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         assessmentModuleCode+='\n'+await res.text();
       }
