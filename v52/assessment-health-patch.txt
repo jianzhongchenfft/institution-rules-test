@@ -142,9 +142,6 @@
     note:''
   });
   const fixedMedicationLines=text=>String(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
-  const medicationChangeSignature=item=>[
-    item?.action||'',item?.duration_type||'',item?.medication_before||'',item?.medication_after||''
-  ].join('|');
   const isCompleteMedicationChange=item=>{
     if(!item?.action||!item?.duration_type)return false;
     if(item.action==='add')return !!String(item.medication_after||'').trim();
