@@ -1,12 +1,29 @@
 -- CURRENT RUNTIME DEFINITION — 評估管理／健康與用藥
 -- 2026-10-02
--- 現行測試版定義；不包含開發期間的舊 form_code 過渡步驟。
--- 歷史開發 SQL 保留於 assessment-health-supabase-20261001.sql，日後修改請以本檔為準。
+-- 現行測試版定義；健康現況、身體健康10項與用藥均由單一 health_medication 工具管理。
+-- 舊版歷史可由 Git 紀錄與備份分支追溯，主分支只保留此現行定義。
 
 alter table public.assessment_health_records
   add column if not exists baseline_confirmed_at timestamptz,
   add column if not exists change_confirmed_at timestamptz,
   add column if not exists status_confirmed_at timestamptz;
+
+-- 合併舊「身體與健康狀況評估」工具到 health_medication。
+-- 只有舊兩張表都完成時，合併後才維持完成；只完成其中一張則回到進行中。
+update public.assessment_event_forms hm
+set status=case
+      when hm.status='completed' and hs.status='completed' then 'completed'
+      when hm.status in ('completed','in_progress') or hs.status in ('completed','in_progress') then 'in_progress'
+      else hm.status
+    end,
+    updated_at=now()
+from public.assessment_event_forms hs
+where hm.assessment_event_id=hs.assessment_event_id
+  and hm.form_code='health_medication'
+  and hs.form_code='health_status';
+
+delete from public.assessment_event_forms
+where form_code='health_status';
 
 CREATE OR REPLACE FUNCTION public.save_assessment_health(p_event_id uuid, p_medical_info jsonb, p_medication_checks jsonb, p_health_items jsonb, p_health_notes jsonb, p_finalize boolean DEFAULT false, p_copied_from_id uuid DEFAULT NULL::uuid, p_section text DEFAULT 'all'::text)
  RETURNS assessment_health_records
@@ -50,17 +67,12 @@ begin
     raise exception 'INVALID_HEALTH_SECTION';
   end if;
 
-  v_form_code:=case p_section
-    when 'baseline' then 'health_medication'
-    when 'change' then 'health_medication'
-    when 'status' then 'health_status'
-    else null
-  end;
+  v_form_code:='health_medication';
 
-  if p_section<>'all' and not exists (
+  if not exists (
     select 1 from public.assessment_event_forms f
-    where f.assessment_event_id=p_event_id and f.form_code=v_form_code
-  ) then raise exception 'HEALTH_FORM_NOT_SELECTED:%',v_form_code; end if;
+    where f.assessment_event_id=p_event_id and f.form_code='health_medication'
+  ) then raise exception 'HEALTH_FORM_NOT_SELECTED:health_medication'; end if;
 
   p_medical_info:=coalesce(p_medical_info,'{}'::jsonb);
   p_medication_checks:=coalesce(p_medication_checks,'{}'::jsonb);
@@ -516,18 +528,18 @@ begin
   end if;
 
   update public.assessment_event_forms
-  set status=case when p_finalize then 'completed' else 'in_progress' end,
+  set status=case
+        when p_finalize and p_section='all' then 'completed'
+        when status='completed' then status
+        else 'in_progress'
+      end,
       updated_at=now()
   where assessment_event_id=p_event_id
-    and (
-      (p_section='all' and form_code in ('health_medication','health_status'))
-      or form_code=v_form_code
-    )
-    and (p_finalize or status<>'completed');
+    and form_code='health_medication';
 
   update public.assessment_events
   set status=case
-      when p_finalize and not exists(
+      when p_finalize and p_section='all' and not exists(
         select 1 from public.assessment_event_forms f
         where f.assessment_event_id=p_event_id
           and f.status not in ('completed','unable','not_applicable')
@@ -537,7 +549,7 @@ begin
     end,
     started_at=coalesce(started_at,now()),
     forms_completed_at=case
-      when p_finalize and not exists(
+      when p_finalize and p_section='all' and not exists(
         select 1 from public.assessment_event_forms f
         where f.assessment_event_id=p_event_id
           and f.status not in ('completed','unable','not_applicable')
@@ -550,7 +562,7 @@ begin
 
   return v_record;
 end;
-$function$
+$function$;
 
 
 revoke all on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid,text) from public;
