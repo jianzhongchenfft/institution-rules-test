@@ -257,6 +257,7 @@
           </div>
         </div>
 
+        ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
         ${renderSummary()}
         ${renderCopyBox()}
         ${local.hasLaterCompleted
