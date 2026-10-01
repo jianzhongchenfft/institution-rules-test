@@ -44,7 +44,7 @@
     {code:'support',name:'支持系統',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'baseline_carry',sort:60},
     {code:'spmsq',name:'SPMSQ 簡易心智狀態問卷',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:70},
     {code:'gds15',name:'GDS-15 老人心理健康評估表',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:80},
-    {code:'caregiver_burden',name:'主要照顧者負荷量表',requiredFor:[],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:90}
+    {code:'caregiver_burden',name:'高負荷家庭照顧者初篩',requiredFor:[],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:90}
   ];
 
   const ASSESSMENT_FORM_HANDLERS={
@@ -54,7 +54,8 @@
     gds15:{api:'v52AssessmentGds15',done:['completed','unable','not_applicable']},
     health_medication:{api:'v52AssessmentHealth',done:['completed']},
     home_safety:{api:'v52AssessmentHomeSafety',done:['completed']},
-    support:{api:'v52AssessmentSupport',done:['completed']}
+    support:{api:'v52AssessmentSupport',done:['completed']},
+    caregiver_burden:{api:'v52AssessmentCaregiverScreen',done:['completed','unable','not_applicable']}
   };
 
   const existingModule=modules.find(m=>m.id==='assessments');
