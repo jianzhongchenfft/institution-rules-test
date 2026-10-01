@@ -269,12 +269,12 @@
   }
 
   function render(){
-    const row=eventById(local.eventId),c=row?caseById(row.case_id):null,form=row?formById(row.id,local.section):null;
+    const row=eventById(local.eventId),c=row?caseById(row.case_id):null,form=row?formById(row.id):null;
     if(!row||!c||!form)return window.v52AssessmentApi?.renderAssessmentPage?.();
 
     const canEditRow=canEdit(row)&&row.status!=='voided';
-    const mode=healthSectionMode(row,local.section);
-    const title=sectionTitle(local.section,row);
+    const mode=healthSectionMode(row);
+    const title=sectionTitle('combined',row);
     const events=safeArray(local.medicalInfo.healthcare_events);
     const noEvents=local.medicalInfo.no_healthcare_events===true;
     const openingNoFixed=local.medicalInfo.opening_no_fixed_medications===true;
@@ -294,7 +294,7 @@
         </div>
         <div class="health-section-body">
           <div class="health-subsection">
-            <div class="health-subtitle"><strong>健康基本資料</strong></div>
+            <div class="health-subtitle"><strong>健康現況</strong></div>
             <div class="health-grid">
               <div class="health-field">
                 <label>目前重要疾病／慢性病史</label>
@@ -573,8 +573,8 @@
       ${local.hasLaterCompleted?'<div class="health-notice">此筆評估日期早於個案較新的已完成身體健康評估；系統只會將本次日期以前最近一筆完成紀錄視為「前次評估」。</div>':''}
       <section class="health-section">
         <div class="health-section-head">
-          <h3>身體與健康狀況評估</h3>
-          <p>評估目前10項身體健康狀況；開案與後續評估皆重新判斷當下狀態。</p>
+          <h3>身體健康狀態（10項）</h3>
+          <p>本區評估個案目前10項身體健康狀態；開案與後續皆重新判斷當下狀況。</p>
         </div>
         <div class="health-section-body">
           ${local.previous?`
@@ -596,15 +596,16 @@
         <div class="page-head">
           <div>
             <h1>${escapeHTML(c.case_name)}｜${escapeHTML(title)}</h1>
-            <p>${local.section==='medication'
-              ?(mode==='baseline'?'建立接案當下的健康與用藥基準。':'追蹤前次評估後的健康、就醫與用藥變化。')
-              :'記錄本次身體與健康狀況。'}</p>
+            <p>${mode==='baseline'
+              ?'一次完成接案當下的健康現況、身體健康狀態與用藥評估。'
+              :'一次完成本期健康變化、身體健康狀態與用藥追蹤。'}</p>
           </div>
           <div class="assessment-head-actions"><button id="healthBack" class="btn">← 返回評估事件</button></div>
         </div>
 
         ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
-        ${local.section==='medication'?(mode==='baseline'?baselineHtml:changeHtml):statusHtml}
+        ${mode==='baseline'?baselineHtml:changeHtml}
+        ${statusHtml}
 
         ${canEditRow?`
           <div class="health-actions">
