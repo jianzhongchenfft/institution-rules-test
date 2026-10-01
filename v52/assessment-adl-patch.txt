@@ -167,6 +167,7 @@
     previousEvent:null,
     answers:{},
     notes:{},
+    expandedNotes:new Set(),
     pendingCopyFromId:null,
     hasLaterCompleted:false,
     loading:false
@@ -239,6 +240,7 @@
     local.record=currentRes.data||null;
     local.answers={...safeObj(local.record?.answers)};
     local.notes={...safeObj(local.record?.notes)};
+    local.expandedNotes=new Set();
 
     const allCompleted=historyRes.data||[];
     const dated=allCompleted
@@ -313,6 +315,8 @@
     const current=selectedScore(item.key);
     const prev=previousScore(item.key);
     const changed=isChanged(item.key);
+    const noteValue=String(local.notes?.[item.key]||'');
+    const showNote=changed||!!noteValue||local.expandedNotes.has(item.key);
     return `
       <section class="adl-card ${changed?'changed':''}" data-adl-card="${item.key}">
         <div class="adl-card-head">
@@ -332,10 +336,15 @@
             </label>
           `).join('')}
         </div>
-        <div class="adl-note">
-          <label>${changed?'本項較前次有變化，可補充原因或觀察：':'備註（選填）：'}</label>
-          <textarea data-adl-note="${item.key}" placeholder="可記錄輔具使用、協助程度或本次觀察">${escapeHTML(local.notes?.[item.key]||'')}</textarea>
-        </div>
+        ${current!==null&&!showNote?`
+          <div class="adl-note"><button type="button" class="btn sm" data-adl-add-note="${item.key}">＋ 補充備註</button></div>
+        `:''}
+        ${showNote?`
+          <div class="adl-note">
+            <label>${changed?'本項較前次有變化，可補充原因或觀察：':'備註（選填）：'}</label>
+            <textarea data-adl-note="${item.key}" placeholder="可記錄輔具使用、協助程度或本次觀察">${escapeHTML(noteValue)}</textarea>
+          </div>
+        `:''}
       </section>
     `;
   }
@@ -399,6 +408,15 @@
           radio.closest('.adl-option')?.classList.toggle('selected',radio.checked);
         });
         refreshAdlDerivedUI();
+      });
+    });
+
+    document.querySelectorAll('[data-adl-add-note]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        local.expandedNotes.add(btn.dataset.adlAddNote);
+        const y=window.scrollY;
+        renderAdlPage();
+        window.scrollTo({top:y,behavior:'auto'});
       });
     });
 
