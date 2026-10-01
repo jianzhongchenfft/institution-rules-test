@@ -538,6 +538,11 @@
             <label>評估原因 *</label>
             <select id="assessmentReason">${assessmentReasonOptions(selectedReason)}</select>
           </div>
+          <div class="field half" id="assessmentProblemFollowupField">
+            <label>問題追蹤日期</label>
+            <input id="assessmentProblemFollowupDate" type="date" value="${existing?.problem_followup_date||''}">
+            <div style="font-size:10.5px;color:#667085;margin-top:5px">僅用於本次狀況／特定問題後續確認，不會直接改變完整評估週期。</div>
+          </div>
           <div class="field full">
             <div id="assessmentSupervisorPreview" class="assessment-supervisor-preview"></div>
           </div>
@@ -591,6 +596,9 @@
             reason_code:reasonCode,
             reason_note:$('assessmentReasonNote')?.value.trim()||null,
             combined_with_home_visit:!!$('assessmentWithVisit')?.checked,
+            problem_followup_date:['condition_change','specific_problem'].includes(type)
+              ?($('assessmentProblemFollowupDate')?.value||null)
+              :null,
             updated_by:state.user.id,
             updated_at:new Date().toISOString()
           };
@@ -647,6 +655,9 @@
             reason_code:reasonCode,
             reason_note:$('assessmentReasonNote')?.value.trim()||null,
             combined_with_home_visit:!!$('assessmentWithVisit')?.checked,
+            problem_followup_date:['condition_change','specific_problem'].includes(type)
+              ?($('assessmentProblemFollowupDate')?.value||null)
+              :null,
             responsible_staff_id:c.supervisor_id||null,
             status:'pending',
             created_by:state.user.id,
@@ -700,6 +711,12 @@
       }
     });
 
+    const toggleProblemFollowupField=()=>{
+      const type=$('assessmentType')?.value;
+      const field=$('assessmentProblemFollowupField');
+      if(field)field.style.display=['condition_change','specific_problem'].includes(type)?'block':'none';
+    };
+
     let previousType=initialType;
     $('assessmentType')?.addEventListener('change',()=>{
       const next=$('assessmentType').value;
@@ -709,10 +726,12 @@
         reason.value=defaultAssessmentReasonForType(next);
       }
       previousType=next;
+      toggleProblemFollowupField();
     });
     $('assessmentCase')?.addEventListener('change',updateAssessmentSupervisorPreview);
     updateAssessmentSupervisorPreview();
     applyAssessmentFormRules(null);
+    toggleProblemFollowupField();
   }
 
   async function startAssessment(row){
@@ -808,6 +827,12 @@
         <div class="assessment-detail-cell"><label>評估原因</label><div>${escapeHTML(assessmentReasonText(row))}</div></div>
         <div class="assessment-detail-cell"><label>與家訪同日</label><div>${row.combined_with_home_visit?'是':'否'}</div></div>
         <div class="assessment-detail-cell"><label>表單進度</label><div>${p.done}／${p.total}</div></div>
+        ${['condition_change','specific_problem'].includes(row.assessment_type)?'<div class="assessment-detail-cell"><label>問題追蹤日期</label><div>'+(row.problem_followup_date?rocDate(row.problem_followup_date+'T00:00:00'):'未設定')+'</div></div>':''}
+        <div class="assessment-detail-cell"><label>完整評估週期</label><div>${
+          ['opening','periodic'].includes(row.assessment_type)
+            ?'本次完成後作為完整評估基準'
+            :(row.counts_as_full_reassessment?'已確認視同完整再評估':'目前不影響原定完整評估週期')
+        }</div></div>
         ${row.status==='voided'?'<div class="assessment-detail-cell" style="grid-column:1/-1"><label>作廢原因</label><div>'+escapeHTML(row.void_reason||'—')+'</div></div>':''}
       </div>
 
@@ -828,7 +853,9 @@
                     <strong>${escapeHTML(form.form_name)}</strong>
                     <small>${form.is_required?'核心工具｜':''}${escapeHTML(assessmentFormStatusLabel(form.status))}</small>
                   </div>
-                  <button class="btn sm" disabled>${row.status==='pending'?'待開始':'下一階段開放'}</button>
+                  ${form.form_code==='adl'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentAdl
+                    ?'<button class="btn sm primary" data-open-adl="'+row.id+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
+                    :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
                 </div>
               `).join('')}
             </div>
@@ -841,6 +868,9 @@
     $('assessmentEdit')?.addEventListener('click',()=>openAssessmentEventModal(row));
     $('assessmentStart')?.addEventListener('click',()=>startAssessment(row));
     $('assessmentVoid')?.addEventListener('click',()=>voidAssessment(row));
+    document.querySelectorAll('[data-open-adl]').forEach(btn=>{
+      btn.addEventListener('click',()=>window.v52AssessmentAdl?.open(btn.dataset.openAdl));
+    });
     window.scrollTo({top:0,behavior:'auto'});
   }
 
