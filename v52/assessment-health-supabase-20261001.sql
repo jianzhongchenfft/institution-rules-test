@@ -172,9 +172,9 @@ begin
     raise exception 'INVALID_NO_FIXED_MEDICATIONS';
   end if;
 
-  if nullif(btrim(p_medical_info->>'diagnosis_change'),'') is not null
-     and p_medical_info->>'diagnosis_change' not in ('no','yes') then
-    raise exception 'INVALID_DIAGNOSIS_CHANGE';
+  if nullif(btrim(p_medical_info->>'unvisited_health_change'),'') is not null
+     and p_medical_info->>'unvisited_health_change' not in ('no','yes') then
+    raise exception 'INVALID_UNVISITED_HEALTH_CHANGE';
   end if;
 
   if nullif(btrim(p_medical_info->>'medication_change'),'') is not null
