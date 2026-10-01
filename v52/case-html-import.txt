@@ -266,9 +266,11 @@
       const w=welfare.value;
       const noFee=[...payment.options].find(o=>o.value==='不收費');
       if(w==='低收入戶'){
+        const changedToNoFee=payment.value!=='不收費';
         payment.value='不收費';
         payment.disabled=true;
         if(noFee)noFee.disabled=false;
+        if(changedToNoFee)toast('收入別為第一類，付款方式已自動調整為「不收費」。','success');
       }else{
         payment.disabled=false;
         if(noFee)noFee.disabled=(w==='中低收入戶'||w==='一般戶');
