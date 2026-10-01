@@ -160,14 +160,6 @@ begin
   p_health_items:=coalesce(p_health_items,'{}'::jsonb);
   p_health_notes:=coalesce(p_health_notes,'{}'::jsonb);
 
-  if p_medical_info ? '_sync_case_health_profile' then
-    if jsonb_typeof(p_medical_info->'_sync_case_health_profile')<>'boolean' then
-      raise exception 'INVALID_SYNC_CASE_HEALTH_PROFILE';
-    end if;
-    v_sync_master:=coalesce((p_medical_info->>'_sync_case_health_profile')::boolean,false);
-    p_medical_info:=p_medical_info-'_sync_case_health_profile';
-  end if;
-
   if p_medical_info ? 'healthcare_events'
      and jsonb_typeof(p_medical_info->'healthcare_events')<>'array' then
     raise exception 'INVALID_HEALTHCARE_EVENTS';
@@ -243,10 +235,41 @@ begin
     end if;
   end loop;
 
-  if v_sync_master then
-    v_new_conditions:=nullif(btrim(p_medical_info->>'baseline_important_conditions'),'');
-    v_new_treatments:=nullif(btrim(p_medical_info->>'baseline_ongoing_treatments'),'');
+  select * into v_old
+  from public.assessment_health_records
+  where assessment_event_id=p_event_id
+  for update;
 
+  v_new_conditions:=nullif(btrim(p_medical_info->>'baseline_important_conditions'),'');
+  v_new_treatments:=nullif(btrim(p_medical_info->>'baseline_ongoing_treatments'),'');
+
+  if v_old.id is null then
+    v_sync_master:=
+      (
+        p_medical_info ? 'baseline_important_conditions'
+        and v_case.important_conditions is distinct from v_new_conditions
+      )
+      or
+      (
+        p_medical_info ? 'baseline_ongoing_treatments'
+        and v_case.ongoing_treatments is distinct from v_new_treatments
+      );
+  else
+    v_sync_master:=
+      (
+        p_medical_info ? 'baseline_important_conditions'
+        and nullif(btrim(v_old.medical_info->>'baseline_important_conditions'),'')
+            is distinct from v_new_conditions
+      )
+      or
+      (
+        p_medical_info ? 'baseline_ongoing_treatments'
+        and nullif(btrim(v_old.medical_info->>'baseline_ongoing_treatments'),'')
+            is distinct from v_new_treatments
+      );
+  end if;
+
+  if v_sync_master then
     if v_case.important_conditions is distinct from v_new_conditions then
       insert into public.case_health_profile_history(
         case_id,field_name,old_value,new_value,changed_by
@@ -269,11 +292,6 @@ begin
         updated_at=now()
     where id=v_case.id;
   end if;
-
-  select * into v_old
-  from public.assessment_health_records
-  where assessment_event_id=p_event_id
-  for update;
 
   if v_old.id is null then
     insert into public.assessment_health_records(
