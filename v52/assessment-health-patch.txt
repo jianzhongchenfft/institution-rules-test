@@ -132,6 +132,55 @@
   },0);
 
   const emptyEvent=()=>({date:'',type:'',facility:'',department:'',reason:'',result:''});
+  const newMedicationChange=()=>({
+    id:(globalThis.crypto?.randomUUID?.()||('med-'+Date.now()+'-'+Math.random().toString(36).slice(2))),
+    action:'',
+    duration_type:'',
+    medication_before:'',
+    medication_after:'',
+    note:''
+  });
+  const fixedMedicationLines=text=>String(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const medicationChangeSignature=item=>[
+    item?.action||'',item?.duration_type||'',item?.medication_before||'',item?.medication_after||''
+  ].join('|');
+  const isCompleteMedicationChange=item=>{
+    if(!item?.action||!item?.duration_type)return false;
+    if(item.action==='add')return !!String(item.medication_after||'').trim();
+    if(item.action==='stop')return !!String(item.medication_before||'').trim();
+    if(item.action==='adjust')return !!String(item.medication_before||'').trim()&&!!String(item.medication_after||'').trim();
+    return false;
+  };
+  const addFixedLine=(lines,value)=>{
+    const v=String(value||'').trim();
+    if(v&&!lines.some(x=>x===v))lines.push(v);
+  };
+  const removeFixedLine=(lines,value)=>{
+    const v=String(value||'').trim();
+    const i=lines.findIndex(x=>x===v);
+    if(i>=0)lines.splice(i,1);
+  };
+  const replaceFixedLine=(lines,from,to)=>{
+    const a=String(from||'').trim(),b=String(to||'').trim();
+    const i=lines.findIndex(x=>x===a);
+    if(i>=0){
+      if(b)lines[i]=b; else lines.splice(i,1);
+    }else if(b&&!lines.some(x=>x===b)){
+      lines.push(b);
+    }
+  };
+  const reverseLongTermMedicationChange=(lines,item)=>{
+    if(item?.duration_type!=='long_term'||!isCompleteMedicationChange(item))return;
+    if(item.action==='add')removeFixedLine(lines,item.medication_after);
+    else if(item.action==='stop')addFixedLine(lines,item.medication_before);
+    else if(item.action==='adjust')replaceFixedLine(lines,item.medication_after,item.medication_before);
+  };
+  const applyLongTermMedicationChange=(lines,item)=>{
+    if(item?.duration_type!=='long_term'||!isCompleteMedicationChange(item))return;
+    if(item.action==='add')addFixedLine(lines,item.medication_after);
+    else if(item.action==='stop')removeFixedLine(lines,item.medication_before);
+    else if(item.action==='adjust')replaceFixedLine(lines,item.medication_before,item.medication_after);
+  };
 
   async function load(eventId){
     const row=eventById(eventId);
@@ -155,6 +204,14 @@
       local.medicalInfo.baseline_ongoing_treatments=currentCase?.ongoing_treatments||'';
     }
     local.medicalInfo.healthcare_events=safeArray(local.medicalInfo.healthcare_events).map(x=>({...safe(x)}));
+    local.medicalInfo.medication_changes=safeArray(local.medicalInfo.medication_changes).map((x,i)=>({
+      id:x?.id||('legacy-med-'+i),
+      action:x?.action||'',
+      duration_type:x?.duration_type||'',
+      medication_before:x?.medication_before||'',
+      medication_after:x?.medication_after||'',
+      note:x?.note||''
+    }));
     local.medicationChecks={...safe(local.record?.medication_checks)};
     local.healthItems={...safe(local.record?.health_items)};
     local.healthNotes={...safe(local.record?.health_notes)};
@@ -177,7 +234,6 @@
       local.medicalInfo.medication_assisted_by=prevMed.medication_assisted_by||'';
       local.medicalInfo.medication_regular=prevMed.medication_regular||'';
       local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
-      local.pendingCopyFromId=local.previous.id;
     }
   }
 
@@ -193,6 +249,14 @@
       if(Object.values(item).some(v=>String(v||'').trim()!==''))events.push(item);
     });
     local.medicalInfo.healthcare_events=events;
+
+    const medicationChanges=[];
+    document.querySelectorAll('[data-med-change]').forEach(row=>{
+      const item={id:row.dataset.medChange||newMedicationChange().id};
+      row.querySelectorAll('[data-med-change-field]').forEach(el=>item[el.dataset.medChangeField]=el.value);
+      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))medicationChanges.push(item);
+    });
+    local.medicalInfo.medication_changes=medicationChanges;
 
     document.querySelectorAll('[data-health-med-note]').forEach(el=>{
       const key=el.dataset.healthMedNote;
@@ -281,6 +345,65 @@
     `;
   }
 
+  function renderMedicationChange(item,index){
+    const fixedLines=fixedMedicationLines(local.medicalInfo.fixed_medications);
+    const action=item.action||'',duration=item.duration_type||'';
+    const beforeOptions=[...new Set([item.medication_before,...fixedLines].filter(Boolean))];
+    const beforeField=action==='stop'||action==='adjust'
+      ?(duration==='long_term'
+        ?`<select data-med-change-field="medication_before">
+            <option value="">請選擇目前固定用藥</option>
+            ${beforeOptions.map(v=>`<option value="${escapeHTML(v)}" ${item.medication_before===v?'selected':''}>${escapeHTML(v)}</option>`).join('')}
+          </select>`
+        :`<input data-med-change-field="medication_before" value="${escapeHTML(item.medication_before||'')}" placeholder="例如：感冒藥A">`)
+      :'';
+    const afterField=action==='add'||action==='adjust'
+      ?`<input data-med-change-field="medication_after" value="${escapeHTML(item.medication_after||'')}" placeholder="${action==='add'?'例如：高血壓藥A，每日1次':'請填調整後藥物與用法'}">`
+      :'';
+
+    return `
+      <div class="health-event" data-med-change="${escapeHTML(item.id||'')}">
+        <div class="health-event-head">
+          <strong>用藥異動 ${index+1}</strong>
+          <button type="button" class="btn sm" data-remove-med-change="${index}">移除</button>
+        </div>
+        <div class="health-event-grid">
+          <div>
+            <label>異動類型</label>
+            <select data-med-change-field="action">
+              <option value="">請選擇</option>
+              <option value="add" ${action==='add'?'selected':''}>新增</option>
+              <option value="stop" ${action==='stop'?'selected':''}>停用</option>
+              <option value="adjust" ${action==='adjust'?'selected':''}>調整</option>
+            </select>
+          </div>
+          <div>
+            <label>用藥性質</label>
+            <select data-med-change-field="duration_type">
+              <option value="">請選擇</option>
+              <option value="long_term" ${duration==='long_term'?'selected':''}>長期／固定</option>
+              <option value="short_term" ${duration==='short_term'?'selected':''}>短期／臨時</option>
+            </select>
+          </div>
+          ${(action==='stop'||action==='adjust')?`
+            <div class="wide">
+              <label>${action==='stop'?'停用藥物':'調整前藥物'}</label>
+              ${beforeField}
+            </div>`:''}
+          ${(action==='add'||action==='adjust')?`
+            <div class="wide">
+              <label>${action==='add'?'新增藥物／用法':'調整後藥物／用法'}</label>
+              ${afterField}
+            </div>`:''}
+          <div class="wide">
+            <label>備註（選填）</label>
+            <textarea data-med-change-field="note">${escapeHTML(item.note||'')}</textarea>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderHealthItem([key,label]){
     const cur=local.healthItems[key],prev=local.previous?.health_items?.[key],changed=cur&&prev&&cur!==prev;
     return `
@@ -314,7 +437,6 @@
     const noEvents=local.medicalInfo.no_healthcare_events===true;
     const noFixedMeds=local.medicalInfo.no_fixed_medications===true;
     const unvisitedHealthChanged=local.medicalInfo.unvisited_health_change==='yes';
-    const medicationChanged=local.medicalInfo.medication_change==='changed';
     const hasSideEffect=local.medicalInfo.side_effect==='present';
 
     window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'身體與健康狀況評估');
@@ -331,16 +453,6 @@
 
         ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
         ${renderSummary()}
-
-        ${local.previous?`
-          <div class="health-copy">
-            <div>
-              <strong>前次健康評估：${local.previous.total_score??'—'} 分</strong>
-              <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):''}｜只帶入可延續的目前狀況；本期就醫、未就醫的重要變化、用藥異動與後續處置不會複製。</span>
-            </div>
-            <button id="healthCopyPrevious" class="btn sm">帶入前次現況</button>
-          </div>
-        `:''}
 
         ${local.hasLaterCompleted?'<div class="health-notice">此筆評估日期早於個案較新的已完成健康評估；系統只會將本次日期以前最近一筆已完成紀錄視為「前次評估」。</div>':''}
 
@@ -431,17 +543,19 @@
                   <label>目前固定用藥（名稱與用途）</label>
                   <textarea data-health-medical="fixed_medications">${escapeHTML(local.medicalInfo.fixed_medications||'')}</textarea>
                 </div>
-                <div class="health-field">
-                  <label>本期用藥是否新增／停用／調整</label>
-                  <select data-health-medical="medication_change">
-                    <option value="">請選擇</option>
-                    <option value="none" ${local.medicalInfo.medication_change==='none'?'selected':''}>無異動</option>
-                    <option value="changed" ${medicationChanged?'selected':''}>有異動</option>
-                  </select>
+                <div class="health-field" style="grid-column:1/-1">
+                  <label style="display:flex;align-items:center;gap:6px">
+                    <input type="checkbox" data-health-medical="no_medication_changes" ${local.medicalInfo.no_medication_changes===true?'checked':''} style="width:auto">
+                    本評估期間無用藥異動
+                  </label>
                 </div>
-                <div class="health-field" style="${medicationChanged?'':'display:none'}">
-                  <label>本期用藥異動內容</label>
-                  <textarea data-health-medical="medication_change_note">${escapeHTML(local.medicalInfo.medication_change_note||'')}</textarea>
+                <div style="grid-column:1/-1;${local.medicalInfo.no_medication_changes===true?'display:none':''}">
+                  <div class="health-event-list">
+                    ${(safeArray(local.medicalInfo.medication_changes).length
+                      ?safeArray(local.medicalInfo.medication_changes)
+                      :[newMedicationChange()]).map(renderMedicationChange).join('')}
+                  </div>
+                  <button id="healthAddMedicationChange" type="button" class="btn sm" style="margin-top:8px">＋ 新增一筆用藥異動</button>
                 </div>
                 <div class="health-field">
                   <label>用藥方式</label>
@@ -519,6 +633,15 @@
             <p>依目前觀察評估10項，每項「狀況良好2分／需觀察1分／異常轉介0分」。</p>
           </div>
           <div class="health-section-body">
+            ${local.previous?`
+              <div class="health-copy">
+                <div>
+                  <strong>前次身體與健康狀況</strong>
+                  <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):''}</span>
+                </div>
+                <button id="healthCopyPrevious" class="btn sm">帶入前次</button>
+              </div>
+            `:''}
             <div class="health-items">${HEALTH_ITEMS.map(renderHealthItem).join('')}</div>
           </div>
         </section>
@@ -539,7 +662,7 @@
       el.addEventListener(evt,()=>{
         syncInputs();
         const key=el.dataset.healthMedical;
-        if(['no_healthcare_events','no_fixed_medications','unvisited_health_change','medication_change','side_effect'].includes(key)){
+        if(['no_healthcare_events','no_fixed_medications','unvisited_health_change','no_medication_changes','side_effect'].includes(key)){
           const y=window.scrollY;
           render();
           window.scrollTo({top:y,behavior:'auto'});
@@ -576,40 +699,39 @@
       render();
     }));
 
+    $('healthAddMedicationChange')?.addEventListener('click',()=>{
+      syncInputs();
+      local.medicalInfo.no_medication_changes=false;
+      local.medicalInfo.medication_changes=[...safeArray(local.medicalInfo.medication_changes),newMedicationChange()];
+      render();
+    });
+
+    document.querySelectorAll('[data-remove-med-change]').forEach(btn=>btn.addEventListener('click',()=>{
+      syncInputs();
+      const index=Number(btn.dataset.removeMedChange);
+      const items=safeArray(local.medicalInfo.medication_changes);
+      items.splice(index,1);
+      local.medicalInfo.medication_changes=items;
+      render();
+    }));
+
+    document.querySelectorAll('[data-med-change-field]').forEach(el=>{
+      const evt=el.tagName==='SELECT'?'change':'input';
+      el.addEventListener(evt,()=>{
+        syncInputs();
+        if(el.tagName==='SELECT'){
+          const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
+        }
+      });
+    });
+
     $('healthCopyPrevious')?.addEventListener('click',()=>{
       if(!local.previous)return;
-
-      const prevMed=safe(local.previous.medical_info);
-
-      local.medicalInfo={
-        baseline_important_conditions:c.important_conditions||'',
-        baseline_ongoing_treatments:c.ongoing_treatments||'',
-        healthcare_events:[],
-        no_healthcare_events:false,
-        unvisited_health_change:'',
-        unvisited_health_change_note:'',
-        regular_followup:prevMed.regular_followup||'',
-        regular_followup_reason:prevMed.regular_followup_reason||'',
-        no_fixed_medications:prevMed.no_fixed_medications===true,
-        fixed_medications:prevMed.fixed_medications||'',
-        medication_change:'',
-        medication_change_note:'',
-        medication_method:prevMed.medication_method||'',
-        medication_assisted_by:prevMed.medication_assisted_by||'',
-        medication_regular:prevMed.medication_regular||'',
-        medication_followup:prevMed.medication_followup||'',
-        side_effect:'',
-        side_effect_note:'',
-        care_impact:'',
-        care_impact_note:''
-      };
-
-      local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
       local.healthItems={...safe(local.previous.health_items)};
       local.healthNotes={...safe(local.previous.health_notes)};
       local.pendingCopyFromId=local.previous.id;
       render();
-      toast('已帶入前次現況；本期事件與變化欄位已保留空白，請重新確認','success');
+      toast('已帶入前次身體與健康狀況','success');
     });
 
     $('healthDraft')?.addEventListener('click',()=>save(false));
@@ -679,9 +801,52 @@
       medicalInfoForSave.fixed_medications='';
     }
 
-    if(medicalInfoForSave.medication_change!=='changed'){
-      medicalInfoForSave.medication_change_note='';
+    let medicationChanges=medicalInfoForSave.no_medication_changes===true
+      ?[]
+      :safeArray(medicalInfoForSave.medication_changes).map(x=>({...x}));
+
+    if(finalize){
+      const incomplete=medicationChanges.find(x=>!isCompleteMedicationChange(x));
+      if(incomplete){
+        return toast('請完成本期用藥異動的「異動類型、用藥性質及藥物內容」','warn');
+      }
     }
+
+    const oldMedicationChanges=safeArray(local.record?.medical_info?.medication_changes);
+    const oldById=new Map(oldMedicationChanges.map(x=>[x.id,x]));
+    const newById=new Map(medicationChanges.map(x=>[x.id,x]));
+    const fixedLines=fixedMedicationLines(medicalInfoForSave.fixed_medications);
+
+    oldMedicationChanges.forEach(oldItem=>{
+      const nextItem=newById.get(oldItem.id);
+      if(oldItem.duration_type==='long_term'&&isCompleteMedicationChange(oldItem)
+        &&(!nextItem||medicationChangeSignature(oldItem)!==medicationChangeSignature(nextItem))){
+        reverseLongTermMedicationChange(fixedLines,oldItem);
+      }
+    });
+    medicationChanges.forEach(item=>{
+      const oldItem=oldById.get(item.id);
+      if(item.duration_type==='long_term'&&isCompleteMedicationChange(item)
+        &&(!oldItem||medicationChangeSignature(oldItem)!==medicationChangeSignature(item))){
+        applyLongTermMedicationChange(fixedLines,item);
+      }
+    });
+
+    medicalInfoForSave.fixed_medications=fixedLines.join('\n');
+    medicalInfoForSave.no_fixed_medications=fixedLines.length===0;
+    medicalInfoForSave.medication_changes=medicationChanges;
+    medicalInfoForSave.no_medication_changes=medicationChanges.length===0;
+    medicalInfoForSave.medication_change=medicationChanges.length?'changed':'none';
+    medicalInfoForSave.medication_change_note=medicationChanges.map(item=>{
+      const action=item.action==='add'?'新增':item.action==='stop'?'停用':'調整';
+      const duration=item.duration_type==='long_term'?'長期／固定':'短期／臨時';
+      const detail=item.action==='add'
+        ?item.medication_after
+        :item.action==='stop'
+          ?item.medication_before
+          :item.medication_before+' → '+item.medication_after;
+      return action+'｜'+duration+'｜'+detail+(item.note?'｜'+item.note:'');
+    }).join('\n');
 
     if(medicalInfoForSave.side_effect!=='present'){
       medicalInfoForSave.side_effect_note='';
