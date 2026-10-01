@@ -358,10 +358,14 @@
     const savedBase=safeArray(local.medicalInfo.fixed_medication_base_entries);
     const savedEffective=safeArray(local.medicalInfo.fixed_medication_entries);
     const previousEffective=safeArray(prevMed.fixed_medication_entries);
+    const hasSavedBase=Object.prototype.hasOwnProperty.call(local.medicalInfo,'fixed_medication_base_entries')
+      &&Array.isArray(local.medicalInfo.fixed_medication_base_entries);
+    const hasPreviousEffective=Object.prototype.hasOwnProperty.call(prevMed,'fixed_medication_entries')
+      &&Array.isArray(prevMed.fixed_medication_entries);
 
-    if(savedBase.length){
+    if(hasSavedBase){
       local.fixedMedicationBaseEntries=savedBase.map(x=>normalizeMedicationEntry(x,row));
-    }else if(!local.record&&previousEffective.length){
+    }else if(!local.record&&hasPreviousEffective){
       local.fixedMedicationBaseEntries=previousEffective.map(x=>normalizeMedicationEntry(x,local.previousEvent));
     }else if(!local.record&&local.previous){
       local.fixedMedicationBaseEntries=legacyEntriesFromText(prevMed.fixed_medications||'',local.previousEvent,'legacy');
