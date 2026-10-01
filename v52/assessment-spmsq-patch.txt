@@ -126,8 +126,14 @@
         p_unable:!!local.isUnable,p_unable_reason:local.isUnable?(local.unableReason||null):null,p_copied_from_id:null
       });
       if(error)throw error;
-      await window.v52AssessmentApi?.loadAssessmentData?.(false);await load(row.id);render();
-      toast(finalize?'SPMSQ本次確認已完成':'SPMSQ草稿已儲存','success');
+      await window.v52AssessmentApi?.loadAssessmentData?.(false);
+      if(finalize){
+        window.v52AssessmentApi?.renderAssessmentDetail?.(row.id);
+        toast('SPMSQ本次確認已完成','success');
+      }else{
+        await load(row.id);render();
+        toast('SPMSQ草稿已儲存','success');
+      }
     }catch(err){console.error(err);toast('儲存SPMSQ失敗：'+(err?.message||err),'error');}
     finally{showLoading(false);}
   }
