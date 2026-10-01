@@ -157,33 +157,60 @@ begin
   p_health_items:=coalesce(p_health_items,'{}'::jsonb);
   p_health_notes:=coalesce(p_health_notes,'{}'::jsonb);
 
-  if p_medical_info ? 'no_recent_medical' then
-    if lower(p_medical_info->>'no_recent_medical') not in ('true','false') then
-      raise exception 'INVALID_NO_RECENT_MEDICAL';
-    end if;
+  if p_medical_info ? 'healthcare_events'
+     and jsonb_typeof(p_medical_info->'healthcare_events')<>'array' then
+    raise exception 'INVALID_HEALTHCARE_EVENTS';
+  end if;
+
+  if p_medical_info ? 'no_healthcare_events'
+     and jsonb_typeof(p_medical_info->'no_healthcare_events')<>'boolean' then
+    raise exception 'INVALID_NO_HEALTHCARE_EVENTS';
+  end if;
+
+  if p_medical_info ? 'no_fixed_medications'
+     and jsonb_typeof(p_medical_info->'no_fixed_medications')<>'boolean' then
+    raise exception 'INVALID_NO_FIXED_MEDICATIONS';
+  end if;
+
+  if p_medical_info ? 'diagnosis_change'
+     and p_medical_info->>'diagnosis_change' not in ('no','yes') then
+    raise exception 'INVALID_DIAGNOSIS_CHANGE';
+  end if;
+
+  if p_medical_info ? 'medication_change'
+     and p_medical_info->>'medication_change' not in ('none','changed') then
+    raise exception 'INVALID_MEDICATION_CHANGE';
   end if;
 
   if p_medical_info ? 'medication_method'
      and p_medical_info->>'medication_method' not in ('self','assisted') then
     raise exception 'INVALID_MEDICATION_METHOD';
   end if;
+
   if p_medical_info ? 'regular_followup'
      and p_medical_info->>'regular_followup' not in ('yes','no') then
     raise exception 'INVALID_REGULAR_FOLLOWUP';
   end if;
+
   if p_medical_info ? 'medication_regular'
      and p_medical_info->>'medication_regular' not in ('yes','no') then
     raise exception 'INVALID_MEDICATION_REGULAR';
   end if;
+
   if p_medical_info ? 'side_effect'
      and p_medical_info->>'side_effect' not in ('none','present') then
     raise exception 'INVALID_SIDE_EFFECT';
   end if;
 
+  if p_medical_info ? 'care_impact'
+     and p_medical_info->>'care_impact' not in ('no_impact','observe','adjust_plan','contact_external') then
+    raise exception 'INVALID_CARE_IMPACT';
+  end if;
+
   foreach v_key in array v_med_keys loop
     if p_medication_checks ? v_key then
       v_status:=p_medication_checks->v_key->>'status';
-      if v_status is not null and v_status not in ('good','improve') then
+      if v_status is not null and v_status not in ('good','improve','not_applicable') then
         raise exception 'INVALID_MEDICATION_CHECK:%',v_key;
       end if;
     end if;
@@ -191,12 +218,15 @@ begin
 
   foreach v_key in array v_health_keys loop
     v_status:=p_health_items->>v_key;
+
     if v_status is not null and v_status not in ('good','observe','refer') then
       raise exception 'INVALID_HEALTH_STATUS:%',v_key;
     end if;
+
     if p_finalize and v_status is null then
       raise exception 'HEALTH_INCOMPLETE:%',v_key;
     end if;
+
     if v_status='good' then v_total:=v_total+2;
     elsif v_status='observe' then v_total:=v_total+1;
     end if;
@@ -223,7 +253,8 @@ begin
     )
     returning * into v_record;
   else
-    for v_key in select key from jsonb_object_keys(coalesce(v_old.medical_info,'{}'::jsonb)||p_medical_info) as t(key)
+    for v_key in
+      select key from jsonb_object_keys(coalesce(v_old.medical_info,'{}'::jsonb)||p_medical_info) as t(key)
     loop
       if (v_old.medical_info->v_key) is distinct from (p_medical_info->v_key) then
         insert into public.assessment_health_history(
@@ -235,7 +266,8 @@ begin
       end if;
     end loop;
 
-    for v_key in select key from jsonb_object_keys(coalesce(v_old.medication_checks,'{}'::jsonb)||p_medication_checks) as t(key)
+    for v_key in
+      select key from jsonb_object_keys(coalesce(v_old.medication_checks,'{}'::jsonb)||p_medication_checks) as t(key)
     loop
       if (v_old.medication_checks->v_key) is distinct from (p_medication_checks->v_key) then
         insert into public.assessment_health_history(
@@ -247,7 +279,8 @@ begin
       end if;
     end loop;
 
-    for v_key in select key from jsonb_object_keys(coalesce(v_old.health_items,'{}'::jsonb)||p_health_items) as t(key)
+    for v_key in
+      select key from jsonb_object_keys(coalesce(v_old.health_items,'{}'::jsonb)||p_health_items) as t(key)
     loop
       if (v_old.health_items->v_key) is distinct from (p_health_items->v_key) then
         insert into public.assessment_health_history(
@@ -259,7 +292,8 @@ begin
       end if;
     end loop;
 
-    for v_key in select key from jsonb_object_keys(coalesce(v_old.health_notes,'{}'::jsonb)||p_health_notes) as t(key)
+    for v_key in
+      select key from jsonb_object_keys(coalesce(v_old.health_notes,'{}'::jsonb)||p_health_notes) as t(key)
     loop
       if (v_old.health_notes->v_key) is distinct from (p_health_notes->v_key) then
         insert into public.assessment_health_history(
