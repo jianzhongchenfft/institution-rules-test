@@ -160,16 +160,20 @@
       if(error)throw error;
 
       await window.v52AssessmentApi?.loadAssessmentData?.(false);
-      await load(row.id);
-      render();
 
       const label=sectionTitle(section,row);
-      toast(
-        masterWillChange
-          ?(finalize?label+'已完成，個案健康資料已更新':label+'草稿已儲存，個案健康資料已更新')
-          :(finalize?label+'已完成':label+'草稿已儲存'),
-        'success'
-      );
+      const message=masterWillChange
+        ?(finalize?label+'已完成，個案健康資料已更新':label+'草稿已儲存，個案健康資料已更新')
+        :(finalize?label+'已完成':label+'草稿已儲存');
+
+      if(finalize){
+        window.v52AssessmentApi?.renderAssessmentDetail?.(row.id);
+        toast(message,'success');
+      }else{
+        await load(row.id);
+        render();
+        toast(message,'success');
+      }
     }catch(err){
       console.error(err);
       const msg=err?.message||String(err);
