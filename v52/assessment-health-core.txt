@@ -391,9 +391,6 @@
         ]){
           if(!String(local.medicalInfo[key]||'').trim())local.medicalInfo[key]=prevMed[key]||'';
         }
-        if(!Object.keys(local.medicationChecks).length){
-          local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
-        }
         local.medicalInfo.medication_changes=[];
         local.medicalInfo.medication_corrections=[];
         local.medicalInfo.no_medication_changes=false;
