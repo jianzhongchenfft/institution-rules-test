@@ -108,6 +108,8 @@
   const local={
     eventId:null,record:null,previous:null,previousEvent:null,
     medicalInfo:{},medicationChecks:{},healthItems:{},healthNotes:{},
+    expandedMedicationNotes:new Set(),
+    expandedHealthNotes:new Set(),
     fixedMedicationBaseEntries:[],
     section:'combined',
     pendingCopyFromId:null,hasLaterCompleted:false
@@ -353,6 +355,8 @@
     local.medicationChecks={...safe(local.record?.medication_checks)};
     local.healthItems={...safe(local.record?.health_items)};
     local.healthNotes={...safe(local.record?.health_notes)};
+    local.expandedMedicationNotes=new Set();
+    local.expandedHealthNotes=new Set();
 
     const dated=(hist.data||[])
       .map(record=>({record,event:eventById(record.assessment_event_id)}))
