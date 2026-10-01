@@ -666,7 +666,9 @@
     const canEditRow=canEdit(row)&&row.status!=='voided';
     const events=safeArray(local.medicalInfo.healthcare_events);
     const noEvents=local.medicalInfo.no_healthcare_events===true;
-    const noFixedMeds=local.medicalInfo.no_fixed_medications===true;
+    const isOpening=row.assessment_type==='opening';
+    const currentFixedEntries=rebuildFixedMedicationEntries();
+    const openingHasNoFixed=local.fixedMedicationBaseEntries.length===0;
     const unvisitedHealthChanged=local.medicalInfo.unvisited_health_change==='yes';
     const hasSideEffect=local.medicalInfo.side_effect==='present';
 
@@ -765,15 +767,33 @@
                 <small>固定用藥記目前狀況，本期新增／停用／調整另外記錄</small>
               </div>
 
-              <div class="health-inline" style="margin-bottom:10px">
-                <label><input type="checkbox" data-health-medical="no_fixed_medications" ${noFixedMeds?'checked':''}> 目前無固定用藥</label>
-              </div>
-
-              <div class="health-grid">
-                <div class="health-field" style="${noFixedMeds?'display:none':''}">
-                  <label>目前固定用藥（名稱與用途）</label>
-                  <textarea data-health-medical="fixed_medications">${escapeHTML(local.medicalInfo.fixed_medications||'')}</textarea>
+              ${isOpening?`
+                <div class="health-field" style="margin-bottom:10px">
+                  <label style="display:flex;align-items:center;gap:6px">
+                    <input id="openingNoFixedMedication" type="checkbox" ${openingHasNoFixed?'checked':''} style="width:auto">
+                    接案時無固定用藥
+                  </label>
                 </div>
+                <div class="health-field" style="${openingHasNoFixed?'display:none':'margin-bottom:12px'}">
+                  <label>接案時既有固定用藥（每行一項）</label>
+                  <textarea id="openingFixedMedicationBaseline" placeholder="例如：\n高血壓藥A：每日1次\n阿斯匹靈：心血管用藥">${escapeHTML(local.fixedMedicationBaseEntries.map(x=>x.medication).join('\n'))}</textarea>
+                  <div class="help">這裡建立接案時原本就在服用的固定用藥基準。</div>
+                </div>
+              `:''}
+
+              <div class="health-subtitle" style="margin-top:${isOpening?'12px':'0'}">
+                <strong>目前固定用藥</strong>
+                ${!isOpening?'<button id="healthAddMedicationCorrection" type="button" class="btn sm">修正既有固定用藥</button>':''}
+              </div>
+              ${renderFixedMedicationList(currentFixedEntries)}
+
+              ${!isOpening&&safeArray(local.medicalInfo.medication_corrections).length?`
+                <div class="health-event-list" style="margin-top:10px">
+                  ${safeArray(local.medicalInfo.medication_corrections).map(renderMedicationCorrection).join('')}
+                </div>
+              `:''}
+
+              <div class="health-grid" style="margin-top:12px">
                 <div class="health-field" style="grid-column:1/-1">
                   <label style="display:flex;align-items:center;gap:6px">
                     <input type="checkbox" data-health-medical="no_medication_changes" ${local.medicalInfo.no_medication_changes===true?'checked':''} style="width:auto">
