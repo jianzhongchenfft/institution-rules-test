@@ -35,16 +35,19 @@
     ['other','其他']
   ];
 
+  const ALL_ASSESSMENT_TYPES=['opening','periodic','condition_change','specific_problem'];
   const ASSESSMENT_FORMS=[
-    {code:'adl',name:'ADL 日常生活活動功能量表',core:true,sort:1},
-    {code:'iadl',name:'IADL 工具性日常生活活動量表',core:true,sort:2},
-    {code:'health',name:'身體與健康狀況評估',core:true,sort:3},
-    {code:'home_safety',name:'居家環境安全評估',core:true,sort:4},
-    {code:'support',name:'支持系統',core:true,sort:5},
-    {code:'spmsq',name:'SPMSQ 簡易心智狀態問卷',core:true,sort:6},
-    {code:'gds15',name:'GDS-15 老人心理健康評估表',core:true,sort:7},
-    {code:'caregiver_burden',name:'主要照顧者負荷量表',core:false,sort:8},
-    {code:'bsrs5',name:'BSRS-5 簡式健康量表',core:false,sort:9}
+    {code:'adl',name:'ADL 日常生活活動功能量表',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:10},
+    {code:'iadl',name:'IADL 工具性日常生活活動量表',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:20},
+    {code:'health_baseline',name:'健康與用藥基本資料',requiredFor:['opening'],availableFor:['opening'],kind:'baseline',sort:30},
+    {code:'health_change',name:'近期健康與用藥變化',requiredFor:['periodic'],availableFor:['periodic','condition_change','specific_problem'],kind:'change',sort:30},
+    {code:'health_status',name:'身體與健康狀況評估',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:40},
+    {code:'home_safety',name:'居家環境安全評估',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:50},
+    {code:'support',name:'支持系統',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'baseline_carry',sort:60},
+    {code:'spmsq',name:'SPMSQ 簡易心智狀態問卷',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:70},
+    {code:'gds15',name:'GDS-15 老人心理健康評估表',requiredFor:['opening','periodic'],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:80},
+    {code:'caregiver_burden',name:'主要照顧者負荷量表',requiredFor:[],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:90},
+    {code:'bsrs5',name:'BSRS-5 簡式健康量表',requiredFor:[],availableFor:ALL_ASSESSMENT_TYPES,kind:'status',sort:100}
   ];
 
   const existingModule=modules.find(m=>m.id==='assessments');
@@ -447,10 +450,29 @@
     ).join('');
   }
 
+  function assessmentFormAvailable(def,type){
+    return (def.availableFor||ALL_ASSESSMENT_TYPES).includes(type);
+  }
+
+  function assessmentFormRequired(def,type){
+    return (def.requiredFor||[]).includes(type);
+  }
+
+  function assessmentFormKindLabel(def,type){
+    if(assessmentFormRequired(def,type)){
+      if(def.kind==='baseline')return '開案基準資料';
+      if(def.kind==='change')return '本期變化追蹤';
+      if(def.kind==='baseline_carry')return type==='opening'?'開案建立基準':'沿用現況並確認';
+      return '完整評估核心工具';
+    }
+    if(def.kind==='change')return '依本次問題選用';
+    return '依個案狀況選用';
+  }
+
   function assessmentSelectedCodesForNew(type){
-    return ['opening','periodic'].includes(type)
-      ?ASSESSMENT_FORMS.filter(x=>x.core).map(x=>x.code)
-      :[];
+    return ASSESSMENT_FORMS
+      .filter(def=>assessmentFormAvailable(def,type)&&assessmentFormRequired(def,type))
+      .map(def=>def.code);
   }
 
   function assessmentFormStatusLabel(v){
@@ -466,45 +488,50 @@
   function renderAssessmentFormOptions(existing,type){
     const currentForms=existing?assessmentFormsFor(existing.id):[];
     const currentMap=new Map(currentForms.map(x=>[x.form_code,x]));
-    const selected=new Set(existing?currentForms.map(x=>x.form_code):assessmentSelectedCodesForNew(type));
-    return ASSESSMENT_FORMS.map(def=>{
-      const row=currentMap.get(def.code);
-      const locked=!!row&&row.status!=='pending';
-      const checked=selected.has(def.code);
-      return `
-        <label class="assessment-form-option">
-          <input type="checkbox"
-            data-assessment-form="${def.code}"
-            data-core="${def.core?'1':'0'}"
-            data-status-locked="${locked?'1':'0'}"
-            ${checked?'checked':''}
-            ${locked?'disabled':''}>
-          <span>
-            <strong>${escapeHTML(def.name)}</strong>
-            <small>${def.core?'完整評估核心工具':'依個案狀況選用'}${locked?'｜已開始填寫，無法由此移除':''}</small>
-          </span>
-        </label>
-      `;
-    }).join('');
+    const selected=new Set(
+      existing
+        ?currentForms
+          .filter(row=>{
+            const def=ASSESSMENT_FORMS.find(x=>x.code===row.form_code);
+            return def&&assessmentFormAvailable(def,type);
+          })
+          .map(x=>x.form_code)
+        :assessmentSelectedCodesForNew(type)
+    );
+
+    return ASSESSMENT_FORMS
+      .filter(def=>assessmentFormAvailable(def,type))
+      .map(def=>{
+        const row=currentMap.get(def.code);
+        const locked=!!row&&row.status!=='pending';
+        const required=assessmentFormRequired(def,type);
+        const checked=selected.has(def.code)||required;
+        return `
+          <label class="assessment-form-option">
+            <input type="checkbox"
+              data-assessment-form="${def.code}"
+              data-status-locked="${locked?'1':'0'}"
+              data-required="${required?'1':'0'}"
+              ${checked?'checked':''}
+              ${(locked||required)?'disabled':''}>
+            <span>
+              <strong>${escapeHTML(def.name)}</strong>
+              <small>${escapeHTML(assessmentFormKindLabel(def,type))}${locked?'｜已開始填寫，無法由此移除':''}</small>
+            </span>
+          </label>
+        `;
+      }).join('');
   }
 
-  function applyAssessmentFormRules(previousType){
-    const type=$('assessmentType')?.value||'opening';
-    const full=['opening','periodic'].includes(type);
+  function applyAssessmentFormRules(){
     document.querySelectorAll('[data-assessment-form]').forEach(input=>{
       const locked=input.dataset.statusLocked==='1';
-      const core=input.dataset.core==='1';
-      if(locked){
-        input.disabled=true;
-        input.checked=true;
-        return;
-      }
-      input.disabled=false;
-      if(full&&core){
+      const required=input.dataset.required==='1';
+      if(locked||required){
         input.checked=true;
         input.disabled=true;
-      }else if(previousType&&['opening','periodic'].includes(previousType)&&!full&&core){
-        input.checked=false;
+      }else{
+        input.disabled=false;
       }
     });
   }
@@ -581,7 +608,7 @@
           </div>
           <div class="field full">
             <label>本次評估工具 *</label>
-            <div style="font-size:10.5px;color:#667085;margin-bottom:8px">開案評估與定期再評估會固定帶入核心工具；狀況變化／特定問題評估可只選必要工具。</div>
+            <div style="font-size:10.5px;color:#667085;margin-bottom:8px">開案評估建立基準資料；定期再評估追蹤本期變化；當下狀態量表依評估類型固定或選用。</div>
             <div class="assessment-form-grid" id="assessmentFormGrid">
               ${renderAssessmentFormOptions(existing,initialType)}
             </div>
@@ -649,7 +676,6 @@
             if(existing.status==='pending'){
               const current=assessmentFormsFor(existing.id);
               const currentMap=new Map(current.map(x=>[x.form_code,x]));
-              const full=['opening','periodic'].includes(type);
               const upserts=selectedCodes.map(code=>{
                 const def=ASSESSMENT_FORMS.find(x=>x.code===code);
                 const old=currentMap.get(code);
@@ -659,7 +685,7 @@
                   form_code:def.code,
                   form_name:def.name,
                   sort_order:def.sort,
-                  is_required:full&&def.core,
+                  is_required:assessmentFormRequired(def,type),
                   status:old?.status||'pending',
                   created_at:old?.created_at||new Date().toISOString(),
                   updated_at:new Date().toISOString()
@@ -708,7 +734,6 @@
           if(eventError)throw eventError;
           createdEvent=newEvent;
 
-          const full=['opening','periodic'].includes(type);
           const formRows=selectedCodes.map(code=>{
             const def=ASSESSMENT_FORMS.find(x=>x.code===code);
             return {
@@ -716,7 +741,7 @@
               form_code:def.code,
               form_name:def.name,
               sort_order:def.sort,
-              is_required:full&&def.core,
+              is_required:assessmentFormRequired(def,type),
               status:'pending'
             };
           });
@@ -758,7 +783,9 @@
     let previousType=initialType;
     $('assessmentType')?.addEventListener('change',()=>{
       const next=$('assessmentType').value;
-      applyAssessmentFormRules(previousType);
+      const grid=$('assessmentFormGrid');
+      if(grid)grid.innerHTML=renderAssessmentFormOptions(existing,next);
+      applyAssessmentFormRules();
       const reason=$('assessmentReason');
       if(reason&&(!reason.value||reason.value===defaultAssessmentReasonForType(previousType))){
         reason.value=defaultAssessmentReasonForType(next);
@@ -768,7 +795,7 @@
     });
     $('assessmentCase')?.addEventListener('change',updateAssessmentSupervisorPreview);
     updateAssessmentSupervisorPreview();
-    applyAssessmentFormRules(null);
+    applyAssessmentFormRules();
     toggleProblemFollowupField();
   }
 
@@ -901,8 +928,10 @@
                         ?'<button class="btn sm primary" data-open-spmsq="'+row.id+'">'+(['completed','unable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
                         :form.form_code==='gds15'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentGds15
                           ?'<button class="btn sm primary" data-open-gds15="'+row.id+'">'+(['completed','unable','not_applicable'].includes(form.status)?'查看／修正':'開始／繼續')+'</button>'
-                          :form.form_code==='health'&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentHealth
-                            ?'<button class="btn sm primary" data-open-health="'+row.id+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
+                          :['health_baseline','health_change','health_status'].includes(form.form_code)&&row.status!=='pending'&&row.status!=='voided'&&window.v52AssessmentHealth
+                            ?'<button class="btn sm primary" data-open-health="'+row.id+'" data-health-section="'+(
+                              form.form_code==='health_baseline'?'baseline':form.form_code==='health_change'?'change':'status'
+                            )+'">'+(form.status==='completed'?'查看／修正':'開始／繼續')+'</button>'
                             :'<button class="btn sm" disabled>'+(row.status==='pending'?'待開始':'下一階段開放')+'</button>'}
                 </div>
               `).join('')}
@@ -929,7 +958,7 @@
       btn.addEventListener('click',()=>window.v52AssessmentGds15?.open(btn.dataset.openGds15));
     });
     document.querySelectorAll('[data-open-health]').forEach(btn=>{
-      btn.addEventListener('click',()=>window.v52AssessmentHealth?.open(btn.dataset.openHealth));
+      btn.addEventListener('click',()=>window.v52AssessmentHealth?.open(btn.dataset.openHealth,btn.dataset.healthSection));
     });
     window.scrollTo({top:0,behavior:'auto'});
   }
