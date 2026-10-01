@@ -112,7 +112,7 @@
     document.querySelectorAll('[data-spmsq-response]').forEach(inp=>local.responses[inp.dataset.spmsqResponse]=inp.value);
     if(local.isUnable){
       local.unableReason=$('spmsqUnableReason')?.value.trim()||local.unableReason.trim();
-      if(finalize&&!local.unableReason)return toast('請填寫無法評估原因','warn');
+      if(!local.unableReason)return toast('請填寫無法評估原因','warn');
     }else if(finalize&&completedCount()!==10){
       const missing=ITEMS.filter(([k])=>!String(local.responses[k]||'').trim()||!['correct','wrong'].includes(local.judgments[k])).map(([,l])=>l).join('、');
       return toast('尚有未完成項目：'+missing,'warn');
