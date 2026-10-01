@@ -172,37 +172,37 @@ begin
     raise exception 'INVALID_NO_FIXED_MEDICATIONS';
   end if;
 
-  if p_medical_info ? 'diagnosis_change'
+  if nullif(btrim(p_medical_info->>'diagnosis_change'),'') is not null
      and p_medical_info->>'diagnosis_change' not in ('no','yes') then
     raise exception 'INVALID_DIAGNOSIS_CHANGE';
   end if;
 
-  if p_medical_info ? 'medication_change'
+  if nullif(btrim(p_medical_info->>'medication_change'),'') is not null
      and p_medical_info->>'medication_change' not in ('none','changed') then
     raise exception 'INVALID_MEDICATION_CHANGE';
   end if;
 
-  if p_medical_info ? 'medication_method'
+  if nullif(btrim(p_medical_info->>'medication_method'),'') is not null
      and p_medical_info->>'medication_method' not in ('self','assisted') then
     raise exception 'INVALID_MEDICATION_METHOD';
   end if;
 
-  if p_medical_info ? 'regular_followup'
+  if nullif(btrim(p_medical_info->>'regular_followup'),'') is not null
      and p_medical_info->>'regular_followup' not in ('yes','no') then
     raise exception 'INVALID_REGULAR_FOLLOWUP';
   end if;
 
-  if p_medical_info ? 'medication_regular'
+  if nullif(btrim(p_medical_info->>'medication_regular'),'') is not null
      and p_medical_info->>'medication_regular' not in ('yes','no') then
     raise exception 'INVALID_MEDICATION_REGULAR';
   end if;
 
-  if p_medical_info ? 'side_effect'
+  if nullif(btrim(p_medical_info->>'side_effect'),'') is not null
      and p_medical_info->>'side_effect' not in ('none','present') then
     raise exception 'INVALID_SIDE_EFFECT';
   end if;
 
-  if p_medical_info ? 'care_impact'
+  if nullif(btrim(p_medical_info->>'care_impact'),'') is not null
      and p_medical_info->>'care_impact' not in ('no_impact','observe','adjust_plan','contact_external') then
     raise exception 'INVALID_CARE_IMPACT';
   end if;
