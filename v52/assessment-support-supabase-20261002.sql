@@ -124,6 +124,7 @@ declare
   v_old public.assessment_support_records;
   v_key text;
   v_status text;
+  v_item jsonb;
   v_domain_keys text[]:=array[
     'daily_care','meal_housework','medical_transport','medication_health',
     'financial','emotional','decision_contact'
@@ -156,6 +157,13 @@ begin
   if jsonb_typeof(p_resources)<>'object' then raise exception 'INVALID_SUPPORT_RESOURCES'; end if;
   if jsonb_typeof(p_summary)<>'object' then raise exception 'INVALID_SUPPORT_SUMMARY'; end if;
 
+  if p_resources ? 'social_resources' and jsonb_typeof(p_resources->'social_resources')<>'array' then
+    raise exception 'INVALID_SUPPORT_SOCIAL_RESOURCES';
+  end if;
+  if p_resources ? 'unmet_needs' and jsonb_typeof(p_resources->'unmet_needs')<>'array' then
+    raise exception 'INVALID_SUPPORT_UNMET_NEEDS';
+  end if;
+
   foreach v_key in array v_domain_keys loop
     if p_support_domains ? v_key then
       v_status:=p_support_domains->v_key->>'status';
@@ -176,23 +184,137 @@ begin
   end loop;
 
   if p_finalize then
-    if nullif(btrim(coalesce(p_household->>'living_arrangement','')),'') is null then raise exception 'SUPPORT_LIVING_ARRANGEMENT_REQUIRED'; end if;
-    if coalesce(p_household->>'primary_caregiver_status','') not in ('present','none') then raise exception 'SUPPORT_PRIMARY_CAREGIVER_STATUS_REQUIRED'; end if;
+    if coalesce(p_household->>'living_arrangement','') not in (
+      'alone','spouse','parents','children','grandchildren','relatives','nonrelative','other'
+    ) then raise exception 'SUPPORT_LIVING_ARRANGEMENT_REQUIRED'; end if;
+
+    if coalesce(p_household->>'family_change_status','') not in ('no','yes') then
+      raise exception 'SUPPORT_FAMILY_CHANGE_REQUIRED';
+    end if;
+    if p_household->>'family_change_status'='yes'
+       and nullif(btrim(coalesce(p_household->>'family_change_note','')),'') is null then
+      raise exception 'SUPPORT_FAMILY_CHANGE_NOTE_REQUIRED';
+    end if;
+
+    if coalesce(p_household->>'primary_caregiver_status','') not in ('present','none') then
+      raise exception 'SUPPORT_PRIMARY_CAREGIVER_STATUS_REQUIRED';
+    end if;
     if p_household->>'primary_caregiver_status'='present' then
       if nullif(btrim(coalesce(p_household->>'primary_caregiver_name','')),'') is null
          or nullif(btrim(coalesce(p_household->>'primary_caregiver_relation','')),'') is null then
         raise exception 'SUPPORT_PRIMARY_CAREGIVER_INFO_REQUIRED';
       end if;
     end if;
-    if coalesce(p_resources->>'economic_status','') not in ('stable','watch','difficulty') then raise exception 'SUPPORT_ECONOMIC_STATUS_REQUIRED'; end if;
-    if (p_resources->>'economic_status') in ('watch','difficulty')
-       and nullif(btrim(coalesce(p_resources->>'economic_note','')),'') is null then raise exception 'SUPPORT_ECONOMIC_NOTE_REQUIRED'; end if;
-    if coalesce(p_summary->>'overall_support','') not in ('adequate','needs_attention','weak') then raise exception 'SUPPORT_OVERALL_REQUIRED'; end if;
-    if (p_summary->>'overall_support') in ('needs_attention','weak')
-       and nullif(btrim(coalesce(p_summary->>'key_issues','')),'') is null then raise exception 'SUPPORT_KEY_ISSUES_REQUIRED'; end if;
-    if coalesce(p_summary->>'followup_required','') not in ('yes','no') then raise exception 'SUPPORT_FOLLOWUP_REQUIRED'; end if;
+
+    if coalesce(p_household->>'backup_available','') not in ('yes','no') then
+      raise exception 'SUPPORT_BACKUP_STATUS_REQUIRED';
+    end if;
+
+    for v_item in select value from jsonb_array_elements(p_family_members) loop
+      if jsonb_typeof(v_item)<>'object' then raise exception 'INVALID_SUPPORT_FAMILY_MEMBER_ITEM'; end if;
+      if nullif(btrim(coalesce(v_item->>'name','')),'') is null
+         or nullif(btrim(coalesce(v_item->>'relation','')),'') is null
+         or nullif(btrim(coalesce(v_item->>'support_role','')),'') is null then
+        raise exception 'SUPPORT_FAMILY_MEMBER_INCOMPLETE';
+      end if;
+      if nullif(btrim(coalesce(v_item->>'co_resident','')),'') is not null
+         and v_item->>'co_resident' not in ('yes','no') then
+        raise exception 'INVALID_SUPPORT_FAMILY_MEMBER_COHABIT';
+      end if;
+    end loop;
+
+    if coalesce(p_resources->>'economic_status','') not in ('stable','watch','difficulty') then
+      raise exception 'SUPPORT_ECONOMIC_STATUS_REQUIRED';
+    end if;
+    if p_resources->>'economic_status' in ('watch','difficulty')
+       and nullif(btrim(coalesce(p_resources->>'economic_note','')),'') is null then
+      raise exception 'SUPPORT_ECONOMIC_NOTE_REQUIRED';
+    end if;
+
+    if coalesce(p_resources->>'economic_care_impact','') not in ('yes','no') then
+      raise exception 'SUPPORT_ECONOMIC_IMPACT_REQUIRED';
+    end if;
+    if p_resources->>'economic_care_impact'='yes'
+       and nullif(btrim(coalesce(p_resources->>'economic_care_impact_note','')),'') is null then
+      raise exception 'SUPPORT_ECONOMIC_IMPACT_NOTE_REQUIRED';
+    end if;
+
+    for v_item in select value from jsonb_array_elements(coalesce(p_resources->'social_resources','[]'::jsonb)) loop
+      if jsonb_typeof(v_item)<>'object' then raise exception 'INVALID_SUPPORT_RESOURCE_ITEM'; end if;
+      if v_item->>'nature' not in ('formal','informal') then raise exception 'INVALID_SUPPORT_RESOURCE_NATURE'; end if;
+      if v_item->>'type' not in (
+        'long_term_care','medical','welfare','disability','assistive_device','community',
+        'social_work','transport','meal','charity_religion','neighbor_friend','volunteer','other'
+      ) then raise exception 'INVALID_SUPPORT_RESOURCE_TYPE'; end if;
+      if nullif(btrim(coalesce(v_item->>'name','')),'') is null
+         or nullif(btrim(coalesce(v_item->>'assistance','')),'') is null then
+        raise exception 'SUPPORT_RESOURCE_INFO_REQUIRED';
+      end if;
+      if v_item->>'usage_status' not in ('stable','occasional','waiting','stopped') then
+        raise exception 'INVALID_SUPPORT_RESOURCE_USAGE';
+      end if;
+      if v_item->>'sufficiency' not in ('adequate','partial','insufficient') then
+        raise exception 'INVALID_SUPPORT_RESOURCE_SUFFICIENCY';
+      end if;
+      if v_item->>'sufficiency' in ('partial','insufficient')
+         and nullif(btrim(coalesce(v_item->>'insufficiency_note','')),'') is null then
+        raise exception 'SUPPORT_RESOURCE_GAP_NOTE_REQUIRED';
+      end if;
+    end loop;
+
+    if coalesce(p_resources->>'social_interaction_status','') not in ('regular','limited','isolated','unable') then
+      raise exception 'SUPPORT_SOCIAL_INTERACTION_REQUIRED';
+    end if;
+    if p_resources->>'social_interaction_status' in ('limited','isolated','unable')
+       and nullif(btrim(coalesce(p_resources->>'social_interaction_note','')),'') is null then
+      raise exception 'SUPPORT_SOCIAL_INTERACTION_NOTE_REQUIRED';
+    end if;
+
+    if coalesce(p_resources->>'community_participation_status','') not in (
+      'participates','none','unwilling','health_limited','not_applicable'
+    ) then raise exception 'SUPPORT_COMMUNITY_PARTICIPATION_REQUIRED'; end if;
+
+    if coalesce(p_resources->>'unmet_needs_status','') not in ('yes','no') then
+      raise exception 'SUPPORT_UNMET_NEEDS_STATUS_REQUIRED';
+    end if;
+    if p_resources->>'unmet_needs_status'='yes'
+       and jsonb_array_length(coalesce(p_resources->'unmet_needs','[]'::jsonb))=0 then
+      raise exception 'SUPPORT_UNMET_NEEDS_REQUIRED';
+    end if;
+    if p_resources->>'unmet_needs_status'='no'
+       and jsonb_array_length(coalesce(p_resources->'unmet_needs','[]'::jsonb))>0 then
+      raise exception 'SUPPORT_UNMET_NEEDS_CONFLICT';
+    end if;
+
+    for v_item in select value from jsonb_array_elements(coalesce(p_resources->'unmet_needs','[]'::jsonb)) loop
+      if jsonb_typeof(v_item)<>'object' then raise exception 'INVALID_SUPPORT_UNMET_NEED_ITEM'; end if;
+      if v_item->>'type' not in (
+        'long_term_care','medical','welfare','disability','assistive_device','community',
+        'social_work','transport','meal','charity_religion','neighbor_friend','volunteer','other'
+      ) then raise exception 'INVALID_SUPPORT_UNMET_NEED_TYPE'; end if;
+      if nullif(btrim(coalesce(v_item->>'need','')),'') is null
+         or nullif(btrim(coalesce(v_item->>'action','')),'') is null then
+        raise exception 'SUPPORT_UNMET_NEED_INFO_REQUIRED';
+      end if;
+      if v_item->>'status' not in ('pending','referred','in_progress','completed','declined') then
+        raise exception 'INVALID_SUPPORT_UNMET_NEED_STATUS';
+      end if;
+    end loop;
+
+    if coalesce(p_summary->>'overall_support','') not in ('adequate','needs_attention','weak') then
+      raise exception 'SUPPORT_OVERALL_REQUIRED';
+    end if;
+    if p_summary->>'overall_support' in ('needs_attention','weak')
+       and nullif(btrim(coalesce(p_summary->>'key_issues','')),'') is null then
+      raise exception 'SUPPORT_KEY_ISSUES_REQUIRED';
+    end if;
+    if coalesce(p_summary->>'followup_required','') not in ('yes','no') then
+      raise exception 'SUPPORT_FOLLOWUP_REQUIRED';
+    end if;
     if p_summary->>'followup_required'='yes'
-       and nullif(btrim(coalesce(p_summary->>'followup_note','')),'') is null then raise exception 'SUPPORT_FOLLOWUP_NOTE_REQUIRED'; end if;
+       and nullif(btrim(coalesce(p_summary->>'followup_note','')),'') is null then
+      raise exception 'SUPPORT_FOLLOWUP_NOTE_REQUIRED';
+    end if;
   end if;
 
   select * into v_old from public.assessment_support_records where assessment_event_id=p_event_id for update;
