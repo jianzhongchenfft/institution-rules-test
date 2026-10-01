@@ -792,6 +792,8 @@ async function htmlViewOriginal(path,fileName){
           '<div class="field"><label>原住民族別</label><input id="editIndigenousGroup" value="'+escapeHTML(c.indigenous_group||'')+'"></div>',
           '<div class="field"><label>長照福利身分</label><select id="editWelfareIdentity">'+htmlWelfareOptions(c.welfare_identity||'')+'</select></div>',
           '<div class="field"><label>自負擔比例（%）</label><input id="editCopayRate" type="number" readonly value="'+(c.copay_rate??'')+'"><div class="help">依長照福利身分自動帶入</div></div>',
+          '<div class="field full"><label>目前重要疾病／慢性病史</label><textarea id="editImportantConditions" placeholder="例如：高血壓、末期腎臟病">'+escapeHTML(c.important_conditions||'')+'</textarea><div class="help">記錄目前持續存在、會影響照顧判斷的重要疾病；本期新發生的診斷仍記在健康評估。</div></div>',
+          '<div class="field full"><label>固定治療／特殊醫療安排</label><textarea id="editOngoingTreatments" placeholder="例如：每週一、三、五固定血液透析">'+escapeHTML(c.ongoing_treatments||'')+'</textarea><div class="help">記錄長期固定治療或特殊醫療安排，不需每次評估重新輸入。</div></div>',
           '<div class="field"><label>A單位</label><input id="editAUnit" value="'+escapeHTML(c.a_unit_name||'')+'"></div>',
           '<div class="field"><label>A個管</label><input id="editManager" value="'+escapeHTML(c.case_manager_name||'')+'"></div>',
           '<div class="field"><label>A個管電話</label><input id="editManagerPhone" value="'+escapeHTML(c.case_manager_phone||'')+'"></div>',
@@ -815,7 +817,10 @@ async function htmlViewOriginal(path,fileName){
           lives_alone:$('editLivesAlone').value,has_dementia:$('editDementia').value,
           identity_type:$('editIdentity').value.trim(),has_disability:$('editDisability').value,is_indigenous:$('editIndigenous').value,indigenous_group:$('editIndigenousGroup').value.trim(),welfare_identity:$('editWelfareIdentity').value.trim(),copay_rate:$('editCopayRate').value,a_unit_name:$('editAUnit').value.trim(),
           case_manager_name:$('editManager').value.trim(),case_manager_phone:$('editManagerPhone').value.trim(),
-          assessor_name:$('editAssessor').value.trim(),notes:$('editNotes').value.trim(),
+          assessor_name:$('editAssessor').value.trim(),
+          important_conditions:$('editImportantConditions').value.trim(),
+          ongoing_treatments:$('editOngoingTreatments').value.trim(),
+          notes:$('editNotes').value.trim(),
           contacts:htmlReadContacts()
         };
         payload.payment_method=htmlNormalizePaymentForWelfare(payload.welfare_identity,payload.payment_method);
@@ -1220,7 +1225,10 @@ async function htmlViewOriginal(path,fileName){
           htmlCaseField('繳款方式',c.payment_method||'未設定'),htmlCaseField('負責督導',htmlGetCaseVisitsApi().caseStaffName(c.supervisor_id)),htmlCaseField('身分類別／長照資格',c.identity_type),
           htmlCaseField('是否身障',c.has_disability===true?'是':c.has_disability===false?'否':'—'),htmlCaseField('是否原住民',c.is_indigenous===true?'是':c.is_indigenous===false?'否':'—'),htmlCaseField('原住民族別',c.indigenous_group),
           htmlCaseField('長照福利身分',c.welfare_identity),htmlCaseField('自負擔比例',c.copay_rate!=null?c.copay_rate+'%':'—'),
-          htmlCaseField('地址',c.address,true),htmlCaseField('A單位',c.a_unit_name),htmlCaseField('A個管',c.case_manager_name),htmlCaseField('A個管電話',c.case_manager_phone),
+          htmlCaseField('地址',c.address,true),
+          htmlCaseField('目前重要疾病／慢性病史',c.important_conditions,true),
+          htmlCaseField('固定治療／特殊醫療安排',c.ongoing_treatments,true),
+          htmlCaseField('A單位',c.a_unit_name),htmlCaseField('A個管',c.case_manager_name),htmlCaseField('A個管電話',c.case_manager_phone),
           htmlCaseField('照專／評估人員',c.assessor_name),htmlCaseField('備註',c.notes,true),
         '</div>',
       '</div>',
