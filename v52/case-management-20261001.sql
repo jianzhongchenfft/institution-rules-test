@@ -7,6 +7,48 @@ begin;
 alter table public.care_cases
   add column if not exists has_dementia boolean;
 
+alter table public.care_cases
+  add column if not exists important_conditions text,
+  add column if not exists ongoing_treatments text;
+
+create table if not exists public.case_health_profile_history (
+  id uuid primary key default gen_random_uuid(),
+  case_id uuid not null references public.care_cases(id) on delete cascade,
+  field_name text not null check (field_name in ('important_conditions','ongoing_treatments')),
+  old_value text,
+  new_value text,
+  changed_by uuid not null,
+  changed_at timestamptz not null default now()
+);
+
+create index if not exists case_health_profile_history_case_idx
+  on public.case_health_profile_history(case_id,changed_at desc);
+
+alter table public.case_health_profile_history enable row level security;
+
+drop policy if exists case_health_profile_history_read on public.case_health_profile_history;
+create policy case_health_profile_history_read
+on public.case_health_profile_history
+for select to authenticated
+using (private.can_manage_cases());
+
+drop policy if exists case_health_profile_history_insert on public.case_health_profile_history;
+create policy case_health_profile_history_insert
+on public.case_health_profile_history
+for insert to authenticated
+with check (
+  changed_by=(select auth.uid())
+  and exists (
+    select 1 from public.care_cases c
+    where c.id=case_health_profile_history.case_id
+      and private.can_edit_case(c.supervisor_id)
+  )
+);
+
+revoke all on public.case_health_profile_history from public, anon, authenticated;
+grant select, insert on public.case_health_profile_history to authenticated;
+grant all on public.case_health_profile_history to service_role;
+
 alter table public.care_plans
   add column if not exists is_preferred_version boolean not null default false;
 
@@ -350,6 +392,10 @@ AS $function$
 declare
   v_case_id uuid := nullif(payload->>'case_id','')::uuid;
   v_old_supervisor uuid;
+  v_old_conditions text;
+  v_old_treatments text;
+  v_new_conditions text;
+  v_new_treatments text;
   v_new_supervisor uuid := nullif(payload->>'supervisor_id','')::uuid;
   v_case_no text := upper(regexp_replace(btrim(coalesce(payload->>'case_no','')),'\s+','','g'));
   v_case_name text := btrim(coalesce(payload->>'case_name',''));
@@ -364,11 +410,21 @@ declare
 begin
   if v_case_id is null then raise exception '缺少個案資料'; end if;
 
-  select c.supervisor_id into v_old_supervisor
+  select c.supervisor_id,c.important_conditions,c.ongoing_treatments
+    into v_old_supervisor,v_old_conditions,v_old_treatments
   from public.care_cases c
   where c.id=v_case_id;
 
   if not found then raise exception '找不到個案'; end if;
+
+  v_new_conditions:=case
+    when payload ? 'important_conditions' then nullif(btrim(payload->>'important_conditions'),'')
+    else v_old_conditions
+  end;
+  v_new_treatments:=case
+    when payload ? 'ongoing_treatments' then nullif(btrim(payload->>'ongoing_treatments'),'')
+    else v_old_treatments
+  end;
   if not private.can_edit_case(v_old_supervisor) then raise exception '沒有修改此個案的權限'; end if;
 
   select s.id,s.role into v_staff_id,v_staff_role
@@ -407,6 +463,22 @@ begin
     raise exception '督導不可自行變更個案負責督導';
   end if;
 
+  if v_old_conditions is distinct from v_new_conditions then
+    insert into public.case_health_profile_history(
+      case_id,field_name,old_value,new_value,changed_by
+    ) values(
+      v_case_id,'important_conditions',v_old_conditions,v_new_conditions,(select auth.uid())
+    );
+  end if;
+
+  if v_old_treatments is distinct from v_new_treatments then
+    insert into public.case_health_profile_history(
+      case_id,field_name,old_value,new_value,changed_by
+    ) values(
+      v_case_id,'ongoing_treatments',v_old_treatments,v_new_treatments,(select auth.uid())
+    );
+  end if;
+
   update public.care_cases
   set case_no=v_case_no,
       case_name=v_case_name,
@@ -429,6 +501,8 @@ begin
       case_manager_name=nullif(btrim(payload->>'case_manager_name'),''),
       case_manager_phone=nullif(btrim(payload->>'case_manager_phone'),''),
       assessor_name=nullif(btrim(payload->>'assessor_name'),''),
+      important_conditions=v_new_conditions,
+      ongoing_treatments=v_new_treatments,
       service_usage_type=v_usage,
       payment_method=v_payment,
       service_status=v_status,
