@@ -18,6 +18,7 @@
 - assessment-health-core.txt：健康共用資料、前次紀錄判定、用藥資料模型與共用 helper。
 - assessment-health-ui.txt：健康與用藥、身體健康10項畫面。
 - assessment-health-save.txt：健康表單儲存、完成與開啟流程。
+- assessment-home-safety-patch.txt：居家環境安全 21 項評估、前次帶入、風險變化比較與追蹤摘要。
 
 健康三個片段由 part07.txt 依序串接後一次 eval，因此仍共享同一個 closure，不使用額外全域狀態。
 
@@ -40,12 +41,20 @@ assessment_health_records 仍是一個 event 一筆紀錄；使用者介面只�
 - adl
 - iadl
 - health_medication
-- home_safety（尚待完成）
+- home_safety
 - support（尚待完成）
 - spmsq
 - gds15
 - caregiver_burden（尚待完成）
 - bsrs5（尚待完成）
+
+## 居家環境安全工具
+- 21 項、6 大區域，不計算人工總分。
+- 每項使用「安全／需改善／不適用＋備註」。
+- 後續評估可由使用者主動帶入前次完成紀錄，不自動沿用。
+- 系統自動比較新增風險、持續風險、已改善與不再適用。
+- 樓梯、廚房依住宅概況可自動列為不適用。
+- 有需改善項目時，完成確認前需留下改善建議、說明對象、個案／家屬回應與是否追蹤。
 
 ## 後續開發規則
 1. 不再把新量表直接寫進 assessment-patch.txt。
