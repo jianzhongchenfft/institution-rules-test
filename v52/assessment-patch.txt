@@ -218,7 +218,7 @@
     try{
       const [casesRes,staffRes,eventRes,formsRes]=await Promise.all([
         db.from('care_cases')
-          .select('id,case_name,case_no,supervisor_id,service_status,assessment_date,current_plan_date')
+          .select('id,case_name,case_no,supervisor_id,service_status,assessment_date,current_plan_date,important_conditions,ongoing_treatments')
           .order('case_name'),
         db.from('staff_users')
           .select('id,display_name,role,is_active,can_supervise')
