@@ -994,6 +994,8 @@ async function htmlViewOriginal(path,fileName){
             status.textContent='身分證字號與目前個案不一致，已停止匯入。';
             toast('此 HTML 似乎不是這位個案的資料','error');return;
           }
+          d.lives_alone=c.lives_alone;
+          d.has_dementia=c.has_dementia;
           d._file=file;
           d._source=source;
           d.source_hash=await htmlSha256(file);
@@ -1069,7 +1071,7 @@ async function htmlViewOriginal(path,fileName){
         assessor_name:d.assessor_name||c.assessor_name||'',
         supervisor_id:c.supervisor_id,
         service_usage_type:c.service_usage_type,
-        payment_method:c.payment_method||'',
+        payment_method:htmlNormalizePaymentForWelfare(d.welfare_identity||c.welfare_identity||'',c.payment_method||''),
         contacts:d.contacts||[],
         services:d.services||[],
         budgets:d.budgets||[],
