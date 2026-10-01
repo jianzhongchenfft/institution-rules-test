@@ -163,8 +163,8 @@ using (
   )
 );
 
-revoke all on public.assessment_events from anon;
-revoke all on public.assessment_event_forms from anon;
+revoke all on public.assessment_events from public, anon, authenticated;
+revoke all on public.assessment_event_forms from public, anon, authenticated;
 
 grant select, insert, update on public.assessment_events to authenticated;
 grant select, insert, update, delete on public.assessment_event_forms to authenticated;
