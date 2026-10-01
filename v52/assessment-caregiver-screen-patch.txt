@@ -2,9 +2,9 @@
 (()=>{
   const INDICATORS=[
     ['behavior_stress','被照顧者的行為／情緒問題已造成明顯照顧困難','例如出現攻擊、遊走、妄想、嚴重干擾等情形，使照顧者身心壓力明顯增加。'],
-    ['older_caregiver','照顧者屬高齡照顧者','依官方初篩定義判斷是否屬高齡照顧者。'],
+    ['older_caregiver','照顧者屬高齡照顧者','一般照顧者 65 歲以上；原住民照顧者 55 歲以上。'],
     ['limited_experience','缺乏照顧經驗或面對新的照顧問題時知能不足','例如突然成為照顧者，或個案病況、管路、壓瘡、行為問題等出現新變化。'],
-    ['no_relief','缺乏替代照顧人力或不易使用協助資源','長時間主要由同一人承擔照顧，缺乏親友或照顧資源可替手。'],
+    ['no_relief','缺乏替代照顧人力或不易使用協助資源','每週約 20 小時以上主要照顧工作，且缺乏親友或照顧資源可替手，或因其他因素不易求助。'],
     ['multiple_dependents','同時需要照顧兩名以上家人','除本案外，仍需照顧其他失能家人、幼兒或其他需要密集照顧者。'],
     ['caregiver_health','照顧者自身健康或身心狀況已影響照顧能力／意願','包含疾病、身心狀況、睡眠或情緒問題等已影響照顧。'],
     ['resource_financial_crisis','資源資格或突發經濟／生活需求造成照顧壓力','例如補助資格改變、資源中斷或突發事件使基本生活與照顧安排受影響。'],
@@ -232,7 +232,15 @@
     $('cgBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
     $('cgApplicability')?.addEventListener('change',e=>{
       local.applicability=e.target.value;
-      if(local.applicability!=='applicable'){local.answers={};local.notes={};}
+      local.expandedNotes=new Set();
+      if(local.applicability!=='applicable'){
+        local.answers={};
+        local.notes={};
+        local.caregiverInfo={};
+        local.summary={};
+      }else{
+        delete local.summary.unable_reason;
+      }
       rerenderPreservingScroll();
     });
     $('cgUseSupportCaregiver')?.addEventListener('click',()=>{
