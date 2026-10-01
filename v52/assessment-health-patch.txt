@@ -9,7 +9,7 @@
     ['lower_limb','下肢運動能力（行走穩定性、肌力）'],
     ['daily_activity','日常活動與休閒（看電視、散步、社交活動）'],
     ['sleep','夜間睡眠狀況（入睡困難、易醒）'],
-    ['appetite_weight','食慾與體重變化'],
+    ['appetite_weight','食慾與體重狀況'],
     ['mood','情緒與精神狀況（焦慮、易怒、無助感）']
   ];
 
@@ -108,12 +108,20 @@
     eventId:null,record:null,previous:null,previousEvent:null,
     medicalInfo:{},medicationChecks:{},healthItems:{},healthNotes:{},
     fixedMedicationBaseEntries:[],
+    section:'status',
     pendingCopyFromId:null,hasLaterCompleted:false
   };
 
   const eventById=id=>state.assessmentEvents?.find(x=>x.id===id)||null;
   const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
-  const formById=id=>(state.assessmentEventForms||[]).find(x=>x.assessment_event_id===id&&x.form_code==='health')||null;
+  const healthFormCode=section=>section==='baseline'?'health_baseline':section==='change'?'health_change':'health_status';
+  const formById=(id,section=local.section)=>(state.assessmentEventForms||[])
+    .find(x=>x.assessment_event_id===id&&x.form_code===healthFormCode(section))||null;
+  const sectionTitle=section=>({
+    baseline:'健康與用藥基本資料',
+    change:'近期健康與用藥變化',
+    status:'身體與健康狀況評估'
+  })[section]||'身體與健康狀況評估';
   const safe=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   const safeArray=v=>Array.isArray(v)?v:[];
 
@@ -333,11 +341,17 @@
     local.healthItems={...safe(local.record?.health_items)};
     local.healthNotes={...safe(local.record?.health_notes)};
 
-    const dated=(hist.data||[]).map(record=>({record,event:eventById(record.assessment_event_id)})).filter(x=>x.event?.planned_date);
-    local.hasLaterCompleted=dated.some(x=>x.event.planned_date>row.planned_date);
-    const candidates=dated
+    const dated=(hist.data||[])
+      .map(record=>({record,event:eventById(record.assessment_event_id)}))
+      .filter(x=>x.event?.planned_date);
+    const relevantCompleted=dated.filter(x=>{
+      if(local.section==='status')return !!(x.record.status_confirmed_at||x.record.confirmed_at);
+      return !!(x.record.baseline_confirmed_at||x.record.change_confirmed_at||x.record.confirmed_at);
+    });
+    local.hasLaterCompleted=relevantCompleted.some(x=>x.event.planned_date>row.planned_date);
+    const candidates=relevantCompleted
       .filter(x=>x.event.planned_date<row.planned_date)
-      .sort((a,b)=>String(b.event.planned_date).localeCompare(String(a.event.planned_date))||String(b.record.confirmed_at||'').localeCompare(String(a.record.confirmed_at||'')));
+      .sort((a,b)=>String(b.event.planned_date).localeCompare(String(a.event.planned_date))||String(b.record.updated_at||'').localeCompare(String(a.record.updated_at||'')));
 
     local.previous=candidates[0]?.record||null;
     local.previousEvent=candidates[0]?.event||null;
