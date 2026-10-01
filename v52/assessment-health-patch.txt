@@ -107,6 +107,7 @@
   const local={
     eventId:null,record:null,previous:null,previousEvent:null,
     medicalInfo:{},medicationChecks:{},healthItems:{},healthNotes:{},
+    fixedMedicationBase:[],
     pendingCopyFromId:null,hasLaterCompleted:false
   };
 
@@ -181,6 +182,21 @@
     else if(item.action==='stop')removeFixedLine(lines,item.medication_before);
     else if(item.action==='adjust')replaceFixedLine(lines,item.medication_before,item.medication_after);
   };
+  const activeMedicationChanges=()=>local.medicalInfo.no_medication_changes===true
+    ?[]
+    :safeArray(local.medicalInfo.medication_changes);
+  const rebuildFixedMedicationsFromChanges=()=>{
+    const lines=[...local.fixedMedicationBase];
+    activeMedicationChanges().forEach(item=>applyLongTermMedicationChange(lines,item));
+    local.medicalInfo.fixed_medications=lines.join('\n');
+    local.medicalInfo.no_fixed_medications=lines.length===0;
+    return lines;
+  };
+  const setFixedMedicationBaseFromCurrent=()=>{
+    const lines=fixedMedicationLines(local.medicalInfo.fixed_medications);
+    [...activeMedicationChanges()].reverse().forEach(item=>reverseLongTermMedicationChange(lines,item));
+    local.fixedMedicationBase=[...lines];
+  };
 
   async function load(eventId){
     const row=eventById(eventId);
@@ -235,6 +251,14 @@
       local.medicalInfo.medication_regular=prevMed.medication_regular||'';
       local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
     }
+
+    const medicationBase=fixedMedicationLines(local.medicalInfo.fixed_medications);
+    if(local.record){
+      [...safeArray(local.medicalInfo.medication_changes)].reverse()
+        .forEach(item=>reverseLongTermMedicationChange(medicationBase,item));
+    }
+    local.fixedMedicationBase=[...medicationBase];
+    rebuildFixedMedicationsFromChanges();
   }
 
   function syncInputs(){
@@ -662,6 +686,12 @@
       el.addEventListener(evt,()=>{
         syncInputs();
         const key=el.dataset.healthMedical;
+        if(key==='fixed_medications'){
+          setFixedMedicationBaseFromCurrent();
+        }
+        if(key==='no_medication_changes'){
+          rebuildFixedMedicationsFromChanges();
+        }
         if(['no_healthcare_events','no_fixed_medications','unvisited_health_change','no_medication_changes','side_effect'].includes(key)){
           const y=window.scrollY;
           render();
@@ -712,6 +742,7 @@
       const items=safeArray(local.medicalInfo.medication_changes);
       items.splice(index,1);
       local.medicalInfo.medication_changes=items;
+      rebuildFixedMedicationsFromChanges();
       render();
     }));
 
@@ -719,6 +750,11 @@
       const evt=el.tagName==='SELECT'?'change':'input';
       el.addEventListener(evt,()=>{
         syncInputs();
+        rebuildFixedMedicationsFromChanges();
+        const fixedEl=document.querySelector('[data-health-medical="fixed_medications"]');
+        if(fixedEl)fixedEl.value=local.medicalInfo.fixed_medications||'';
+        const noneEl=document.querySelector('[data-health-medical="no_fixed_medications"]');
+        if(noneEl)noneEl.checked=local.medicalInfo.no_fixed_medications===true;
         if(el.tagName==='SELECT'){
           const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
         }
@@ -812,32 +848,16 @@
       }
     }
 
-    const oldMedicationChanges=safeArray(local.record?.medical_info?.medication_changes);
-    const oldById=new Map(oldMedicationChanges.map(x=>[x.id,x]));
-    const newById=new Map(medicationChanges.map(x=>[x.id,x]));
-    const fixedLines=fixedMedicationLines(medicalInfoForSave.fixed_medications);
-
-    oldMedicationChanges.forEach(oldItem=>{
-      const nextItem=newById.get(oldItem.id);
-      if(oldItem.duration_type==='long_term'&&isCompleteMedicationChange(oldItem)
-        &&(!nextItem||medicationChangeSignature(oldItem)!==medicationChangeSignature(nextItem))){
-        reverseLongTermMedicationChange(fixedLines,oldItem);
-      }
-    });
-    medicationChanges.forEach(item=>{
-      const oldItem=oldById.get(item.id);
-      if(item.duration_type==='long_term'&&isCompleteMedicationChange(item)
-        &&(!oldItem||medicationChangeSignature(oldItem)!==medicationChangeSignature(item))){
-        applyLongTermMedicationChange(fixedLines,item);
-      }
-    });
+    local.medicalInfo.medication_changes=medicationChanges;
+    local.medicalInfo.no_medication_changes=medicationChanges.length===0;
+    const fixedLines=rebuildFixedMedicationsFromChanges();
 
     medicalInfoForSave.fixed_medications=fixedLines.join('\n');
     medicalInfoForSave.no_fixed_medications=fixedLines.length===0;
     medicalInfoForSave.medication_changes=medicationChanges;
     medicalInfoForSave.no_medication_changes=medicationChanges.length===0;
     medicalInfoForSave.medication_change=medicationChanges.length?'changed':'none';
-    medicalInfoForSave.medication_change_note=medicationChanges.map(item=>{
+    medicalInfoForSave.medication_change_note=medicationChanges.filter(isCompleteMedicationChange).map(item=>{
       const action=item.action==='add'?'新增':item.action==='stop'?'停用':'調整';
       const duration=item.duration_type==='long_term'?'長期／固定':'短期／臨時';
       const detail=item.action==='add'
