@@ -200,7 +200,7 @@
     if(!formById(eventId))return toast('本次評估未選用「'+sectionTitle('combined',row)+'」','warn');
 
     showLoading(true);
-    try{await load(eventId);render();}
+    try{await load(eventId);render();window.scrollTo({top:0,behavior:'auto'});}
     catch(err){console.error(err);toast('讀取'+sectionTitle('combined',row)+'失敗：'+(err?.message||err),'error');}
     finally{showLoading(false);}
   }

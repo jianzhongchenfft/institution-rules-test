@@ -829,6 +829,6 @@
 
     $('healthDraft')?.addEventListener('click',()=>save(false));
     $('healthConfirm')?.addEventListener('click',()=>save(true));
-    window.scrollTo({top:0,behavior:'auto'});
+    // 表單內重繪不主動捲動，避免新增／移除／修正等操作跳回頁首。
   }
 
