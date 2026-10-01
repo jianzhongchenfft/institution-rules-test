@@ -31,6 +31,7 @@
   const LIVING_OPTIONS=[
     ['alone','獨居'],
     ['spouse','與配偶同住'],
+    ['parents','與父母同住'],
     ['children','與子女同住'],
     ['grandchildren','與孫輩同住'],
     ['relatives','與其他親屬同住'],
@@ -350,7 +351,7 @@
             </label>
           `).join('')}
         </div>
-        ${cur.status==='adequate'&&!showNote?`<div class="support-note"><button type="button" class="btn sm" data-support-domain-add-note="${key}">＋ 補充備註</button></div>`:''}
+        ${!showNote&&!['partial','insufficient','not_applicable'].includes(cur.status)?`<div class="support-note"><button type="button" class="btn sm" data-support-domain-add-note="${key}">＋ 補充備註</button></div>`:''}
         ${showNote?`
           <div class="support-note">
             <label>備註${noteRequired?' *':''}</label>
