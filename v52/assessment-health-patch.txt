@@ -342,7 +342,7 @@
 
             <div class="health-subsection">
               <div class="health-subtitle">
-                <strong>0. 個案健康基本資料（本次評估快照）</strong>
+                <strong>個案健康基本資料（本次評估快照）</strong>
                 <small>新評估預設帶入個案主檔；此處修改只影響本次評估紀錄</small>
               </div>
 
