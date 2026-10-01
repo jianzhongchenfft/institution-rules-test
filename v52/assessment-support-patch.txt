@@ -498,6 +498,8 @@
       if(!String(h.primary_caregiver_relation||'').trim())return '請填寫主要照顧者與個案關係';
     }
     if(!h.backup_available)return '請選擇是否有替代照顧者／其他重要支持者';
+    if(h.backup_available==='yes'&&local.familyMembers.length===0)return '已選擇有替代照顧者／其他重要支持者，請至少新增一位支持者';
+    if(h.backup_available==='no'&&local.familyMembers.length>0)return '目前已新增重要支持者，請將「是否有替代照顧者／其他重要支持者」改為「有」';
 
     const incompleteSupporter=local.familyMembers.find(x=>
       !String(x.name||'').trim()
