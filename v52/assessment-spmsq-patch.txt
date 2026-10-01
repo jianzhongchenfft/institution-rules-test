@@ -77,7 +77,6 @@
           <div class="spmsq-summary-card"><label>前次錯誤題數</label><strong>${local.previous?.error_count??'—'}</strong><small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small></div>
           <div class="spmsq-summary-card"><label>結果說明</label><strong style="font-size:14px">${local.isUnable?'無法評估':(!complete?'尚未完成':err<=2?'0–2題錯誤':'3題以上')}</strong><small>${local.isUnable?'請填寫原因':(!complete?'完成10題後顯示':err<=2?'多屬正常範圍':'建議持續觀察並視需要進一步評估')}</small></div>
         </section>
-        ${local.previous?`<div class="spmsq-copy"><div><strong>前次 SPMSQ：${local.previous.error_count} 題錯誤</strong><span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):''}</span></div><button id="spmsqCopy" class="btn sm">帶入前次結果</button></div>`:''}
         ${local.hasLaterCompleted?'<div class="spmsq-notice">此筆評估日期早於個案較新的已完成 SPMSQ；系統只會將本次日期以前最近一筆已完成 SPMSQ 視為「前次評估」。</div>':''}
         <div class="spmsq-unable"><label><input id="spmsqUnable" type="checkbox" style="width:auto" ${local.isUnable?'checked':''}> 無法評估</label><textarea id="spmsqUnableReason" placeholder="請填寫無法評估原因" style="display:${local.isUnable?'block':'none'}">${escapeHTML(local.unableReason)}</textarea></div>
         <div class="spmsq-items" style="${local.isUnable?'opacity:.45;pointer-events:none':''}">
@@ -101,7 +100,6 @@
     document.querySelectorAll('input[name^="spmsq_q"]').forEach(inp=>inp.addEventListener('change',()=>{local.judgments[inp.name.replace('spmsq_','')]=inp.value;const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});}));
     $('spmsqUnable')?.addEventListener('change',()=>{local.isUnable=$('spmsqUnable').checked;render();});
     $('spmsqUnableReason')?.addEventListener('input',()=>local.unableReason=$('spmsqUnableReason').value);
-    $('spmsqCopy')?.addEventListener('click',()=>{local.responses={...safe(local.previous?.responses)};local.judgments={...safe(local.previous?.judgments)};local.pendingCopyFromId=local.previous?.id||null;local.isUnable=false;local.unableReason='';render();toast('已帶入前次SPMSQ，請重新確認本次回答與判定','success');});
     $('spmsqDraft')?.addEventListener('click',()=>save(false));
     $('spmsqConfirm')?.addEventListener('click',()=>save(true));
     window.scrollTo({top:0,behavior:'auto'});
@@ -124,7 +122,7 @@
     try{
       const {error}=await db.rpc('save_assessment_spmsq',{
         p_event_id:row.id,p_responses:local.responses,p_judgments:local.judgments,p_finalize:!!finalize,
-        p_unable:!!local.isUnable,p_unable_reason:local.isUnable?(local.unableReason||null):null,p_copied_from_id:local.pendingCopyFromId||null
+        p_unable:!!local.isUnable,p_unable_reason:local.isUnable?(local.unableReason||null):null,p_copied_from_id:null
       });
       if(error)throw error;
       await window.v52AssessmentApi?.loadAssessmentData?.(false);await load(row.id);render();
