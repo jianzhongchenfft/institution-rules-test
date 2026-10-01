@@ -136,6 +136,9 @@ declare
     'storage_safety','expired_medicine','medicine_recognition',
     'follow_prescription','medication_management_support'
   ];
+  v_sync_master boolean:=false;
+  v_new_conditions text;
+  v_new_treatments text;
 begin
   if (select auth.uid()) is null then raise exception 'AUTH_REQUIRED'; end if;
 
@@ -156,6 +159,14 @@ begin
   p_medication_checks:=coalesce(p_medication_checks,'{}'::jsonb);
   p_health_items:=coalesce(p_health_items,'{}'::jsonb);
   p_health_notes:=coalesce(p_health_notes,'{}'::jsonb);
+
+  if p_medical_info ? '_sync_case_health_profile' then
+    if jsonb_typeof(p_medical_info->'_sync_case_health_profile')<>'boolean' then
+      raise exception 'INVALID_SYNC_CASE_HEALTH_PROFILE';
+    end if;
+    v_sync_master:=coalesce((p_medical_info->>'_sync_case_health_profile')::boolean,false);
+    p_medical_info:=p_medical_info-'_sync_case_health_profile';
+  end if;
 
   if p_medical_info ? 'healthcare_events'
      and jsonb_typeof(p_medical_info->'healthcare_events')<>'array' then
@@ -231,6 +242,33 @@ begin
     elsif v_status='observe' then v_total:=v_total+1;
     end if;
   end loop;
+
+  if v_sync_master then
+    v_new_conditions:=nullif(btrim(p_medical_info->>'baseline_important_conditions'),'');
+    v_new_treatments:=nullif(btrim(p_medical_info->>'baseline_ongoing_treatments'),'');
+
+    if v_case.important_conditions is distinct from v_new_conditions then
+      insert into public.case_health_profile_history(
+        case_id,field_name,old_value,new_value,changed_by
+      ) values(
+        v_case.id,'important_conditions',v_case.important_conditions,v_new_conditions,(select auth.uid())
+      );
+    end if;
+
+    if v_case.ongoing_treatments is distinct from v_new_treatments then
+      insert into public.case_health_profile_history(
+        case_id,field_name,old_value,new_value,changed_by
+      ) values(
+        v_case.id,'ongoing_treatments',v_case.ongoing_treatments,v_new_treatments,(select auth.uid())
+      );
+    end if;
+
+    update public.care_cases
+    set important_conditions=v_new_conditions,
+        ongoing_treatments=v_new_treatments,
+        updated_at=now()
+    where id=v_case.id;
+  end if;
 
   select * into v_old
   from public.assessment_health_records
