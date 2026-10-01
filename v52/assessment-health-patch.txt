@@ -1,0 +1,370 @@
+
+(()=>{
+  const HEALTH_ITEMS=[
+    ['consciousness','意識狀況（清醒、混亂、嗜睡）'],
+    ['eating','進食狀況（能否自行進食、吞嚥困難）'],
+    ['elimination','排泄狀況（規律、便秘、失禁等）'],
+    ['mobility','行動能力（走動、上下床、使用輔具）'],
+    ['upper_limb','上肢運動能力（抬手、握力、協調性）'],
+    ['lower_limb','下肢運動能力（行走穩定性、肌力）'],
+    ['daily_activity','日常活動與休閒（看電視、散步、社交活動）'],
+    ['sleep','夜間睡眠狀況（入睡困難、易醒）'],
+    ['appetite_weight','食慾與體重變化'],
+    ['mood','情緒與精神狀況（焦慮、易怒、無助感）']
+  ];
+
+  const HEALTH_OPTIONS=[
+    ['good','狀況良好',2],
+    ['observe','需觀察',1],
+    ['refer','異常轉介',0]
+  ];
+
+  const MED_CHECKS=[
+    ['storage_safety','用藥放置位置安全、避免誤食'],
+    ['expired_medicine','有無過期藥物'],
+    ['medicine_recognition','是否能辨識不同藥物（外觀或標示）'],
+    ['follow_prescription','是否依照醫囑服藥（含時間與劑量）'],
+    ['medication_management_support','是否有人協助管理藥物']
+  ];
+
+  const MED_FIELDS=[
+    ['recent_visit_reason','近期就醫時間與原因','textarea'],
+    ['facility','就醫院所名稱','text'],
+    ['diagnoses','目前主要診斷','textarea'],
+    ['physician_dept','主治醫師／科別','text'],
+    ['recent_medications','近期用藥（名稱與用途）','textarea'],
+    ['chronic_medications','慢箋用藥（名稱與用途）','textarea']
+  ];
+
+  const style=document.createElement('style');
+  style.id='v52-assessment-health-style';
+  style.textContent=`
+    .health-page{max-width:1020px;margin:0 auto}
+    .health-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:12px}
+    .health-summary-card,.health-section,.health-card{border:1px solid var(--line);border-radius:12px;background:#fff}
+    .health-summary-card{padding:11px 12px}.health-summary-card label{display:block;font-size:10px;font-weight:900;color:#667085;margin-bottom:5px}
+    .health-summary-card strong{font-size:18px;color:#344054}.health-summary-card small{display:block;font-size:10.5px;color:#667085;margin-top:4px;line-height:1.45}
+    .health-copy{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #d9e9f7;background:#f7fbff;border-radius:11px;padding:11px 12px;margin-bottom:12px}
+    .health-copy strong{font-size:12px;color:#175cd3}.health-copy span{display:block;font-size:10.5px;color:#475467;margin-top:3px}
+    .health-notice{padding:10px 12px;border-radius:10px;background:#fffaeb;border:1px solid #fedf89;color:#93370d;font-size:11.5px;font-weight:800;margin-bottom:12px}
+    .health-section{margin-bottom:12px;overflow:hidden}.health-section-head{padding:11px 12px;background:#faf8f7;border-bottom:1px solid var(--line)}
+    .health-section-head h3{font-size:13px;margin:0;color:#344054}.health-section-body{padding:12px}
+    .health-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.health-field label{display:block;font-size:10.5px;font-weight:900;color:#667085;margin-bottom:5px}
+    .health-field input,.health-field textarea,.health-field select{width:100%;box-sizing:border-box}.health-field textarea{min-height:70px;resize:vertical}
+    .health-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.health-inline label{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800}
+    .health-inline input{width:auto}.health-med-checks,.health-items{display:grid;gap:9px}
+    .health-card{overflow:hidden}.health-card.changed{border-color:#e7a98e;box-shadow:0 0 0 2px rgba(220,148,121,.10)}
+    .health-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 11px;background:#faf8f7;border-bottom:1px solid var(--line)}
+    .health-card-title{font-size:12px;font-weight:900;color:#344054;line-height:1.5}.health-tags{display:flex;gap:6px;flex-wrap:wrap}
+    .health-tag{font-size:9.5px;font-weight:900;padding:3px 7px;border-radius:999px;background:#f2f4f7;color:#667085}.health-tag.prev{background:#eff8ff;color:#175cd3}.health-tag.change{background:#fff1eb;color:#a45d49}
+    .health-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:10px 11px}.health-option{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:11px;font-weight:800;cursor:pointer}
+    .health-option.selected{border-color:#dc9479;background:#fff8f5}.health-option input{width:auto}.health-score{margin-left:auto;color:#667085;font-size:9.5px}
+    .health-note{padding:0 11px 11px}.health-note textarea{width:100%;box-sizing:border-box;min-height:60px}
+    .health-actions{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding:11px 0;background:linear-gradient(to bottom,rgba(250,248,247,0),#faf8f7 24%)}
+    @media(max-width:720px){.health-summary{grid-template-columns:1fr}.health-grid{grid-template-columns:1fr}.health-options{grid-template-columns:1fr}.health-copy{flex-direction:column;align-items:flex-start}.health-copy .btn{width:100%}.health-actions .btn{flex:1}}
+  `;
+  document.head.appendChild(style);
+
+  const local={
+    eventId:null,record:null,previous:null,previousEvent:null,
+    medicalInfo:{},medicationChecks:{},healthItems:{},healthNotes:{},
+    pendingCopyFromId:null,hasLaterCompleted:false
+  };
+
+  const eventById=id=>state.assessmentEvents?.find(x=>x.id===id)||null;
+  const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
+  const formById=id=>(state.assessmentEventForms||[]).find(x=>x.assessment_event_id===id&&x.form_code==='health')||null;
+  const safe=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+  const canEdit=row=>{
+    const c=row?caseById(row.case_id):null;
+    if(!c||!state.profile)return false;
+    return ['business_manager','organization_manager','admin'].includes(state.profile.role)||(state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id);
+  };
+
+  const healthStatusLabel=v=>HEALTH_OPTIONS.find(x=>x[0]===v)?.[1]||'—';
+  const answeredCount=()=>HEALTH_ITEMS.filter(([k])=>HEALTH_OPTIONS.some(x=>x[0]===local.healthItems[k])).length;
+  const score=()=>HEALTH_ITEMS.reduce((sum,[k])=>{
+    const opt=HEALTH_OPTIONS.find(x=>x[0]===local.healthItems[k]);
+    return sum+(opt?opt[2]:0);
+  },0);
+
+  async function load(eventId){
+    const row=eventById(eventId);
+    if(!row)throw new Error('找不到評估事件');
+
+    const [cur,hist]=await Promise.all([
+      db.from('assessment_health_records').select('*').eq('assessment_event_id',eventId).maybeSingle(),
+      db.from('assessment_health_records').select('*').eq('case_id',row.case_id).not('confirmed_at','is',null).neq('assessment_event_id',eventId).order('confirmed_at',{ascending:false})
+    ]);
+    if(cur.error)throw cur.error;
+    if(hist.error)throw hist.error;
+
+    local.eventId=eventId;
+    local.record=cur.data||null;
+    local.medicalInfo={...safe(local.record?.medical_info)};
+    local.medicationChecks={...safe(local.record?.medication_checks)};
+    local.healthItems={...safe(local.record?.health_items)};
+    local.healthNotes={...safe(local.record?.health_notes)};
+
+    const dated=(hist.data||[]).map(record=>({record,event:eventById(record.assessment_event_id)})).filter(x=>x.event?.planned_date);
+    local.hasLaterCompleted=dated.some(x=>x.event.planned_date>row.planned_date);
+    const candidates=dated.filter(x=>x.event.planned_date<row.planned_date).sort((a,b)=>String(b.event.planned_date).localeCompare(String(a.event.planned_date))||String(b.record.confirmed_at||'').localeCompare(String(a.record.confirmed_at||'')));
+    local.previous=candidates[0]?.record||null;
+    local.previousEvent=candidates[0]?.event||null;
+    local.pendingCopyFromId=(local.record?.copied_from_id&&local.record.copied_from_id===local.previous?.id)?local.record.copied_from_id:null;
+  }
+
+  function syncInputs(){
+    document.querySelectorAll('[data-health-medical]').forEach(el=>{
+      local.medicalInfo[el.dataset.healthMedical]=el.type==='checkbox'?el.checked:el.value;
+    });
+    document.querySelectorAll('[data-health-med-note]').forEach(el=>{
+      const key=el.dataset.healthMedNote;
+      local.medicationChecks[key]={...(local.medicationChecks[key]||{}),note:el.value};
+    });
+    document.querySelectorAll('[data-health-note]').forEach(el=>local.healthNotes[el.dataset.healthNote]=el.value);
+  }
+
+  function renderSummary(){
+    const count=answeredCount(),total=score(),complete=count===10,prev=local.previous?.total_score;
+    return `
+      <section class="health-summary">
+        <div class="health-summary-card"><label>本次健康狀況得分</label><strong>${count?total:'—'}</strong><small>${complete?'正式總分（滿分20分）':'暫計｜已填 '+count+'/10 項'}</small></div>
+        <div class="health-summary-card"><label>前次得分</label><strong>${prev??'—'}</strong><small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small></div>
+        <div class="health-summary-card"><label>與前次差異</label><strong style="font-size:14px">${prev==null||!complete?'—':((total-prev)>0?'+':'')+(total-prev)+' 分'}</strong><small>分數越高代表整體狀況越好</small></div>
+      </section>
+    `;
+  }
+
+  function renderMedicalField([key,label,type]){
+    const prev=local.previous?.medical_info?.[key];
+    return `
+      <div class="health-field">
+        <label>${escapeHTML(label)}${prev?`<span style="font-weight:500;color:#175cd3">　前次：${escapeHTML(String(prev))}</span>`:''}</label>
+        ${type==='textarea'
+          ?`<textarea data-health-medical="${key}">${escapeHTML(local.medicalInfo[key]||'')}</textarea>`
+          :`<input data-health-medical="${key}" value="${escapeHTML(local.medicalInfo[key]||'')}">`}
+      </div>
+    `;
+  }
+
+  function renderMedCheck([key,label]){
+    const cur=local.medicationChecks[key]||{};
+    const prev=local.previous?.medication_checks?.[key]||{};
+    return `
+      <div class="health-card ${cur.status&&prev.status&&cur.status!==prev.status?'changed':''}">
+        <div class="health-card-head">
+          <div class="health-card-title">${escapeHTML(label)}</div>
+          <div class="health-tags">${prev.status?`<span class="health-tag prev">前次：${prev.status==='good'?'狀況良好':'需改善'}</span>`:''}</div>
+        </div>
+        <div class="health-options" style="grid-template-columns:1fr 1fr">
+          ${[['good','狀況良好'],['improve','需改善']].map(([v,l])=>`
+            <label class="health-option ${cur.status===v?'selected':''}">
+              <input type="radio" name="health_med_${key}" value="${v}" ${cur.status===v?'checked':''}>${l}
+            </label>
+          `).join('')}
+        </div>
+        <div class="health-note"><textarea data-health-med-note="${key}" placeholder="備註（選填）">${escapeHTML(cur.note||'')}</textarea></div>
+      </div>
+    `;
+  }
+
+  function renderHealthItem([key,label]){
+    const cur=local.healthItems[key],prev=local.previous?.health_items?.[key],changed=cur&&prev&&cur!==prev;
+    return `
+      <div class="health-card ${changed?'changed':''}">
+        <div class="health-card-head">
+          <div class="health-card-title">${escapeHTML(label)}</div>
+          <div class="health-tags">
+            ${prev?`<span class="health-tag prev">前次：${escapeHTML(healthStatusLabel(prev))}</span>`:''}
+            ${changed?'<span class="health-tag change">本次有變化</span>':''}
+          </div>
+        </div>
+        <div class="health-options">
+          ${HEALTH_OPTIONS.map(([v,l,s])=>`
+            <label class="health-option ${cur===v?'selected':''}">
+              <input type="radio" name="health_item_${key}" value="${v}" ${cur===v?'checked':''}>
+              <span>${l}</span><span class="health-score">${s}分</span>
+            </label>
+          `).join('')}
+        </div>
+        <div class="health-note"><textarea data-health-note="${key}" placeholder="備註（選填）">${escapeHTML(local.healthNotes[key]||'')}</textarea></div>
+      </div>
+    `;
+  }
+
+  function render(){
+    const row=eventById(local.eventId),c=row?caseById(row.case_id):null,form=row?formById(row.id):null;
+    if(!row||!c||!form)return window.v52AssessmentApi?.renderAssessmentPage?.();
+
+    const canEditRow=canEdit(row)&&row.status!=='voided';
+    const noRecent=!!local.medicalInfo.no_recent_medical;
+
+    window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'身體與健康狀況評估');
+
+    $('content').innerHTML=`
+      <div class="health-page">
+        <div class="page-head">
+          <div><h1>${escapeHTML(c.case_name)}｜身體與健康狀況評估</h1><p>包含近期就醫／用藥及身體健康狀況。</p></div>
+          <div class="assessment-head-actions"><button id="healthBack" class="btn">← 返回評估事件</button></div>
+        </div>
+
+        ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
+        ${renderSummary()}
+
+        ${local.previous?`
+          <div class="health-copy">
+            <div><strong>前次健康評估：${local.previous.total_score??'—'} 分</strong><span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):''}｜帶入後仍需逐項確認本次狀況</span></div>
+            <button id="healthCopyPrevious" class="btn sm">帶入前次資料</button>
+          </div>
+        `:''}
+
+        ${local.hasLaterCompleted?'<div class="health-notice">此筆評估日期早於個案較新的已完成健康評估；系統只會將本次日期以前最近一筆已完成紀錄視為「前次評估」。</div>':''}
+
+        <section class="health-section">
+          <div class="health-section-head"><h3>一、近期就醫與用藥情形</h3></div>
+          <div class="health-section-body">
+            <div class="health-inline" style="margin-bottom:10px">
+              <label><input type="checkbox" data-health-medical="no_recent_medical" ${noRecent?'checked':''}> 無近期就醫與用藥情形</label>
+            </div>
+            <div id="healthMedicalDetails" style="${noRecent?'display:none':''}">
+              <div class="health-grid">${MED_FIELDS.map(renderMedicalField).join('')}</div>
+
+              <div class="health-grid" style="margin-top:10px">
+                <div class="health-field">
+                  <label>用藥方式</label>
+                  <select data-health-medical="medication_method">
+                    <option value="">請選擇</option>
+                    <option value="self" ${local.medicalInfo.medication_method==='self'?'selected':''}>自行</option>
+                    <option value="assisted" ${local.medicalInfo.medication_method==='assisted'?'selected':''}>他人協助</option>
+                  </select>
+                </div>
+                <div class="health-field"><label>協助者</label><input data-health-medical="medication_assisted_by" value="${escapeHTML(local.medicalInfo.medication_assisted_by||'')}"></div>
+                <div class="health-field">
+                  <label>是否定期回診</label>
+                  <select data-health-medical="regular_followup"><option value="">請選擇</option><option value="yes" ${local.medicalInfo.regular_followup==='yes'?'selected':''}>是</option><option value="no" ${local.medicalInfo.regular_followup==='no'?'selected':''}>否</option></select>
+                </div>
+                <div class="health-field"><label>未定期回診原因</label><input data-health-medical="regular_followup_reason" value="${escapeHTML(local.medicalInfo.regular_followup_reason||'')}"></div>
+                <div class="health-field">
+                  <label>是否服藥規律</label>
+                  <select data-health-medical="medication_regular"><option value="">請選擇</option><option value="yes" ${local.medicalInfo.medication_regular==='yes'?'selected':''}>是</option><option value="no" ${local.medicalInfo.medication_regular==='no'?'selected':''}>否</option></select>
+                </div>
+                <div class="health-field"><label>需追蹤事項</label><input data-health-medical="medication_followup" value="${escapeHTML(local.medicalInfo.medication_followup||'')}"></div>
+                <div class="health-field">
+                  <label>是否出現藥物副作用</label>
+                  <select data-health-medical="side_effect"><option value="">請選擇</option><option value="none" ${local.medicalInfo.side_effect==='none'?'selected':''}>否</option><option value="present" ${local.medicalInfo.side_effect==='present'?'selected':''}>有</option></select>
+                </div>
+                <div class="health-field"><label>副作用說明</label><input data-health-medical="side_effect_note" value="${escapeHTML(local.medicalInfo.side_effect_note||'')}"></div>
+              </div>
+
+              <div class="health-med-checks" style="margin-top:12px">${MED_CHECKS.map(renderMedCheck).join('')}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="health-section">
+          <div class="health-section-head"><h3>二、身體與健康狀況</h3></div>
+          <div class="health-section-body"><div class="health-items">${HEALTH_ITEMS.map(renderHealthItem).join('')}</div></div>
+        </section>
+
+        ${canEditRow?`
+          <div class="health-actions">
+            ${form.status!=='completed'?'<button id="healthDraft" class="btn">儲存草稿</button>':''}
+            <button id="healthConfirm" class="btn primary">${form.status==='completed'?'儲存修正並確認':'完成本次確認'}</button>
+          </div>
+        `:''}
+      </div>
+    `;
+
+    $('healthBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
+
+    document.querySelectorAll('[data-health-medical]').forEach(el=>{
+      el.addEventListener(el.type==='checkbox'?'change':'input',()=>{
+        local.medicalInfo[el.dataset.healthMedical]=el.type==='checkbox'?el.checked:el.value;
+        if(el.dataset.healthMedical==='no_recent_medical')render();
+      });
+      if(el.tagName==='SELECT')el.addEventListener('change',()=>local.medicalInfo[el.dataset.healthMedical]=el.value);
+    });
+
+    document.querySelectorAll('input[name^="health_med_"]').forEach(input=>input.addEventListener('change',()=>{
+      syncInputs();
+      const key=input.name.replace('health_med_','');
+      local.medicationChecks[key]={...(local.medicationChecks[key]||{}),status:input.value};
+      const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
+    }));
+
+    document.querySelectorAll('input[name^="health_item_"]').forEach(input=>input.addEventListener('change',()=>{
+      syncInputs();
+      local.healthItems[input.name.replace('health_item_','')]=input.value;
+      const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
+    }));
+
+    $('healthCopyPrevious')?.addEventListener('click',()=>{
+      if(!local.previous)return;
+      local.medicalInfo={...safe(local.previous.medical_info)};
+      local.medicationChecks=JSON.parse(JSON.stringify(safe(local.previous.medication_checks)));
+      local.healthItems={...safe(local.previous.health_items)};
+      local.healthNotes={...safe(local.previous.health_notes)};
+      local.pendingCopyFromId=local.previous.id;
+      render();
+      toast('已帶入前次健康評估，請逐項確認本次狀況後再完成','success');
+    });
+
+    $('healthDraft')?.addEventListener('click',()=>save(false));
+    $('healthConfirm')?.addEventListener('click',()=>save(true));
+    window.scrollTo({top:0,behavior:'auto'});
+  }
+
+  async function save(finalize){
+    const row=eventById(local.eventId);
+    if(!row||!canEdit(row))return toast('您沒有此個案的評估編輯權限','error');
+
+    syncInputs();
+
+    if(finalize&&answeredCount()!==10){
+      const missing=HEALTH_ITEMS.filter(([k])=>!HEALTH_OPTIONS.some(x=>x[0]===local.healthItems[k])).map(([,l])=>l).join('、');
+      return toast('尚有未完成項目：'+missing,'warn');
+    }
+    if(!finalize&&answeredCount()===0&&Object.keys(local.medicalInfo).length===0){
+      return toast('至少填寫一項後再儲存草稿','warn');
+    }
+
+    showLoading(true);
+    try{
+      const {error}=await db.rpc('save_assessment_health',{
+        p_event_id:row.id,
+        p_medical_info:local.medicalInfo,
+        p_medication_checks:local.medicationChecks,
+        p_health_items:local.healthItems,
+        p_health_notes:local.healthNotes,
+        p_finalize:!!finalize,
+        p_copied_from_id:local.pendingCopyFromId||null
+      });
+      if(error)throw error;
+
+      await window.v52AssessmentApi?.loadAssessmentData?.(false);
+      await load(row.id);
+      render();
+      toast(finalize?'身體與健康狀況評估已完成':'健康評估草稿已儲存','success');
+    }catch(err){
+      console.error(err);
+      toast('儲存健康評估失敗：'+(err?.message||err),'error');
+    }finally{
+      showLoading(false);
+    }
+  }
+
+  async function open(eventId){
+    const row=eventById(eventId);
+    if(!row)return toast('找不到評估事件','error');
+    if(row.status==='pending')return toast('請先開始本次評估','warn');
+    if(!formById(eventId))return toast('本次評估未選用身體與健康狀況評估','warn');
+
+    showLoading(true);
+    try{await load(eventId);render();}
+    catch(err){console.error(err);toast('讀取健康評估失敗：'+(err?.message||err),'error');}
+    finally{showLoading(false);}
+  }
+
+  window.v52AssessmentHealth={open};
+})();
