@@ -68,7 +68,7 @@
     const row=eventById(local.eventId),c=row?caseById(row.case_id):null,form=row?formById(row.id):null;
     if(!row||!c||!form)return window.v52AssessmentApi?.renderAssessmentPage?.();
     const count=completedCount(),err=errorCount(),complete=count===10;
-    $('topTitle').textContent='評估管理';$('crumb').textContent='SPMSQ 短簡易智能狀態問卷';
+    window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'SPMSQ 短簡易智能狀態問卷');
     $('content').innerHTML=`
       <div class="spmsq-page">
         <div class="page-head"><div><h1>${escapeHTML(c.case_name)}｜SPMSQ</h1><p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}</p></div><div><button id="spmsqBack" class="btn">← 返回評估事件</button></div></div>
