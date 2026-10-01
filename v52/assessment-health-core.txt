@@ -109,20 +109,18 @@
     eventId:null,record:null,previous:null,previousEvent:null,
     medicalInfo:{},medicationChecks:{},healthItems:{},healthNotes:{},
     fixedMedicationBaseEntries:[],
-    section:'status',
+    section:'combined',
     pendingCopyFromId:null,hasLaterCompleted:false
   };
 
   const eventById=id=>state.assessmentEvents?.find(x=>x.id===id)||null;
   const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
-  const healthFormCode=section=>section==='medication'?'health_medication':'health_status';
-  const formById=(id,section=local.section)=>(state.assessmentEventForms||[])
-    .find(x=>x.assessment_event_id===id&&x.form_code===healthFormCode(section))||null;
-  const healthSectionMode=(row,section=local.section)=>section==='status'?'status':row?.assessment_type==='opening'?'baseline':'change';
-  const sectionTitle=(section,row=eventById(local.eventId))=>{
-    if(section==='medication')return row?.assessment_type==='opening'?'健康與用藥初始評估':'健康與用藥追蹤評估';
-    return '身體與健康狀況評估';
-  };
+  const healthFormCode=()=> 'health_medication';
+  const formById=id=>(state.assessmentEventForms||[])
+    .find(x=>x.assessment_event_id===id&&x.form_code==='health_medication')||null;
+  const healthSectionMode=row=>row?.assessment_type==='opening'?'baseline':'change';
+  const sectionTitle=(section,row=eventById(local.eventId))=>
+    row?.assessment_type==='opening'?'健康與用藥初始評估':'健康與用藥追蹤評估';
   const safe=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   const safeArray=v=>Array.isArray(v)?v:[];
 
@@ -370,10 +368,10 @@
       .map(record=>({record,event:eventById(record.assessment_event_id)}))
       .filter(x=>x.event?.planned_date);
     const relevantCompleted=dated.filter(x=>{
-      if(local.section==='status')return !!x.record.status_confirmed_at;
-      return x.event.assessment_type==='opening'
+      const medicationDone=x.event.assessment_type==='opening'
         ?!!x.record.baseline_confirmed_at
         :!!x.record.change_confirmed_at;
+      return medicationDone&&!!x.record.status_confirmed_at;
     });
     local.hasLaterCompleted=relevantCompleted.some(x=>x.event.planned_date>row.planned_date);
     const candidates=relevantCompleted
@@ -384,10 +382,10 @@
     local.previousEvent=candidates[0]?.event||null;
     local.pendingCopyFromId=(local.record?.copied_from_id&&local.record.copied_from_id===local.previous?.id)?local.record.copied_from_id:null;
 
-    const mode=healthSectionMode(row,local.section);
+    const mode=healthSectionMode(row);
     const prevMed=safe(local.previous?.medical_info);
 
-    if(local.section==='medication'&&mode==='change'&&local.previous){
+    if(mode==='change'&&local.previous){
       const hasSubstantiveChangeData=
         !!local.record?.change_confirmed_at
         ||safeArray(local.medicalInfo.healthcare_events).length>0
@@ -420,7 +418,7 @@
     const hasPreviousEffective=Object.prototype.hasOwnProperty.call(prevMed,'fixed_medication_entries')
       &&Array.isArray(prevMed.fixed_medication_entries);
 
-    if(local.section==='medication'&&mode==='change'&&local.previous){
+    if(mode==='change'&&local.previous){
       local.fixedMedicationBaseEntries=hasPreviousEffective
         ?previousEffective.map(x=>normalizeMedicationEntry(x,local.previousEvent))
         :legacyEntriesFromText(prevMed.fixed_medications||'',local.previousEvent,'legacy');
