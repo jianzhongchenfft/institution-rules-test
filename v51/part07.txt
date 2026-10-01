@@ -24,27 +24,27 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!caseHtmlRes.ok) throw new Error(`v52/case-html-import.txt 載入失敗（${caseHtmlRes.status}）`);
       eval(await caseHtmlRes.text());
 
-      const assessmentRes = await fetch('v52/assessment-patch.txt?v=assessment-health-unvisited-20261001',{cache:'no-store'});
+      const assessmentRes = await fetch('v52/assessment-patch.txt?v=assessment-health-unvisited-v2-20261001',{cache:'no-store'});
       if(!assessmentRes.ok) throw new Error(`v52/assessment-patch.txt 載入失敗（${assessmentRes.status}）`);
       eval(await assessmentRes.text());
 
-      const assessmentAdlRes = await fetch('v52/assessment-adl-patch.txt?v=assessment-health-unvisited-20261001',{cache:'no-store'});
+      const assessmentAdlRes = await fetch('v52/assessment-adl-patch.txt?v=assessment-health-unvisited-v2-20261001',{cache:'no-store'});
       if(!assessmentAdlRes.ok) throw new Error(`v52/assessment-adl-patch.txt 載入失敗（${assessmentAdlRes.status}）`);
       eval(await assessmentAdlRes.text());
 
-      const assessmentIadlRes = await fetch('v52/assessment-iadl-patch.txt?v=assessment-health-unvisited-20261001',{cache:'no-store'});
+      const assessmentIadlRes = await fetch('v52/assessment-iadl-patch.txt?v=assessment-health-unvisited-v2-20261001',{cache:'no-store'});
       if(!assessmentIadlRes.ok) throw new Error(`v52/assessment-iadl-patch.txt 載入失敗（${assessmentIadlRes.status}）`);
       eval(await assessmentIadlRes.text());
 
-      const assessmentSpmsqRes = await fetch('v52/assessment-spmsq-patch.txt?v=assessment-health-unvisited-20261001',{cache:'no-store'});
+      const assessmentSpmsqRes = await fetch('v52/assessment-spmsq-patch.txt?v=assessment-health-unvisited-v2-20261001',{cache:'no-store'});
       if(!assessmentSpmsqRes.ok) throw new Error(`v52/assessment-spmsq-patch.txt 載入失敗（${assessmentSpmsqRes.status}）`);
       eval(await assessmentSpmsqRes.text());
 
-      const assessmentGds15Res = await fetch('v52/assessment-gds15-patch.txt?v=assessment-health-unvisited-20261001',{cache:'no-store'});
+      const assessmentGds15Res = await fetch('v52/assessment-gds15-patch.txt?v=assessment-health-unvisited-v2-20261001',{cache:'no-store'});
       if(!assessmentGds15Res.ok) throw new Error(`v52/assessment-gds15-patch.txt 載入失敗（${assessmentGds15Res.status}）`);
       eval(await assessmentGds15Res.text());
 
-      const assessmentHealthRes = await fetch('v52/assessment-health-patch.txt?v=assessment-health-unvisited-20261001',{cache:'no-store'});
+      const assessmentHealthRes = await fetch('v52/assessment-health-patch.txt?v=assessment-health-unvisited-v2-20261001',{cache:'no-store'});
       if(!assessmentHealthRes.ok) throw new Error(`v52/assessment-health-patch.txt 載入失敗（${assessmentHealthRes.status}）`);
       eval(await assessmentHealthRes.text());
 
