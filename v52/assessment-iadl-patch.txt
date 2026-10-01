@@ -130,7 +130,6 @@
         .not('confirmed_at','is',null)
         .neq('assessment_event_id',eventId)
         .order('confirmed_at',{ascending:false})
-        .limit(30)
     ]);
 
     if(currentRes.error)throw currentRes.error;
@@ -288,7 +287,9 @@
       input.addEventListener('change',()=>{
         const key=input.name.replace(/^iadl_/,'');
         local.answers[key]=Number(input.value);
+        const scrollY=window.scrollY;
         renderIadlPage();
+        window.scrollTo({top:scrollY,behavior:'auto'});
       });
     });
 
