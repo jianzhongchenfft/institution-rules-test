@@ -185,6 +185,60 @@ where form_code in (
   'home_safety','support','spmsq','gds15','caregiver_burden','bsrs5'
 );
 
+-- 2026-10-01: unify opening/follow-up health-medication into one type-aware form.
+insert into public.assessment_event_forms(
+  assessment_event_id,form_code,form_name,sort_order,is_required,status,created_at,updated_at
+)
+select distinct on (f.assessment_event_id)
+  f.assessment_event_id,
+  'health_medication',
+  '健康與用藥評估',
+  30,
+  e.assessment_type in ('opening','periodic'),
+  f.status,
+  f.created_at,
+  now()
+from public.assessment_event_forms f
+join public.assessment_events e on e.id=f.assessment_event_id
+where f.form_code in ('health_baseline','health_change')
+order by f.assessment_event_id,
+         case when f.status='completed' then 0 when f.status='in_progress' then 1 else 2 end,
+         f.updated_at desc
+on conflict (assessment_event_id,form_code) do update
+set form_name=excluded.form_name,
+    sort_order=excluded.sort_order,
+    is_required=excluded.is_required,
+    status=case
+      when public.assessment_event_forms.status='completed' or excluded.status='completed' then 'completed'
+      when public.assessment_event_forms.status='in_progress' or excluded.status='in_progress' then 'in_progress'
+      else excluded.status
+    end,
+    updated_at=now();
+
+delete from public.assessment_event_forms
+where form_code in ('health_baseline','health_change');
+
+update public.assessment_event_forms
+set form_name=case when form_code='health_medication' then '健康與用藥評估' else form_name end,
+    sort_order=case form_code
+      when 'adl' then 10
+      when 'iadl' then 20
+      when 'health_medication' then 30
+      when 'health_status' then 40
+      when 'home_safety' then 50
+      when 'support' then 60
+      when 'spmsq' then 70
+      when 'gds15' then 80
+      when 'caregiver_burden' then 90
+      when 'bsrs5' then 100
+      else sort_order
+    end,
+    updated_at=now()
+where form_code in (
+  'adl','iadl','health_medication','health_status',
+  'home_safety','support','spmsq','gds15','caregiver_burden','bsrs5'
+);
+
 create or replace function public.save_assessment_health(
   p_event_id uuid,
   p_medical_info jsonb,
@@ -238,8 +292,8 @@ begin
   end if;
 
   v_form_code:=case p_section
-    when 'baseline' then 'health_baseline'
-    when 'change' then 'health_change'
+    when 'baseline' then 'health_medication'
+    when 'change' then 'health_medication'
     when 'status' then 'health_status'
     else null
   end;
@@ -259,10 +313,39 @@ begin
     raise exception 'INVALID_OPENING_NO_FIXED_MEDICATIONS';
   end if;
 
+  if p_medical_info ? 'opening_no_temporary_medications'
+     and jsonb_typeof(p_medical_info->'opening_no_temporary_medications')<>'boolean' then
+    raise exception 'INVALID_OPENING_NO_TEMPORARY_MEDICATIONS';
+  end if;
+
+  if p_medical_info ? 'opening_temporary_medications'
+     and jsonb_typeof(p_medical_info->'opening_temporary_medications')<>'array' then
+    raise exception 'INVALID_OPENING_TEMPORARY_MEDICATIONS';
+  end if;
+
+  for v_entry in
+    select value
+    from jsonb_array_elements(coalesce(p_medical_info->'opening_temporary_medications','[]'::jsonb))
+  loop
+    if jsonb_typeof(v_entry)<>'object' then
+      raise exception 'INVALID_OPENING_TEMPORARY_MEDICATION_ITEM';
+    end if;
+    if p_finalize and p_section in ('baseline','all')
+       and v_event.assessment_type='opening'
+       and nullif(btrim(v_entry->>'medication'),'') is null then
+      raise exception 'OPENING_TEMPORARY_MEDICATION_INCOMPLETE';
+    end if;
+  end loop;
+
   if p_finalize and p_section in ('baseline','all') and v_event.assessment_type='opening' then
     if coalesce((p_medical_info->>'opening_no_fixed_medications')::boolean,false)=false
        and jsonb_array_length(coalesce(p_medical_info->'fixed_medication_base_entries','[]'::jsonb))=0 then
       raise exception 'OPENING_MEDICATION_BASELINE_UNCONFIRMED';
+    end if;
+
+    if coalesce((p_medical_info->>'opening_no_temporary_medications')::boolean,false)=false
+       and jsonb_array_length(coalesce(p_medical_info->'opening_temporary_medications','[]'::jsonb))=0 then
+      raise exception 'OPENING_TEMPORARY_MEDICATIONS_UNCONFIRMED';
     end if;
   end if;
 
@@ -649,7 +732,7 @@ begin
       updated_at=now()
   where assessment_event_id=p_event_id
     and (
-      (p_section='all' and form_code in ('health_baseline','health_change','health_status'))
+      (p_section='all' and form_code in ('health_medication','health_status'))
       or form_code=v_form_code
     )
     and (p_finalize or status<>'completed');
