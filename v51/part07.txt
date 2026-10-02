@@ -35,11 +35,12 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
         'v52/assessment-health-save.txt',
         'v52/assessment-home-safety-patch.txt',
         'v52/assessment-support-patch.txt',
-        'v52/assessment-caregiver-screen-patch.txt'
+        'v52/assessment-caregiver-screen-patch.txt',
+        'v52/assessment-summary-patch.txt'
       ];
       let assessmentModuleCode='';
       for(const path of assessmentModuleFiles){
-        const res=await fetch(`${path}?v=assessment-session-trend-20261002`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=assessment-summary-print-20261002`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         assessmentModuleCode+='\n'+await res.text();
       }
