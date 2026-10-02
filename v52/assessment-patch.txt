@@ -503,6 +503,7 @@
   function renderAssessmentFormOptions(existing,type){
     const currentForms=existing?assessmentFormsFor(existing.id):[];
     const currentMap=new Map(currentForms.map(x=>[x.form_code,x]));
+    const eventLocked=!!existing&&['completed','voided'].includes(existing.status);
     const selected=new Set(
       existing
         ?currentForms
@@ -528,10 +529,10 @@
               data-status-locked="${locked?'1':'0'}"
               data-required="${required?'1':'0'}"
               ${checked?'checked':''}
-              ${(locked||required)?'disabled':''}>
+              ${(eventLocked||locked||required)?'disabled':''}>
             <span>
               <strong>${escapeHTML(def.name)}</strong>
-              <small>${escapeHTML(assessmentFormKindLabel(def,type))}${locked?'｜已開始填寫，無法由此移除':''}</small>
+              <small>${escapeHTML(assessmentFormKindLabel(def,type))}${eventLocked?'｜評估事件已完成，工具組合不可變更':locked?'｜已開始填寫，無法由此移除':''}</small>
             </span>
           </label>
         `;
@@ -686,7 +687,7 @@
             const {error}=await db.from('assessment_events').update(payload).eq('id',existing.id);
             if(error)throw error;
 
-            if(existing.status==='pending'){
+            if(!['completed','voided'].includes(existing.status)){
               const current=assessmentFormsFor(existing.id);
               const currentMap=new Map(current.map(x=>[x.form_code,x]));
               const now=new Date().toISOString();
@@ -732,6 +733,25 @@
               if(removable.length){
                 const {error:deleteError}=await db.from('assessment_event_forms').delete().in('id',removable);
                 if(deleteError)throw deleteError;
+              }
+
+              if(existing.status!=='pending'){
+                const doneStatuses=new Set(['completed','unable','not_applicable']);
+                const allFormsDone=selectedCodes.every(code=>{
+                  const old=currentMap.get(code);
+                  return !!old&&doneStatuses.has(old.status);
+                });
+                const nextStatus=allFormsDone?'forms_completed':'in_progress';
+                const statusPayload={
+                  status:nextStatus,
+                  forms_completed_at:allFormsDone?(existing.forms_completed_at||now):null,
+                  updated_by:state.user.id,
+                  updated_at:now
+                };
+                const {error:statusError}=await db.from('assessment_events')
+                  .update(statusPayload)
+                  .eq('id',existing.id);
+                if(statusError)throw statusError;
               }
             }
 
