@@ -1020,7 +1020,6 @@
         </div>
         <div class="assessment-head-actions">
           <button id="assessmentBack" class="btn">← 返回評估列表</button>
-          <button id="assessmentHistoryBtn" class="btn">修改歷程</button>
           ${p.total&&p.done===p.total&&row.status!=='voided'
             ?'<button id="assessmentSummaryBtn" class="btn '+(row.status==='forms_completed'?'primary':'')+'">'+(row.status==='completed'?'查看總結／列印':'填寫評估總結')+'</button>'
             :''}
@@ -1051,6 +1050,11 @@
       <div class="assessment-detail-note">
         評估工具會依評估類型顯示：開案先建立基準資料，後續評估追蹤期間變化；ADL、IADL、認知、情緒與身體健康等則記錄本次當下狀態。
       </div>
+      ${canManageAllAssessments()?`
+        <div style="text-align:right;margin:-4px 2px 10px;font-size:10px;color:#98a2b3">
+          管理查核｜<button id="assessmentHistoryBtn" type="button" style="border:0;background:none;padding:0;color:#667085;font:inherit;text-decoration:underline;cursor:pointer">查看修改歷程</button>
+        </div>
+      `:''}
 
       <section class="panel">
         <div class="panel-head">
