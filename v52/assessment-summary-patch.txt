@@ -131,7 +131,11 @@
   const local={
     eventId:null,
     summary:null,
-    records:{}
+    records:{},
+    previousRecords:{},
+    previousEvents:{},
+    previousSummary:null,
+    previousSummaryEvent:null
   };
 
   const safeObj=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
@@ -162,11 +166,47 @@
     return res.data||null;
   }
 
+  async function previousRecord(table,row,predicate=()=>true){
+    const res=await db.from(table)
+      .select('*')
+      .eq('case_id',row.case_id)
+      .not('confirmed_at','is',null)
+      .neq('assessment_event_id',row.id)
+      .order('confirmed_at',{ascending:false});
+    if(res.error)throw res.error;
+    const candidates=(res.data||[])
+      .filter(predicate)
+      .map(record=>({record,event:eventById(record.assessment_event_id)}))
+      .filter(x=>x.event?.planned_date&&x.event.planned_date<row.planned_date)
+      .sort((a,b)=>String(b.event.planned_date).localeCompare(String(a.event.planned_date))
+        ||String(b.record.confirmed_at||'').localeCompare(String(a.record.confirmed_at||'')));
+    return candidates[0]||null;
+  }
+
+  async function previousOverallSummary(row){
+    const res=await db.from('assessment_event_summaries')
+      .select('*')
+      .eq('case_id',row.case_id)
+      .not('completed_at','is',null)
+      .neq('assessment_event_id',row.id)
+      .order('completed_at',{ascending:false});
+    if(res.error)throw res.error;
+    const candidates=(res.data||[])
+      .map(summary=>({summary,event:eventById(summary.assessment_event_id)}))
+      .filter(x=>x.event?.planned_date&&x.event.planned_date<row.planned_date)
+      .sort((a,b)=>String(b.event.planned_date).localeCompare(String(a.event.planned_date))
+        ||String(b.summary.completed_at||'').localeCompare(String(a.summary.completed_at||'')));
+    return candidates[0]||null;
+  }
+
   async function load(eventId){
     const row=eventById(eventId);
     if(!row)throw new Error('找不到評估事件');
 
-    const [summary,adl,iadl,spmsq,gds15,health,homeSafety,support,caregiver]=await Promise.all([
+    const [
+      summary,adl,iadl,spmsq,gds15,health,homeSafety,support,caregiver,
+      prevAdl,prevIadl,prevSpmsq,prevGds15,prevHealth,prevHomeSafety,prevSupport,prevCaregiver,prevOverall
+    ]=await Promise.all([
       db.from('assessment_event_summaries').select('*').eq('assessment_event_id',eventId).maybeSingle(),
       maybeRecord('assessment_adl_records',eventId),
       maybeRecord('assessment_iadl_records',eventId),
@@ -175,7 +215,16 @@
       maybeRecord('assessment_health_records',eventId),
       maybeRecord('assessment_home_safety_records',eventId),
       maybeRecord('assessment_support_records',eventId),
-      maybeRecord('assessment_caregiver_screen_records',eventId)
+      maybeRecord('assessment_caregiver_screen_records',eventId),
+      previousRecord('assessment_adl_records',row),
+      previousRecord('assessment_iadl_records',row),
+      previousRecord('assessment_spmsq_records',row,x=>x.is_unable===false),
+      previousRecord('assessment_gds15_records',row,x=>x.completion_mode==='completed'),
+      previousRecord('assessment_health_records',row),
+      previousRecord('assessment_home_safety_records',row),
+      previousRecord('assessment_support_records',row),
+      previousRecord('assessment_caregiver_screen_records',row,x=>x.applicability==='applicable'),
+      previousOverallSummary(row)
     ]);
     if(summary.error)throw summary.error;
 
@@ -192,6 +241,28 @@
       external_coordination_note:''
     };
     local.records={adl,iadl,spmsq,gds15,health,home_safety:homeSafety,support,caregiver};
+    local.previousRecords={
+      adl:prevAdl?.record||null,
+      iadl:prevIadl?.record||null,
+      spmsq:prevSpmsq?.record||null,
+      gds15:prevGds15?.record||null,
+      health:prevHealth?.record||null,
+      home_safety:prevHomeSafety?.record||null,
+      support:prevSupport?.record||null,
+      caregiver:prevCaregiver?.record||null
+    };
+    local.previousEvents={
+      adl:prevAdl?.event||null,
+      iadl:prevIadl?.event||null,
+      spmsq:prevSpmsq?.event||null,
+      gds15:prevGds15?.event||null,
+      health:prevHealth?.event||null,
+      home_safety:prevHomeSafety?.event||null,
+      support:prevSupport?.event||null,
+      caregiver:prevCaregiver?.event||null
+    };
+    local.previousSummary=prevOverall?.summary||null;
+    local.previousSummaryEvent=prevOverall?.event||null;
   }
 
   function gdsResult(score){
@@ -201,8 +272,8 @@
     return '高度情緒困擾';
   }
 
-  function toolSummary(code,form){
-    const r=local.records;
+  function toolSummary(code,form,records=local.records){
+    const r=records;
     if(code==='adl'){
       const x=r.adl;
       if(!x)return {title:form.form_name,main:'無已儲存紀錄',detail:''};
@@ -289,20 +360,108 @@
     return {title:form.form_name,main:'已完成',detail:''};
   }
 
+  function concernCountHealth(record){
+    const items=safeObj(record?.health_items);
+    return Object.values(items).filter(v=>v==='observe'||v==='refer').length;
+  }
+
+  function riskCountHome(record){
+    return Object.values(safeObj(record?.answers)).filter(v=>v==='needs_improvement').length;
+  }
+
+  function caregiverPositiveCount(record){
+    if(!record||record.applicability!=='applicable')return null;
+    const sum=safeObj(record.summary);
+    const answers=safeObj(record.answers);
+    return Number(sum.positive_count??Object.values(answers).filter(v=>v==='yes').length);
+  }
+
+  function signedDiff(now,prev,unit='分'){
+    if(now===null||now===undefined||prev===null||prev===undefined)return '—';
+    const diff=Number(now)-Number(prev);
+    if(diff===0)return '無變化';
+    return `較前次 ${diff>0?'+':''}${diff} ${unit}`;
+  }
+
+  function comparisonText(code,current,previous){
+    if(!previous)return '首次評估／無前次可比較資料';
+    if(!current)return '本次無可比較資料';
+
+    if(code==='adl')return signedDiff(current.total_score,previous.total_score,'分');
+    if(code==='iadl')return signedDiff(current.total_score,previous.total_score,'分');
+    if(code==='spmsq'){
+      if(current.is_unable)return '本次無法評估';
+      const now=Number(current.error_count||0),prev=Number(previous.error_count||0),diff=now-prev;
+      if(diff===0)return '錯誤題數無變化';
+      return `錯誤題數較前次${diff<0?'減少':'增加'} ${Math.abs(diff)} 題`;
+    }
+    if(code==='gds15'){
+      if(current.completion_mode!=='completed')return '本次無可比較分數';
+      return signedDiff(current.total_score,previous.total_score,'分');
+    }
+    if(code==='health_medication'){
+      const now=concernCountHealth(current),prev=concernCountHealth(previous);
+      return `需觀察／轉介項目 ${prev} → ${now} 項`;
+    }
+    if(code==='home_safety'){
+      const now=riskCountHome(current),prev=riskCountHome(previous);
+      return `需改善項目 ${prev} → ${now} 項`;
+    }
+    if(code==='support'){
+      const now=SUPPORT_OVERALL[safeObj(current.summary).overall_support]||'—';
+      const prev=SUPPORT_OVERALL[safeObj(previous.summary).overall_support]||'—';
+      return prev===now?'整體支持判斷無變化':`${prev} → ${now}`;
+    }
+    if(code==='caregiver_burden'){
+      const now=caregiverPositiveCount(current),prev=caregiverPositiveCount(previous);
+      if(now===null)return '本次無可比較結果';
+      return `符合指標 ${prev??'—'} → ${now} 項`;
+    }
+    return '—';
+  }
+
+  function previousEventKey(code){
+    return code==='health_medication'?'health':code==='caregiver_burden'?'caregiver':code;
+  }
+
   function toolSummaries(){
-    return formsByEvent(local.eventId).map(form=>({
-      code:form.form_code,
-      form,
-      ...toolSummary(form.form_code,form)
-    }));
+    return formsByEvent(local.eventId).map(form=>{
+      const code=form.form_code;
+      const current=toolSummary(code,form,local.records);
+      const previous=toolSummary(code,form,local.previousRecords);
+      const key=previousEventKey(code);
+      const prevEvent=local.previousEvents[key]||null;
+      const hasPrevious=!!local.previousRecords[key];
+      return {
+        code,form,
+        title:current.title,
+        main:current.main,
+        detail:current.detail,
+        previousMain:hasPrevious?previous.main:'—',
+        previousDate:prevEvent?.planned_date?rocDate(prevEvent.planned_date+'T00:00:00'):'',
+        change:comparisonText(code,local.records[key],local.previousRecords[key])
+      };
+    });
+  }
+
+  function renderPreviousOverall(){
+    if(!local.previousSummary||!local.previousSummaryEvent){
+      return '<div class="asum-help">前次整體評估：首次評估／目前沒有較早且已完成總結可供比較。</div>';
+    }
+    const s=local.previousSummary,e=local.previousSummaryEvent;
+    return `<div class="asum-help"><strong>前次整體評估：</strong>${escapeHTML(OVERALL_LABELS[s.overall_status]||'—')}
+      ｜${e.planned_date?rocDate(e.planned_date+'T00:00:00'):'—'}｜${escapeHTML(TYPE_LABELS[e.assessment_type]||e.assessment_type||'—')}
+      ${s.key_findings?'<br><strong>前次主要發現：</strong>'+escapeHTML(s.key_findings):''}</div>`;
   }
 
   function renderToolCards(){
     return `<div class="asum-grid">${toolSummaries().map(item=>`
       <div class="asum-card">
         <div class="asum-card-head"><strong>${escapeHTML(item.title)}</strong><span>${escapeHTML(item.form.status==='completed'?'已完成':item.form.status==='unable'?'無法完成':'不適用')}</span></div>
-        <div class="asum-card-main">${escapeHTML(item.main)}</div>
+        <div class="asum-card-main">本次：${escapeHTML(item.main)}</div>
         <div class="asum-card-detail">${escapeHTML(item.detail||'')}</div>
+        <div class="asum-card-detail" style="margin-top:7px"><strong>前次${item.previousDate?'（'+escapeHTML(item.previousDate)+'）':''}：</strong>${escapeHTML(item.previousMain)}</div>
+        <div class="asum-card-detail"><strong>變化：</strong>${escapeHTML(item.change)}</div>
       </div>
     `).join('')}</div>`;
   }
@@ -332,7 +491,8 @@
       </div>
       ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
       ${finalized?`<div class="asum-complete">本次整體評估已完成。若後續修正總結內容，系統會保留修改歷程。</div>`:''}
-      <div class="asum-help">以下工具摘要均讀取本次評估已儲存的正式紀錄，供督導進行整合判斷；總結不取代各工具原始內容。</div>
+      <div class="asum-help">以下工具摘要均讀取本次評估已儲存的正式紀錄，並與評估日期以前最近一次正式完成的同類工具比較；不依賴家訪紀錄。</div>
+      ${renderPreviousOverall()}
 
       <section class="asum-section">
         <div class="asum-section-head"><strong>一、各評估工具結果摘要</strong><small>僅顯示本次事件實際選用的工具。</small></div>
@@ -350,13 +510,13 @@
             <div class="asum-field full"><label>主要評估發現／問題與需求 *</label><textarea id="asumFindings" placeholder="請整合功能、健康、認知／情緒、環境、家庭支持與照顧者狀況。">${escapeHTML(s.key_findings||'')}</textarea></div>
             <div class="asum-field full"><label>照顧服務重點／建議 *</label><textarea id="asumRecommendations" placeholder="請記錄後續居家服務需注意、維持或調整的重點。">${escapeHTML(s.care_recommendations||'')}</textarea></div>
 
-            <div class="asum-field"><label>是否需後續追蹤 *</label><select id="asumFollowup">${boolSelect(s.followup_required)}</select></div>
-            <div class="asum-field"><label>是否需調整服務／照顧安排 *</label><select id="asumAdjust">${boolSelect(s.service_adjustment_required)}</select></div>
-            ${s.followup_required===true?`<div class="asum-field full"><label>後續追蹤計畫 *</label><textarea id="asumFollowupPlan" placeholder="請說明追蹤重點、方式或預計時程。">${escapeHTML(s.followup_plan||'')}</textarea></div>`:''}
+            <div class="asum-field full"><label>是否需調整服務／照顧安排 *</label><select id="asumAdjust">${boolSelect(s.service_adjustment_required)}</select></div>
             ${s.service_adjustment_required===true?`<div class="asum-field full"><label>服務／照顧調整內容 *</label><textarea id="asumAdjustNote" placeholder="請說明需調整的服務項目、頻率、照顧方式或其他安排。">${escapeHTML(s.service_adjustment_note||'')}</textarea></div>`:''}
 
-            <div class="asum-field"><label>是否需對外協調／轉介 *</label><select id="asumExternal">${boolSelect(s.external_coordination_required)}</select></div>
-            <div class="asum-field"></div>
+            <div class="asum-field full"><label>是否需後續追蹤 *</label><select id="asumFollowup">${boolSelect(s.followup_required)}</select></div>
+            ${s.followup_required===true?`<div class="asum-field full"><label>後續追蹤計畫 *</label><textarea id="asumFollowupPlan" placeholder="請說明追蹤重點、方式或預計時程。">${escapeHTML(s.followup_plan||'')}</textarea></div>`:''}
+
+            <div class="asum-field full"><label>是否需對外協調／轉介 *</label><select id="asumExternal">${boolSelect(s.external_coordination_required)}</select></div>
             ${s.external_coordination_required===true?`<div class="asum-field full"><label>對外協調／轉介內容 *</label><textarea id="asumExternalNote" placeholder="例如：A 單位、個管師、醫療端、社福或家庭照顧者支持服務。">${escapeHTML(s.external_coordination_note||'')}</textarea></div>`:''}
           </div>
         </div>
@@ -494,9 +654,14 @@
     const toolRows=tools.map(item=>`
       <tr>
         <th>${printText(item.title)}</th>
+        <td>${item.previousMain==='—'?'—':`${printText(item.previousMain)}${item.previousDate?`<div class="detail">${printText(item.previousDate)}</div>`:''}`}</td>
         <td><strong>${printText(item.main)}</strong>${item.detail?`<div class="detail">${printText(item.detail)}</div>`:''}</td>
+        <td>${printText(item.change)}</td>
       </tr>
     `).join('');
+    const previousOverallText=local.previousSummary&&local.previousSummaryEvent
+      ?`${OVERALL_LABELS[local.previousSummary.overall_status]||'—'}｜${local.previousSummaryEvent.planned_date?rocDate(local.previousSummaryEvent.planned_date+'T00:00:00'):'—'}｜${TYPE_LABELS[local.previousSummaryEvent.assessment_type]||local.previousSummaryEvent.assessment_type||'—'}`
+      :'首次評估／無前次已完成總結';
 
     return `<!doctype html>
 <html lang="zh-Hant">
@@ -521,7 +686,8 @@
   th,td{border:1px solid #555;padding:6px 7px;vertical-align:top;word-break:break-word}
   th{background:#f3f3f3;font-weight:700;text-align:center}
   .info th{width:18%}.info td{width:32%}
-  .tools th{width:29%;text-align:left}.tools td{width:71%}
+  .tools th{width:24%;text-align:left}.tools td{width:auto}
+  .tools thead th{text-align:center}
   .detail{margin-top:4px;font-size:10.5pt;line-height:1.5}
   .narrative{border:1px solid #555;border-top:0}
   .narrative:first-of-type{border-top:1px solid #555}
@@ -578,22 +744,23 @@
 
   <section class="section">
     <h2>一、評估工具結果摘要</h2>
-    <table class="tools"><tbody>${toolRows}</tbody></table>
+    <table class="tools"><thead><tr><th>評估工具</th><th>前次</th><th>本次</th><th>變化</th></tr></thead><tbody>${toolRows}</tbody></table>
   </section>
 
   <section class="section">
     <h2>二、整體評估與照顧建議</h2>
     <table class="decision">
       <tbody>
-        <tr><th>整體狀況</th><td>${printText(OVERALL_LABELS[s.overall_status]||s.overall_status)}</td></tr>
+        <tr><th>前次整體評估</th><td>${printText(previousOverallText)}</td></tr>
+        <tr><th>本次整體狀況</th><td>${printText(OVERALL_LABELS[s.overall_status]||s.overall_status)}</td></tr>
       </tbody>
     </table>
     <div class="narrative"><h3>主要評估發現／問題與需求</h3><div>${printText(s.key_findings)}</div></div>
     <div class="narrative"><h3>照顧服務重點／建議</h3><div>${printText(s.care_recommendations)}</div></div>
     <table class="decision">
       <tbody>
-        <tr><th>需後續追蹤</th><td>${printBool(s.followup_required)}${s.followup_required?`｜${printText(s.followup_plan)}`:''}</td></tr>
         <tr><th>需調整服務／照顧安排</th><td>${printBool(s.service_adjustment_required)}${s.service_adjustment_required?`｜${printText(s.service_adjustment_note)}`:''}</td></tr>
+        <tr><th>需後續追蹤</th><td>${printBool(s.followup_required)}${s.followup_required?`｜${printText(s.followup_plan)}`:''}</td></tr>
         <tr><th>需對外協調／轉介</th><td>${printBool(s.external_coordination_required)}${s.external_coordination_required?`｜${printText(s.external_coordination_note)}`:''}</td></tr>
       </tbody>
     </table>
