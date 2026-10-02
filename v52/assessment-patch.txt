@@ -91,6 +91,9 @@
     .assessment-table-shell{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px}
     .assessment-table{width:100%;min-width:920px;border-collapse:collapse}
     .assessment-table th{padding:10px 12px;text-align:left;background:#faf8f7;color:#667085;font-size:11px;font-weight:900;border-bottom:1px solid var(--line);white-space:nowrap}
+    .assessment-table th[data-assessment-sort]{cursor:pointer;user-select:none}
+    .assessment-table th[data-assessment-sort]:hover{background:#f7f1ee;color:#344054}
+    .assessment-sort-indicator{display:inline-block;min-width:12px;margin-left:4px;color:#b66f55;font-size:10px}
     .assessment-table td{padding:12px;border-bottom:1px solid var(--line);font-size:12px;color:#344054;vertical-align:middle}
     .assessment-table tr:last-child td{border-bottom:0}
     .assessment-table tbody tr{cursor:pointer}
@@ -160,6 +163,8 @@
     assessmentOwner:null,
     assessmentFilter:null,
     assessmentListScope:'open',
+    assessmentSortKey:null,
+    assessmentSortDir:'asc',
     assessmentLoaded:false
   });
 
@@ -280,6 +285,46 @@
     return '<div class="assessment-progress"><div class="assessment-progress-bar"><span style="width:'+p.pct+'%"></span></div><small>'+p.done+'/'+p.total+'</small></div>';
   }
 
+  const ASSESSMENT_STATUS_SORT_ORDER={
+    pending:0,
+    in_progress:1,
+    forms_completed:2,
+    completed:3,
+    voided:4
+  };
+
+  function assessmentSortIndicator(key){
+    if(state.assessmentSortKey!==key)return '<span class="assessment-sort-indicator"></span>';
+    return '<span class="assessment-sort-indicator">'+(state.assessmentSortDir==='asc'?'↑':'↓')+'</span>';
+  }
+
+  function assessmentSortValue(row,key){
+    const c=assessmentCase(row.case_id);
+    if(key==='planned_date')return row.planned_date||'9999-12-31';
+    if(key==='case_name')return c?.case_name||'';
+    if(key==='assessment_type')return assessmentTypeLabel(row.assessment_type);
+    if(key==='reason')return assessmentReasonText(row);
+    if(key==='supervisor')return assessmentStaffName(row.responsible_staff_id||c?.supervisor_id);
+    if(key==='progress'){
+      const p=assessmentProgress(row.id);
+      return {ratio:p.total?p.done/p.total:0,done:p.done,total:p.total};
+    }
+    if(key==='status')return ASSESSMENT_STATUS_SORT_ORDER[row.status]??99;
+    return '';
+  }
+
+  function assessmentCompareRows(a,b,key){
+    if(key==='progress'){
+      const av=assessmentSortValue(a,key),bv=assessmentSortValue(b,key);
+      if(av.ratio!==bv.ratio)return av.ratio-bv.ratio;
+      if(av.done!==bv.done)return av.done-bv.done;
+      return av.total-bv.total;
+    }
+    const av=assessmentSortValue(a,key),bv=assessmentSortValue(b,key);
+    if(typeof av==='number'&&typeof bv==='number')return av-bv;
+    return String(av).localeCompare(String(bv),'zh-Hant',{numeric:true,sensitivity:'base'});
+  }
+
   function assessmentScopedRows(){
     let rows=[...state.assessmentEvents];
     if(state.assessmentOwner==='mine'){
@@ -298,13 +343,22 @@
     }else if(state.assessmentFilter==='forms_completed'){
       rows=rows.filter(row=>row.status==='forms_completed');
     }
-    rows.sort((a,b)=>{
-      const aOpen=!['completed','voided'].includes(a.status);
-      const bOpen=!['completed','voided'].includes(b.status);
-      if(aOpen!==bOpen)return aOpen?-1:1;
-      if(aOpen)return String(a.planned_date||'9999-12-31').localeCompare(String(b.planned_date||'9999-12-31'));
-      return String(b.planned_date||'').localeCompare(String(a.planned_date||''));
-    });
+    if(state.assessmentSortKey){
+      const dir=state.assessmentSortDir==='desc'?-1:1;
+      rows.sort((a,b)=>{
+        const primary=assessmentCompareRows(a,b,state.assessmentSortKey);
+        if(primary!==0)return primary*dir;
+        return String(a.planned_date||'').localeCompare(String(b.planned_date||''))*dir;
+      });
+    }else{
+      rows.sort((a,b)=>{
+        const aOpen=!['completed','voided'].includes(a.status);
+        const bOpen=!['completed','voided'].includes(b.status);
+        if(aOpen!==bOpen)return aOpen?-1:1;
+        if(aOpen)return String(a.planned_date||'9999-12-31').localeCompare(String(b.planned_date||'9999-12-31'));
+        return String(b.planned_date||'').localeCompare(String(a.planned_date||''));
+      });
+    }
     return rows;
   }
 
@@ -373,13 +427,13 @@
           <table class="assessment-table">
             <thead>
               <tr>
-                <th>預定日期</th>
-                <th>個案</th>
-                <th>評估類型</th>
-                <th>評估原因</th>
-                <th>負責督導</th>
-                <th>表單進度</th>
-                <th>狀態</th>
+                <th data-assessment-sort="planned_date">預定日期${assessmentSortIndicator('planned_date')}</th>
+                <th data-assessment-sort="case_name">個案${assessmentSortIndicator('case_name')}</th>
+                <th data-assessment-sort="assessment_type">評估類型${assessmentSortIndicator('assessment_type')}</th>
+                <th data-assessment-sort="reason">評估原因${assessmentSortIndicator('reason')}</th>
+                <th data-assessment-sort="supervisor">負責督導${assessmentSortIndicator('supervisor')}</th>
+                <th data-assessment-sort="progress">表單進度${assessmentSortIndicator('progress')}</th>
+                <th data-assessment-sort="status">狀態${assessmentSortIndicator('status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -416,6 +470,18 @@
     $('assessmentClearFilter')?.addEventListener('click',()=>{
       state.assessmentFilter=null;
       renderAssessmentPage();
+    });
+    document.querySelectorAll('[data-assessment-sort]').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const key=th.dataset.assessmentSort;
+        if(state.assessmentSortKey===key){
+          state.assessmentSortDir=state.assessmentSortDir==='asc'?'desc':'asc';
+        }else{
+          state.assessmentSortKey=key;
+          state.assessmentSortDir='asc';
+        }
+        renderAssessmentPage();
+      });
     });
     document.querySelectorAll('[data-assessment-owner]').forEach(btn=>{
       btn.addEventListener('click',()=>{
