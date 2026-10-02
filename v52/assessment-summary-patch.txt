@@ -578,7 +578,8 @@
         <div><h1>${escapeHTML(c.case_name)}｜整體評估總結</h1><p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　${escapeHTML(TYPE_LABELS[row.assessment_type]||row.assessment_type)}</p></div>
         <div class="assessment-head-actions">
           <button id="asumBack" type="button" class="btn">← 返回評估事件</button>
-          ${finalized?'<button id="asumPrint" type="button" class="btn">列印預覽</button>':''}
+          <button id="asumBundlePrint" type="button" class="btn">列印完整評估套表</button>
+          ${finalized?'<button id="asumPrint" type="button" class="btn">列印評估摘要</button>':''}
         </div>
       </div>
       ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
@@ -646,6 +647,11 @@
 
   function bind(row){
     $('asumBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
+    $('asumBundlePrint')?.addEventListener('click',()=>{
+      const api=window.v52AssessmentBundlePrint;
+      if(!api?.open)return toast('完整評估套表列印模組尚未載入','error');
+      api.open(row.id);
+    });
     $('asumPrint')?.addEventListener('click',()=>openPrintPreview());
     $('asumOverall')?.addEventListener('change',e=>local.summary.overall_status=e.target.value||null);
     $('asumFindings')?.addEventListener('input',e=>local.summary.key_findings=e.target.value);
