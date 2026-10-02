@@ -689,26 +689,43 @@
             if(existing.status==='pending'){
               const current=assessmentFormsFor(existing.id);
               const currentMap=new Map(current.map(x=>[x.form_code,x]));
-              const upserts=selectedCodes.map(code=>{
+              const now=new Date().toISOString();
+              const existingRows=[];
+              const newRows=[];
+
+              selectedCodes.forEach(code=>{
                 const def=ASSESSMENT_FORMS.find(x=>x.code===code);
                 const old=currentMap.get(code);
-                return {
-                  ...(old?.id?{id:old.id}:{}),
+                const row={
                   assessment_event_id:existing.id,
                   form_code:def.code,
                   form_name:def.name,
                   sort_order:def.sort,
                   is_required:assessmentFormRequired(def,type),
                   status:old?.status||'pending',
-                  created_at:old?.created_at||new Date().toISOString(),
-                  updated_at:new Date().toISOString()
+                  updated_at:now
                 };
+                if(old?.id){
+                  existingRows.push({
+                    ...row,
+                    id:old.id,
+                    created_at:old.created_at||now
+                  });
+                }else{
+                  newRows.push(row);
+                }
               });
-              if(upserts.length){
+
+              if(existingRows.length){
                 const {error:upsertError}=await db.from('assessment_event_forms')
-                  .upsert(upserts,{onConflict:'assessment_event_id,form_code'});
+                  .upsert(existingRows,{onConflict:'assessment_event_id,form_code'});
                 if(upsertError)throw upsertError;
               }
+              if(newRows.length){
+                const {error:insertError}=await db.from('assessment_event_forms').insert(newRows);
+                if(insertError)throw insertError;
+              }
+
               const removable=current
                 .filter(x=>x.status==='pending'&&!selectedCodes.includes(x.form_code))
                 .map(x=>x.id);
