@@ -50,7 +50,29 @@
     if(error) console.error(error);
     await applySession(data?.session || null);
     db.auth.onAuthStateChange((event, session) => {
-      if(event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED'){
+      if(event === 'SIGNED_OUT'){
+        setTimeout(()=>applySession(null),0);
+        return;
+      }
+
+      if(event === 'TOKEN_REFRESHED'){
+        state.session = session;
+        state.user = session?.user || null;
+        return;
+      }
+
+      if(event === 'SIGNED_IN'){
+        const sameUser = !!state.profile
+          && !!state.user?.id
+          && !!session?.user?.id
+          && state.user.id === session.user.id;
+
+        if(sameUser){
+          state.session = session;
+          state.user = session.user;
+          return;
+        }
+
         setTimeout(()=>applySession(session),0);
       }
     });
