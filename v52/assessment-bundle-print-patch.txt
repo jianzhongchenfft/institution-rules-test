@@ -179,7 +179,7 @@
     ]);
 
     local.eventId=eventId;local.row=row;local.caseRow=c;local.forms=forms;local.summary=summary;
-    local.records={adl,iadl,health,home_safety:homeSafety,support,spmsq,gds15,caregiver_burden:caregiver};
+    local.records={adl,iadl,health_medication:health,home_safety:homeSafety,support,spmsq,gds15,caregiver_burden:caregiver};
     local.previous={
       adl:prevAdl?.record||null,iadl:prevIadl?.record||null,health_medication:prevHealth?.record||null,
       home_safety:prevHomeSafety?.record||null,support:prevSupport?.record||null,
@@ -300,7 +300,7 @@
   }
 
   function renderHealth(form){
-    const r=local.records.health;
+    const r=local.records.health_medication;
     if(!r)return sectionMissing(form.form_name);
     const m=safe(r.medical_info),checks=safe(r.medication_checks),items=safe(r.health_items),notes=safe(r.health_notes);
     const fixed=arr(m.fixed_medication_entries?.length?m.fixed_medication_entries:m.fixed_medication_base_entries);
