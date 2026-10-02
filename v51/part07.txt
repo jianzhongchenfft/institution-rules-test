@@ -36,11 +36,12 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
         'v52/assessment-home-safety-patch.txt',
         'v52/assessment-support-patch.txt',
         'v52/assessment-caregiver-screen-patch.txt',
-        'v52/assessment-summary-patch.txt'
+        'v52/assessment-summary-patch.txt',
+        'v52/assessment-history-patch.txt'
       ];
       let assessmentModuleCode='';
       for(const path of assessmentModuleFiles){
-        const res=await fetch(`${path}?v=assessment-list-sort-20261002`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=assessment-history-ui-20261002`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         assessmentModuleCode+='\n'+await res.text();
       }
