@@ -1021,6 +1021,9 @@
         <div class="assessment-head-actions">
           <button id="assessmentBack" class="btn">← 返回評估列表</button>
           ${p.total&&p.done===p.total&&row.status!=='voided'
+            ?'<button id="assessmentBundlePrintBtn" class="btn">列印完整評估套表</button>'
+            :''}
+          ${p.total&&p.done===p.total&&row.status!=='voided'
             ?'<button id="assessmentSummaryBtn" class="btn '+(row.status==='forms_completed'?'primary':'')+'">'+(row.status==='completed'?'查看總結／列印':'填寫評估總結')+'</button>'
             :''}
           ${canEdit?'<button id="assessmentEdit" class="btn">編輯事件</button>':''}
@@ -1082,6 +1085,11 @@
     $('assessmentHistoryBtn')?.addEventListener('click',()=>{
       const api=window.v52AssessmentHistory;
       if(!api?.open)return toast('評估修改歷程模組尚未載入','error');
+      api.open(row.id);
+    });
+    $('assessmentBundlePrintBtn')?.addEventListener('click',()=>{
+      const api=window.v52AssessmentBundlePrint;
+      if(!api?.open)return toast('完整評估套表列印模組尚未載入','error');
       api.open(row.id);
     });
     $('assessmentSummaryBtn')?.addEventListener('click',()=>{
