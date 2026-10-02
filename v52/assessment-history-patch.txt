@@ -237,6 +237,16 @@
       .replace(/^notes\./,'') || '資料';
   }
 
+  function historyValueText(tool,path,value){
+    if(tool==='summary'&&path==='previous_problem_status'){
+      return {improved:'已改善',persistent:'持續存在',worse:'惡化',not_applicable:'不再適用'}[value]||valueText(value);
+    }
+    if(tool==='summary'&&path==='previous_recommendation_status'){
+      return {completed:'已完成',partial:'部分執行',ongoing:'持續執行',not_done:'未執行',not_applicable:'不再適用'}[value]||valueText(value);
+    }
+    return valueText(value);
+  }
+
   function flattenChanges(tool,path,oldValue,newValue,out){
     if(sameValue(oldValue,newValue))return;
     if(
@@ -252,8 +262,8 @@
     }
     out.push({
       label:fieldLabel(tool,path),
-      oldValue:valueText(oldValue),
-      newValue:valueText(newValue)
+      oldValue:historyValueText(tool,path,oldValue),
+      newValue:historyValueText(tool,path,newValue)
     });
   }
 
