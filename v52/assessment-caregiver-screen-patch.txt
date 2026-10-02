@@ -50,6 +50,9 @@
     .cg-tag{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:9.5px;font-weight:900;white-space:nowrap}
     .cg-tag.prev{background:#eff8ff;color:#175cd3}
     .cg-tag.risk{background:#fee4e2;color:#b42318}
+    .cg-tag.new-risk{background:#fee4e2;color:#b42318}
+    .cg-tag.persist{background:#fff4e5;color:#b54708}
+    .cg-tag.better{background:#ecfdf3;color:#027a48}
     .cg-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 11px}
     .cg-option{display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:9px;padding:8px 9px;font-size:10.5px;font-weight:850;cursor:pointer}
     .cg-option input{width:auto}
@@ -95,6 +98,26 @@
   const professionalReferral=()=>local.summary.professional_referral===true;
   const referralRequired=()=>positiveCount()>=2||hasHighRisk()||professionalReferral();
 
+  function indicatorChange(key){
+    const prev=previousAnswer(key),cur=answer(key);
+    if(!prev||!cur)return null;
+    if(prev==='no'&&cur==='yes')return {kind:'new-risk',label:'新增風險'};
+    if(prev==='yes'&&cur==='yes')return {kind:'persist',label:'持續風險'};
+    if(prev==='yes'&&cur==='no')return {kind:'better',label:'已改善'};
+    return null;
+  }
+
+  function indicatorChangeCounts(){
+    const counts={newRisk:0,persist:0,better:0};
+    INDICATORS.forEach(([key])=>{
+      const change=indicatorChange(key);
+      if(change?.kind==='new-risk')counts.newRisk++;
+      if(change?.kind==='persist')counts.persist++;
+      if(change?.kind==='better')counts.better++;
+    });
+    return counts;
+  }
+
   async function load(eventId){
     const row=eventById(eventId);if(!row)throw new Error('找不到評估事件');
     const [cur,hist,support]=await Promise.all([
@@ -123,11 +146,12 @@
   function renderSummary(){
     const count=local.applicability==='applicable'?positiveCount():0;
     const prevCount=local.previous?.applicability==='applicable'?Number(local.previous?.summary?.positive_count||0):null;
+    const changes=indicatorChangeCounts();
     return `<section class="cg-summary">
       <div class="cg-summary-card"><label>本次符合指標</label><strong>${local.applicability==='applicable'?count+'／10':'—'}</strong><small>此工具不計總分，以符合項目判定</small></div>
       <div class="cg-summary-card"><label>高風險指標</label><strong>${local.applicability==='applicable'?(hasHighRisk()?'有':'無'):'—'}</strong><small>暴力／疏忽或自殺相關風險</small></div>
       <div class="cg-summary-card"><label>轉介判定</label><strong>${local.applicability==='applicable'?(referralRequired()?'達轉介標準':'目前未達'):'—'}</strong><small>符合任兩項，或高風險指標任一項</small></div>
-      <div class="cg-summary-card"><label>前次結果</label><strong>${prevCount===null?'—':prevCount+' 項'}</strong><small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small></div>
+      <div class="cg-summary-card"><label>前次／變化</label><strong>${prevCount===null?'—':prevCount+' 項 → '+count+' 項'}</strong><small>${prevCount===null?'無前次完成紀錄':'新增 '+changes.newRisk+'｜持續 '+changes.persist+'｜改善 '+changes.better}</small></div>
     </section>`;
   }
 
@@ -162,10 +186,11 @@
     const cur=answer(key),prev=previousAnswer(key),note=String(local.notes[key]||'');
     const positive=cur==='yes',showNote=positive||!!note||local.expandedNotes.has(key);
     const high=HIGH_RISK_KEYS.has(key);
+    const change=indicatorChange(key);
     return `<div class="cg-card ${positive?'positive':''} ${positive&&high?'high-risk':''}">
       <div class="cg-card-head">
         <div class="cg-card-title">${index+1}. ${escapeHTML(title)}<small>${escapeHTML(help)}</small></div>
-        <div>${prev?`<span class="cg-tag prev">前次：${prev==='yes'?'符合':'未符合'}</span>`:''}${high?`<span class="cg-tag risk" style="margin-left:5px">高風險指標</span>`:''}</div>
+        <div>${prev?`<span class="cg-tag prev">前次：${prev==='yes'?'符合':'未符合'}</span>`:''}${change?`<span class="cg-tag ${change.kind}" style="margin-left:5px">${change.label}</span>`:''}${high?`<span class="cg-tag risk" style="margin-left:5px">高風險指標</span>`:''}</div>
       </div>
       <div class="cg-options">
         <label class="cg-option no ${cur==='no'?'selected':''}"><input type="radio" name="cg_${key}" value="no" ${cur==='no'?'checked':''}>未符合</label>
