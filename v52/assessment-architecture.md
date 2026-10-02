@@ -22,6 +22,7 @@
 - assessment-support-patch.txt：支持系統、家庭照顧安排、支持面向、經濟／社會資源與追蹤。
 - assessment-caregiver-screen-patch.txt：高負荷家庭照顧者初篩、轉介判定與後續處理。
 - assessment-summary-patch.txt：各工具結果彙整、督導整體評估、完成評估與 A4 列印預覽。
+- assessment-history-patch.txt：單次評估事件生命週期與各工具／整體總結修改歷程查閱。
 
 健康三個片段由 part07.txt 依序串接後一次 eval，因此仍共享同一個 closure，不使用額外全域狀態。
 
@@ -97,6 +98,13 @@ assessment_health_records 仍是一個 event 一筆紀錄；使用者介面只�
 - 完成總結後，assessment_events 狀態改為 `completed`；後續如修正總結內容，保留 history。
 - 列印版為 A4「居家服務個案整體評估紀錄表」，包含基本資料、各工具摘要、整體評估與督導核章欄。
 - 列印內容讀取當次已儲存紀錄，不讀取未儲存中的畫面內容。
+
+## 修改歷程
+- 評估事件頁提供「修改歷程」入口。
+- 上方顯示事件建立、開始評估、表單完成、整體完成與最後更新時間。
+- 各工具 history 依修改時間與修改人分組，顯示欄位舊值 → 新值；整體總結 history 由 old_snapshot / new_snapshot 自動比對差異。
+- 第一次建立／完成正式紀錄不視為「修正」；沒有 history 時顯示「目前無修改紀錄」。
+- 修改歷程只供查閱，不提供從歷程直接還原資料，避免繞過各工具既有驗證流程。
 
 ## 後續開發規則
 1. 不再把新量表直接寫進 assessment-patch.txt。
