@@ -320,7 +320,8 @@
       ],['項目','內容'])}`;
     body+=`<h2>二、用藥紀錄</h2>`;
     if(m.opening_no_fixed_medications===true||m.no_fixed_medications===true)body+=`<div class="plain">固定用藥：目前無固定用藥。</div>`;
-    else body+=rowTable((fixed.length?fixed:[null]).map((x,i)=>`<tr><td>${i+1}</td><td>${html(medEntryText(x))}</td></tr>`),['#','固定用藥']);
+    else if(fixed.length)body+=rowTable(fixed.map((x,i)=>`<tr><td>${i+1}</td><td>${html(medEntryText(x))}</td></tr>`),['#','固定用藥']);
+    else body+=`<div class="plain">固定用藥：${html(m.fixed_medications)}</div>`;
     if(m.opening_no_temporary_medications===true)body+=`<div class="plain">短期／臨時用藥：本次無。</div>`;
     else if(temp.length)body+=rowTable(temp.map((x,i)=>`<tr><td>${i+1}</td><td>${html(medEntryText(x))}</td></tr>`),['#','短期／臨時用藥']);
     if(events.length){
@@ -329,7 +330,9 @@
     if(medChanges.length){
       body+=`<h3>用藥變化</h3>`+rowTable(medChanges.map((x,i)=>`<tr><td>${i+1}</td><td>${html(x.action)}</td><td>${html(x.medication_before||'—')}</td><td>${html(x.medication_after||'—')}</td><td>${html(x.note)}</td></tr>`),['#','動作','調整前','調整後','備註']);
     }else if(m.no_medication_changes===true)body+=`<div class="plain">本評估期間無用藥變化。</div>`;
-    if(medCorrections.length)body+=`<div class="plain">另有 ${medCorrections.length} 筆用藥資料修正紀錄（屬本次用藥紀錄修正，不列管理修改歷程）。</div>`;
+    if(medCorrections.length){
+      body+=`<h3>本次用藥資料修正</h3>`+rowTable(medCorrections.map((x,i)=>`<tr><td>${i+1}</td><td>${html(x.action)}</td><td>${html(x.reason)}</td><td>${html(x.medication_after||'—')}</td><td>${html(x.note)}</td></tr>`),['#','動作','修正原因','修正後內容','備註']);
+    }
     body+=`<h2>三、身體健康狀態 10 項</h2>`+rowTable(HEALTH_ITEMS.map(([key,label])=>`<tr><td>${html(label)}</td><td>${html(HEALTH_STATUS[items[key]]||items[key])}</td><td>${html(notes[key])}</td></tr>`),['項目','狀態','備註']);
     body+=`<div class="result-box"><strong>健康狀態總分：${html(r.total_score)}／20 分</strong></div>`;
     body+=`<h2>四、用藥安全現況</h2>`+rowTable(MED_CHECKS.map(([key,label])=>`<tr><td>${html(label)}</td><td>${html(MED_STATUS[safe(checks[key]).status]||safe(checks[key]).status)}</td><td>${html(safe(checks[key]).note)}</td></tr>`),['項目','狀態','備註']);
