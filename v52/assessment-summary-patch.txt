@@ -323,7 +323,7 @@
       if(!x)return {title:form.form_name,main:'無已儲存紀錄',detail:''};
       if(x.is_unable)return {title:form.form_name,main:'本次無法評估',detail:text(x.unable_reason)};
       const err=Number(x.error_count||0);
-      return {title:form.form_name,main:`錯誤 ${err} 題`,detail:err<=2?'多屬正常範圍':'3 題以上；建議持續觀察並視需要進一步評估。'};
+      return {title:form.form_name,main:`錯誤 ${err} 題`,detail:(err<=2?'多屬正常範圍':'3 題以上；建議持續觀察並視需要進一步評估。')+'（錯誤題數含無法作答項目）'};
     }
     if(code==='gds15'){
       const x=r.gds15;
