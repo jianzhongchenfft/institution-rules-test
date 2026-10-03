@@ -1206,7 +1206,7 @@ async function htmlViewOriginal(path,fileName){
         '<div class="case-panel-note" style="margin-top:9px">額度：'+escapeHTML(budgetText)+'</div>',
       '</div>',
       '<div class="case-overview-grid">',
-        '<div class="case-panel-card" style="grid-column:span 2"><div class="case-panel-head"><strong>最近訪視</strong><button class="btn sm" data-case-tab-jump="visits">查看家訪／電訪</button></div>',
+        '<div class="case-panel-card" style="grid-column:span 2"><div class="case-panel-head"><strong>最近訪視</strong><button class="btn sm" data-case-tab-jump="visits">查看家、電訪</button></div>',
           latest?'<div><strong>'+rocDate(latest.visit_date+'T00:00:00')+'　'+escapeHTML(htmlGetCaseVisitsApi().caseTypeLabel(latest.visit_type))+'</strong><div class="case-panel-note" style="margin-top:6px">'+escapeHTML(latest.summary||'未填摘要')+'</div></div>':htmlCaseEmpty('尚無訪視紀錄'),
         '</div>',
         '<div class="case-panel-card" style="grid-column:span 2"><div class="case-panel-head"><strong>主要聯絡資訊</strong><button class="btn sm" data-case-tab-jump="basic">查看基本資料</button></div>',
@@ -1314,9 +1314,9 @@ function htmlRenderServicesTab(data){
     var rows=data.visits.length?data.visits.map(function(v){
       var resolved=htmlGetCaseVisitsApi().isFollowUpResolved(v.id);
       return '<div class="visit-item"><div class="visit-item-top"><div><strong>'+rocDate(v.visit_date+'T00:00:00')+'　'+escapeHTML(htmlGetCaseVisitsApi().caseTypeLabel(v.visit_type))+'</strong><div class="visit-item-sub">訪視人員：'+escapeHTML(htmlGetCaseVisitsApi().caseStaffName(v.visitor_staff_id))+(v.contact_person?'　聯絡／在場：'+escapeHTML(v.contact_person):'')+'</div></div>'+(v.follow_up_needed?'<span class="case-status '+(resolved?'normal':'followup')+'">'+(resolved?'已追蹤':'待追蹤')+'</span>':'')+'</div>'+(v.summary?'<div class="visit-summary">'+escapeHTML(v.summary)+'</div>':'')+(v.follow_up_needed?'<div class="followup-box">追蹤事項：'+escapeHTML(v.follow_up_item||'—')+'<br>預計追蹤：'+(v.follow_up_date?rocDate(v.follow_up_date+'T00:00:00'):'未設定')+'</div>':'')+'</div>';
-    }).join(''):htmlCaseEmpty('尚無家訪／電訪紀錄');
+    }).join(''):htmlCaseEmpty('尚無家、電訪紀錄');
     return [
-      '<div class="case-panel-card"><div class="case-panel-head"><div><strong>家訪／電訪</strong><div class="case-panel-note">待追蹤 '+pending.length+' 項</div></div><div class="section-actions">'+(htmlCanEditCase(c)?'<button class="btn sm" data-add-visit="home">＋ 新增家訪</button><button class="btn sm primary" data-add-visit="phone">＋ 新增電訪</button>':'')+'</div></div>',
+      '<div class="case-panel-card"><div class="case-panel-head"><div><strong>家、電訪</strong><div class="case-panel-note">待追蹤 '+pending.length+' 項</div></div><div class="section-actions">'+(htmlCanEditCase(c)?'<button class="btn sm" data-add-visit="home">＋ 新增家訪</button><button class="btn sm primary" data-add-visit="phone">＋ 新增電訪</button>':'')+'</div></div>',
         pending.length?'<div class="prior-followup" style="margin-bottom:10px"><strong>目前待追蹤 '+pending.length+' 項</strong><span>'+pending.map(function(v){return (v.follow_up_date?rocDate(v.follow_up_date+'T00:00:00'):'未排日期')+'｜'+escapeHTML(v.follow_up_item||'未填內容');}).join('<br>')+'</span></div>':'',
         '<div class="visit-history">'+rows+'</div>',
       '</div>'
@@ -1329,7 +1329,7 @@ function htmlRenderServicesTab(data){
       var label=x.date?rocDate(x.date):'—';
       return '<div class="case-timeline-item"><span class="case-timeline-dot"></span><div class="case-timeline-date">'+escapeHTML(label)+'</div><div class="case-timeline-title">'+escapeHTML(x.title)+'</div><div class="case-timeline-text">'+escapeHTML(x.text||'')+'</div></div>';
     }).join(''):htmlCaseEmpty('尚無個案歷程');
-    return '<div class="case-panel-card"><div class="case-panel-head"><div><strong>個案歷程</strong><div class="case-panel-note">目前整合個案建立、HTML 匯入、照管平台照顧計畫版本與家訪／電訪。</div></div></div><div class="case-timeline">'+rows+'</div></div>';
+    return '<div class="case-panel-card"><div class="case-panel-head"><div><strong>個案歷程</strong><div class="case-panel-note">目前整合個案建立、HTML 匯入、照管平台照顧計畫版本與家、電訪。</div></div></div><div class="case-timeline">'+rows+'</div></div>';
   }
 
   function htmlRenderDocumentsTab(data){
@@ -1392,7 +1392,7 @@ function htmlRenderServicesTab(data){
       var current=data.plans.find(function(p){return p.is_current;})||null;
       var firstValid=data.plans.find(function(p){return !p.is_voided;})||null;
       if(!htmlCaseDetailState.selectedPlanId||!data.plans.some(function(p){return p.id===htmlCaseDetailState.selectedPlanId;}))htmlCaseDetailState.selectedPlanId=current?current.id:firstValid?firstValid.id:data.plans[0]?data.plans[0].id:null;
-      var tabs=[['overview','總覽'],['basic','基本資料'],['platform-plan','照管平台照顧計畫'],['services','服務核定'],['visits','家訪／電訪'],['history','個案歷程'],['documents','文件']];
+      var tabs=[['overview','總覽'],['basic','基本資料'],['platform-plan','照管平台照顧計畫'],['services','服務核定'],['visits','家、電訪'],['history','個案歷程'],['documents','文件']];
       $('crumb').textContent='個案管理 / '+c.case_name;
       $('content').innerHTML=[
         '<div class="case-page">',
