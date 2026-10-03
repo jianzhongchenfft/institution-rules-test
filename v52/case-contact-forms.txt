@@ -165,7 +165,7 @@
       '<div class="import-section">新增後續追蹤事項</div>'+
       (workflowEditable
         ?'<div id="ccNewFollowups"></div><div style="margin-top:7px"><button type="button" id="ccAddFollowup" class="btn sm">＋ 新增追蹤事項</button></div>'
-        :'<div class="case-empty-inline">已完成紀錄若需新增工作事項，請另由新家訪／電訪或一般聯繫建立。</div>');
+        :'<div class="case-empty-inline">已完成紀錄若需新增工作事項，請另由新家訪、電訪或一般聯繫建立。</div>');
   }
 
   function ccHomeExtraHtml(bundle){
