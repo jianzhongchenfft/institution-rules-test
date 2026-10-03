@@ -244,6 +244,12 @@
     if(tool==='summary'&&path==='previous_recommendation_status'){
       return {completed:'已完成',partial:'部分執行',ongoing:'持續執行',not_done:'未執行',not_applicable:'不再適用'}[value]||valueText(value);
     }
+    if(tool==='health'&&/^medication_checks\.[^.]+\.status$/.test(path)){
+      return {good:'狀況良好',improve:'需改善',not_applicable:'不適用'}[value]||valueText(value);
+    }
+    if(tool==='support'&&path==='resources.economic_status'){
+      return {stable:'經濟狀況無虞',watch:'尚可但需留意',difficulty:'有明顯經濟困難'}[value]||valueText(value);
+    }
     return valueText(value);
   }
 
