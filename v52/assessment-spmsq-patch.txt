@@ -113,7 +113,11 @@
     document.querySelectorAll('input[name^="spmsq_q"]').forEach(inp=>inp.addEventListener('change',()=>{
       const key=inp.name.replace('spmsq_','');
       local.judgments[key]=inp.value;
-      if(inp.value==='unable_answer')local.expandedNotes.add(key);
+      if(inp.value==='unable_answer'){
+        local.expandedNotes.add(key);
+      }else if(!String(local.notes[key]||'').trim()){
+        local.expandedNotes.delete(key);
+      }
       const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
     }));
     $('spmsqUnable')?.addEventListener('change',()=>{local.isUnable=$('spmsqUnable').checked;render();});
