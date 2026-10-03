@@ -30,13 +30,13 @@
     .spmsq-title{font-size:13px;font-weight:900;color:#344054;margin-bottom:9px}.spmsq-prev{font-size:10px;color:#175cd3;margin-left:8px}
     .spmsq-judge{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}.spmsq-judge label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;cursor:pointer;font-size:11.5px;font-weight:800}
     .spmsq-judge label.selected{border-color:#dc9479;background:#fff8f5}.spmsq-judge input{width:auto}
-    .spmsq-note{margin-top:9px}.spmsq-note label{display:block;font-size:10.5px;font-weight:900;color:#667085;margin-bottom:5px}.spmsq-note textarea{width:100%;box-sizing:border-box;min-height:58px;resize:vertical}
+    .spmsq-note{margin-top:9px}.spmsq-note label{display:block;font-size:10.5px;font-weight:900;color:#667085;margin-bottom:5px}.spmsq-note textarea{width:100%;box-sizing:border-box;min-height:58px;resize:vertical}.spmsq-note .btn{font-size:10.5px}
     .spmsq-actions{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding:11px 0;background:linear-gradient(to bottom,rgba(250,248,247,0),#faf8f7 24%)}
     @media(max-width:720px){.spmsq-summary{grid-template-columns:1fr}.spmsq-copy{align-items:flex-start;flex-direction:column}.spmsq-copy .btn{width:100%}.spmsq-actions .btn{flex:1}}
   `;
   document.head.appendChild(style);
 
-  const local={eventId:null,record:null,previous:null,previousEvent:null,judgments:{},notes:{},pendingCopyFromId:null,hasLaterCompleted:false,isUnable:false,unableReason:''};
+  const local={eventId:null,record:null,previous:null,previousEvent:null,judgments:{},notes:{},expandedNotes:new Set(),pendingCopyFromId:null,hasLaterCompleted:false,isUnable:false,unableReason:''};
   const eventById=id=>state.assessmentEvents?.find(x=>x.id===id)||null;
   const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
   const formById=id=>(state.assessmentEventForms||[]).find(x=>x.assessment_event_id===id&&x.form_code==='spmsq')||null;
@@ -58,6 +58,7 @@
     ]);
     if(cur.error)throw cur.error;if(hist.error)throw hist.error;
     local.eventId=eventId;local.record=cur.data||null;local.judgments={...safe(local.record?.judgments)};local.notes={...safe(local.record?.notes)};
+    local.expandedNotes=new Set(Object.entries(local.notes).filter(([,v])=>String(v||'').trim()).map(([k])=>k));
     local.isUnable=!!local.record?.is_unable;local.unableReason=local.record?.unable_reason||'';
     const dated=(hist.data||[]).map(record=>({record,event:eventById(record.assessment_event_id)})).filter(x=>x.event?.planned_date);
     local.hasLaterCompleted=dated.some(x=>x.event.planned_date>row.planned_date);
@@ -92,7 +93,11 @@
                 <label class="${local.judgments[key]==='wrong'?'selected':''}"><input type="radio" name="spmsq_${key}" value="wrong" ${local.judgments[key]==='wrong'?'checked':''}>錯誤</label>
                 <label class="${local.judgments[key]==='unable_answer'?'selected':''}"><input type="radio" name="spmsq_${key}" value="unable_answer" ${local.judgments[key]==='unable_answer'?'checked':''}>無法作答</label>
               </div>
-              <div class="spmsq-note"><label>備註（選填）</label><textarea data-spmsq-note="${key}" placeholder="需要時補充，例如：僅能回答年份、因失語無法回答">${escapeHTML(local.notes[key]||'')}</textarea></div>
+              <div class="spmsq-note">
+                ${local.expandedNotes.has(key)||String(local.notes[key]||'').trim()
+                  ?`<label>備註（選填）</label><textarea data-spmsq-note="${key}" placeholder="需要時補充，例如：僅能回答年份、因失語無法回答">${escapeHTML(local.notes[key]||'')}</textarea>`
+                  :`<button type="button" class="btn sm" data-spmsq-add-note="${key}">＋ 補充備註</button>`}
+              </div>
             </section>`;
           }).join('')}
         </div>
@@ -101,6 +106,10 @@
 
     $('spmsqBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
     document.querySelectorAll('[data-spmsq-note]').forEach(inp=>inp.addEventListener('input',()=>local.notes[inp.dataset.spmsqNote]=inp.value));
+    document.querySelectorAll('[data-spmsq-add-note]').forEach(btn=>btn.addEventListener('click',()=>{
+      local.expandedNotes.add(btn.dataset.spmsqAddNote);
+      const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
+    }));
     document.querySelectorAll('input[name^="spmsq_q"]').forEach(inp=>inp.addEventListener('change',()=>{local.judgments[inp.name.replace('spmsq_','')]=inp.value;const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});}));
     $('spmsqUnable')?.addEventListener('change',()=>{local.isUnable=$('spmsqUnable').checked;render();});
     $('spmsqUnableReason')?.addEventListener('input',()=>local.unableReason=$('spmsqUnableReason').value);
