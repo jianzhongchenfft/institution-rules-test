@@ -121,3 +121,12 @@ assessment_health_records 仍是一個 event 一筆紀錄；使用者介面只�
 3. 前次資料一律以「本次 planned_date 以前最近一筆已完成同類評估」判定，不依建立時間。
 4. 健康與用藥維持單一工具；UI 依 assessment_type 切換開案初始版／後續追蹤版，身體健康10項包含在同一張表單。
 5. 紙本列印讀取當次已儲存快照；歷史修改軌跡另由 history 保留。
+
+
+## 評估事件進度同步（2026-10-03）
+- 8 支評估工具儲存 RPC 不再各自重複更新 `assessment_events`。
+- 共用 `private.sync_assessment_event_progress(event_id)` 依 `assessment_event_forms` 狀態統一同步事件進度。
+- 工具 RPC 仍各自負責資料驗證、正式紀錄、修改歷程與自己的 form status。
+- 當所有工具狀態皆為 `completed / unable / not_applicable` 時，事件進入 `forms_completed`。
+- 若事件已是 `completed` 或 `voided`，工具後續修正不會讓事件狀態倒退。
+- 此調整只屬後端去重複與狀態一致性整理，不改評估工具內容與前端流程。
