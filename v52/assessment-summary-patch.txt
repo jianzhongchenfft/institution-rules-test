@@ -316,7 +316,7 @@
     if(code==='iadl'){
       const x=r.iadl;
       if(!x)return {title:form.form_name,main:'無已儲存紀錄',detail:''};
-      return {title:form.form_name,main:`${x.total_score??'—'}／8 分`,detail:'工具性日常生活活動；分數越高代表獨立性越好。'};
+      return {title:form.form_name,main:`${x.total_score??'—'}／16 分`,detail:'工具性日常生活活動；分數越高代表獨立性越好。'};
     }
     if(code==='spmsq'){
       const x=r.spmsq;
