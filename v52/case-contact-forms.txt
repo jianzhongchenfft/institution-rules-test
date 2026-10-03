@@ -253,6 +253,27 @@
     return parts.join('');
   }
 
+  function ccReadDraftPayload(){
+    var newFollowups=[...document.querySelectorAll('[data-cc-new-follow-content]')].map(function(input){
+      var wrap=input.closest('.cc-follow-row');
+      return {content:input.value.trim(),due_date:wrap.querySelector('[data-cc-new-follow-date]')?.value||null,responsible_staff_id:wrap.querySelector('[data-cc-new-follow-staff]')?.value||state.profile.id};
+    }).filter(function(x){return x.content;});
+    var prior=[...document.querySelectorAll('[data-cc-prior-follow]')].map(function(row){
+      return {id:row.dataset.ccPriorFollow,result:row.querySelector('[data-cc-follow-result]')?.value||'not_followed',note:row.querySelector('[data-cc-follow-note]')?.value||'',next_due_date:row.querySelector('[data-cc-follow-next]')?.value||null};
+    });
+    return {new_followups:newFollowups,prior_followups:prior};
+  }
+  function ccApplyDraftPayload(payload){
+    if(!payload)return;
+    (payload.new_followups||[]).forEach(function(x){ccAddFollowupRow(x);});
+    (payload.prior_followups||[]).forEach(function(x){
+      var row=document.querySelector('[data-cc-prior-follow="'+x.id+'"]');if(!row)return;
+      var result=row.querySelector('[data-cc-follow-result]');if(result)result.value=x.result||'not_followed';
+      var note=row.querySelector('[data-cc-follow-note]');if(note)note.value=x.note||'';
+      var next=row.querySelector('[data-cc-follow-next]');if(next)next.value=x.next_due_date||'';
+    });
+  }
+
   function ccReadPeople(type,c,contacts){
     var rows=[];
     if(type==='home_visit'){
@@ -359,6 +380,7 @@
         supervisor_staff_id:c.supervisor_id||null,supervisor_name_snapshot:api.staffName(c.supervisor_id),
         reason_code:$('ccReason').value,reason_note:$('ccReasonNote')?.value.trim()||null,
         summary:$('ccSummary')?.value.trim()||ccBuildSummary(type),status:status,counts_for_cycle:counts,
+        draft_payload:status==='draft'?ccReadDraftPayload():{},
         updated_by_staff_id:state.profile.id,updated_at:new Date().toISOString()
       };
       if(status==='completed'){mainPayload.completed_at=bundle?.main.completed_at||new Date().toISOString();mainPayload.completed_by_staff_id=bundle?.main.completed_by_staff_id||state.profile.id;}
@@ -400,13 +422,14 @@
         }
         var satRows=[...document.querySelectorAll('[data-cc-sat]')].filter(function(x){return x.value;}).map(function(x){return {record_id:recordId,item_code:x.dataset.ccSat,rating_code:x.value,updated_at:new Date().toISOString()};});
         if(satRows.length){var su=await db.from('case_contact_satisfaction').upsert(satRows,{onConflict:'record_id,item_code'});if(su.error)throw su.error;}
-        if(status==='completed'&&!bundle)await ccProcessPriorFollowups(recordId);
-        if(status==='completed'&&!bundle)await ccInsertNewFollowups(c,recordId,type);
+        var completingFresh=!bundle||bundle.main.status==='draft';
+        if(status==='completed'&&completingFresh)await ccProcessPriorFollowups(recordId);
+        if(status==='completed'&&completingFresh)await ccInsertNewFollowups(c,recordId,type);
         if(status==='completed'&&$('ccAssessmentAction').value==='completed'){
           var aid=$('ccAssessmentLink').value;
           if(aid){var link=await db.from('case_record_links').insert({case_id:c.id,from_type:type,from_id:recordId,relation_type:'related',to_type:'assessment_event',to_id:aid,created_by_staff_id:state.profile.id});if(link.error&&link.error.code!=='23505')throw link.error;}
         }
-      }else if(type==='general_phone'&&status==='completed'&&!bundle){
+      }else if(type==='general_phone'&&status==='completed'&&(!bundle||bundle.main.status==='draft')){
         await ccInsertNewFollowups(c,recordId,type);
       }
 
@@ -448,6 +471,7 @@
       window.__ccFormCtx={c:c,contacts:contacts,bundle:bundle,type:type};
       if(type==='general_phone'&&bundle?.createdFollowups?.length)bundle.createdFollowups.forEach(function(x){ccAddFollowupRow(x);});
       ccBindForm(type);
+      if(bundle?.main?.status==='draft')ccApplyDraftPayload(bundle.main.draft_payload||{});
       if(bundle?.links?.length){
         var l=bundle.links.find(function(x){return x.to_type==='assessment_event';});
         if(l&&$('ccAssessmentLink'))$('ccAssessmentLink').value=l.to_id;
