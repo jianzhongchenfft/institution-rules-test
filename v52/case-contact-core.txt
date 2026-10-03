@@ -26,6 +26,11 @@
   function ccCanUse(){
     return !!state.profile && ['supervisor','business_manager','organization_manager','admin'].includes(state.profile.role);
   }
+  function ccCanEditCase(c){
+    if(!state.profile||!c)return false;
+    if(['business_manager','organization_manager','admin'].includes(state.profile.role))return true;
+    return state.profile.role==='supervisor' && state.profile.id===c.supervisor_id;
+  }
   function ccStaffName(id){
     return (state.caseStaff||[]).find(function(s){return s.id===id;})?.display_name||'尚未指派';
   }
@@ -248,7 +253,7 @@
   };
 
   window.caseContactApi={
-    canUse:ccCanUse,staffName:ccStaffName,typeLabel:ccTypeLabel,reasonLabel:ccReasonLabel,
+    canUse:ccCanUse,canEditCase:ccCanEditCase,staffName:ccStaffName,typeLabel:ccTypeLabel,reasonLabel:ccReasonLabel,
     dateOnly:ccDate,addMonths:ccAddMonths,loadData:ccLoadData,renderPage:ccRenderPage,
     latest:ccLatest,latestContact:ccLatestContact,pendingFollowups:ccPendingFollowups,
     cycle:ccCycle,assessmentCycle:ccAssessmentCycle,currentPlan:ccCurrentPlan,
