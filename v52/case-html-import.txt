@@ -1151,6 +1151,9 @@ async function htmlViewOriginal(path,fileName){
     };
     if(!data.c)throw new Error('找不到個案資料');
     state.caseVisits=(state.caseVisits||[]).filter(function(v){return v.case_id!==caseId;}).concat(data.visits);
+    if(window.caseContactApi&&typeof window.caseContactApi.enrichCaseDetailData==='function'){
+      data=await window.caseContactApi.enrichCaseDetailData(data);
+    }
     return data;
   }
 
@@ -1170,10 +1173,17 @@ async function htmlViewOriginal(path,fileName){
       var d=(v.visit_date||'1970-01-01')+'T12:00:00';
       items.push({date:d,title:htmlGetCaseVisitsApi().caseTypeLabel(v.visit_type),text:v.summary||v.follow_up_item||'訪視紀錄',sort:new Date(d).getTime()});
     });
+    if(window.caseContactApi&&typeof window.caseContactApi.extendCaseTimeline==='function'){
+      items=window.caseContactApi.extendCaseTimeline(items,data)||items;
+    }
     return items.sort(function(a,b){return b.sort-a.sort;});
   }
 
   function htmlRenderOverviewTab(data){
+    if(window.caseContactApi&&typeof window.caseContactApi.renderOverviewTab==='function'){
+      var customOverview=window.caseContactApi.renderOverviewTab(data);
+      if(customOverview!==null&&customOverview!==undefined)return customOverview;
+    }
     var c=data.c, currentPlan=data.plans.find(function(p){return p.is_current;})||null;
     var currentServices=data.services.filter(function(x){return x.is_current;});
     var currentBudgets=data.budgets.filter(function(x){return x.is_current;});
@@ -1296,6 +1306,10 @@ function htmlRenderServicesTab(data){
   }
 
   function htmlRenderVisitsTab(data){
+    if(window.caseContactApi&&typeof window.caseContactApi.renderVisitsTab==='function'){
+      var customVisits=window.caseContactApi.renderVisitsTab(data);
+      if(customVisits!==null&&customVisits!==undefined)return customVisits;
+    }
     var c=data.c,pending=htmlGetCaseVisitsApi().pendingFollowUpsFor(c.id);
     var rows=data.visits.length?data.visits.map(function(v){
       var resolved=htmlGetCaseVisitsApi().isFollowUpResolved(v.id);
@@ -1348,6 +1362,9 @@ function htmlRenderServicesTab(data){
     document.querySelectorAll('[data-void-plan]').forEach(function(btn){btn.addEventListener('click',function(){htmlOpenPlanVoid(btn.dataset.voidPlan);});});
     document.querySelectorAll('[data-add-visit]').forEach(function(btn){btn.addEventListener('click',function(){htmlGetCaseVisitsApi().openVisitModal(data.c);setTimeout(function(){var sel=$('visitType');if(sel)sel.value=btn.dataset.addVisit;},0);});});
     document.querySelectorAll('[data-document-index]').forEach(function(btn){btn.addEventListener('click',function(){var x=data.imports[Number(btn.dataset.documentIndex)];if(x)htmlViewOriginal(x.storage_path,x.file_name);});});
+    if(window.caseContactApi&&typeof window.caseContactApi.bindCaseDetailPanel==='function'){
+      window.caseContactApi.bindCaseDetailPanel(data,htmlCaseDetailState.tab);
+    }
   }
 
   function htmlSetCaseDetailTab(tab){
