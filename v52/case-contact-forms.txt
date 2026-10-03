@@ -400,6 +400,12 @@
         var pu=await db.from('case_phone_details').upsert(phone,{onConflict:'record_id'});if(pu.error)throw pu.error;
       }
 
+      if(type==='formal_phone'&&!successful){
+        var fd=await db.from('case_contact_formal_details').delete().eq('record_id',recordId);if(fd.error)throw fd.error;
+        var sd=await db.from('case_contact_satisfaction').delete().eq('record_id',recordId);if(sd.error)throw sd.error;
+        var ld=await db.from('case_record_links').delete().eq('from_id',recordId).eq('to_type','assessment_event');if(ld.error)throw ld.error;
+      }
+
       if(type!=='general_phone'&&successful){
         var formal={
           record_id:recordId,service_usage_status:$('ccServiceUsage').value,service_usage_note:$('ccServiceUsageNote').value.trim()||null,
@@ -421,13 +427,26 @@
           var hu=await db.from('case_home_visit_details').upsert(home,{onConflict:'record_id'});if(hu.error)throw hu.error;
         }
         var satRows=[...document.querySelectorAll('[data-cc-sat]')].filter(function(x){return x.value;}).map(function(x){return {record_id:recordId,item_code:x.dataset.ccSat,rating_code:x.value,updated_at:new Date().toISOString()};});
+        if(bundle){
+          var satDel=await db.from('case_contact_satisfaction').delete().eq('record_id',recordId);if(satDel.error)throw satDel.error;
+        }
         if(satRows.length){var su=await db.from('case_contact_satisfaction').upsert(satRows,{onConflict:'record_id,item_code'});if(su.error)throw su.error;}
         var completingFresh=!bundle||bundle.main.status==='draft';
         if(status==='completed'&&completingFresh)await ccProcessPriorFollowups(recordId);
         if(status==='completed'&&completingFresh)await ccInsertNewFollowups(c,recordId,type);
-        if(status==='completed'&&$('ccAssessmentAction').value==='completed'){
-          var aid=$('ccAssessmentLink').value;
-          if(aid){var link=await db.from('case_record_links').insert({case_id:c.id,from_type:type,from_id:recordId,relation_type:'related',to_type:'assessment_event',to_id:aid,created_by_staff_id:state.profile.id});if(link.error&&link.error.code!=='23505')throw link.error;}
+        if(status==='completed'){
+          var oldLinks=await db.from('case_record_links').delete().eq('from_id',recordId).eq('to_type','assessment_event');if(oldLinks.error)throw oldLinks.error;
+          if($('ccAssessmentAction').value==='completed'){
+            var aid=$('ccAssessmentLink').value;
+            if(aid){var link=await db.from('case_record_links').insert({case_id:c.id,from_type:type,from_id:recordId,relation_type:'related',to_type:'assessment_event',to_id:aid,created_by_staff_id:state.profile.id});if(link.error)throw link.error;}
+          }
+        }
+        if(status==='completed'&&completingFresh&&type==='formal_phone'&&successful){
+          var plannedPhone=api.currentPlan(c.id,'formal_phone');
+          if(plannedPhone){
+            var fulfill=await db.from('case_routine_plans').update({status:'fulfilled',fulfilled_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',plannedPhone.id);
+            if(fulfill.error)throw fulfill.error;
+          }
         }
       }else if(type==='general_phone'&&status==='completed'&&(!bundle||bundle.main.status==='draft')){
         await ccInsertNewFollowups(c,recordId,type);
@@ -469,7 +488,6 @@
         ((!bundle&&type!=='general_phone')?'<div style="margin-top:12px;text-align:right"><button type="button" id="ccSaveDraft" class="btn">儲存草稿</button></div>':'');
       openModal({title:(bundle?'編輯':'新增')+api.typeLabel(type)+'｜'+c.case_name,large:true,confirmText:bundle?'儲存修改':type==='general_phone'?'儲存聯繫紀錄':'完成紀錄',html:body,onConfirm:function(){return ccSaveFromForm(type,'completed');}});
       window.__ccFormCtx={c:c,contacts:contacts,bundle:bundle,type:type};
-      if(type==='general_phone'&&bundle?.createdFollowups?.length)bundle.createdFollowups.forEach(function(x){ccAddFollowupRow(x);});
       ccBindForm(type);
       if(bundle?.main?.status==='draft')ccApplyDraftPayload(bundle.main.draft_payload||{});
       if(bundle?.links?.length){
