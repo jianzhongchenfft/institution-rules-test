@@ -94,8 +94,8 @@
                 <label class="${local.judgments[key]==='unable_answer'?'selected':''}"><input type="radio" name="spmsq_${key}" value="unable_answer" ${local.judgments[key]==='unable_answer'?'checked':''}>無法作答</label>
               </div>
               <div class="spmsq-note">
-                ${local.expandedNotes.has(key)||String(local.notes[key]||'').trim()
-                  ?`<label>備註（選填）</label><textarea data-spmsq-note="${key}" placeholder="需要時補充，例如：僅能回答年份、因失語無法回答">${escapeHTML(local.notes[key]||'')}</textarea>`
+                ${local.judgments[key]==='unable_answer'||local.expandedNotes.has(key)||String(local.notes[key]||'').trim()
+                  ?`<label>${local.judgments[key]==='unable_answer'?'無法作答原因 *':'備註（選填）'}</label><textarea data-spmsq-note="${key}" placeholder="${local.judgments[key]==='unable_answer'?'請填寫無法作答原因':'需要時補充，例如：僅能回答年份、因失語無法回答'}">${escapeHTML(local.notes[key]||'')}</textarea>`
                   :`<button type="button" class="btn sm" data-spmsq-add-note="${key}">＋ 補充備註</button>`}
               </div>
             </section>`;
@@ -110,7 +110,12 @@
       local.expandedNotes.add(btn.dataset.spmsqAddNote);
       const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
     }));
-    document.querySelectorAll('input[name^="spmsq_q"]').forEach(inp=>inp.addEventListener('change',()=>{local.judgments[inp.name.replace('spmsq_','')]=inp.value;const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});}));
+    document.querySelectorAll('input[name^="spmsq_q"]').forEach(inp=>inp.addEventListener('change',()=>{
+      const key=inp.name.replace('spmsq_','');
+      local.judgments[key]=inp.value;
+      if(inp.value==='unable_answer')local.expandedNotes.add(key);
+      const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
+    }));
     $('spmsqUnable')?.addEventListener('change',()=>{local.isUnable=$('spmsqUnable').checked;render();});
     $('spmsqUnableReason')?.addEventListener('input',()=>local.unableReason=$('spmsqUnableReason').value);
     $('spmsqDraft')?.addEventListener('click',()=>save(false));
@@ -127,6 +132,11 @@
     }else if(finalize&&completedCount()!==10){
       const missing=ITEMS.filter(([k])=>!['correct','wrong','unable_answer'].includes(local.judgments[k])).map(([,l])=>l).join('、');
       return toast('尚有未完成項目：'+missing,'warn');
+    }else if(finalize){
+      const missingReasons=ITEMS
+        .filter(([k])=>local.judgments[k]==='unable_answer'&&!String(local.notes[k]||'').trim())
+        .map(([,l])=>l);
+      if(missingReasons.length)return toast('請填寫無法作答原因：'+missingReasons.join('、'),'warn');
     }else if(!finalize&&completedCount()===0&&!Object.values(local.notes).some(v=>String(v||'').trim())){
       return toast('至少判定一項或填寫備註後再儲存草稿','warn');
     }
