@@ -130,3 +130,12 @@ assessment_health_records 仍是一個 event 一筆紀錄；使用者介面只�
 - 當所有工具狀態皆為 `completed / unable / not_applicable` 時，事件進入 `forms_completed`。
 - 若事件已是 `completed` 或 `voided`，工具後續修正不會讓事件狀態倒退。
 - 此調整只屬後端去重複與狀態一致性整理，不改評估工具內容與前端流程。
+
+
+## SPMSQ 判定式紀錄（2026-10-03）
+- SPMSQ 不再保存每題受訪者原始回答；每題只記錄「正確／錯誤／無法作答」及選填備註。
+- 「錯誤」與「無法作答」均計入錯誤題數。
+- 整份表單仍保留「本次無法評估」及原因。
+- `assessment_spmsq_records.responses` 欄位暫時保留以維持資料結構相容，但新資料固定為空物件，不再作為評估依據。
+- 新增 `notes jsonb` 儲存逐題備註；修改歷程改追蹤 judgments 與 notes。
+- TEST 既有受訪者回答與其 response 歷程已清空，因現有資料皆為測試資料。
