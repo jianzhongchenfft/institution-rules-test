@@ -52,7 +52,7 @@
     ['medicine_recognition','個案或協助者能辨識不同藥物'],['follow_prescription','可依醫囑服藥（含時間與劑量）'],
     ['medication_management_support','藥物管理有適當人員協助（如有需要）']
   ];
-  const MED_STATUS={good:'良好',observe:'需觀察',refer:'異常轉介',not_applicable:'不適用'};
+  const MED_STATUS={good:'狀況良好',improve:'需改善',not_applicable:'不適用'};
   const HOME_SECTIONS=[
     ['主要活動空間與動線',[
       ['entrance_clear','主要出入口及行走動線暢通'],['floor_level','地面平整，無明顯危險高低差或門檻'],
