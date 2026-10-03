@@ -110,6 +110,7 @@
 
   function ccFormalHtml(c,bundle){
     var d=bundle?.formal||{};
+    var workflowEditable=!bundle||bundle.main?.status==='draft';
     var satMap={};(bundle?.satisfaction||[]).forEach(function(x){satMap[x.item_code]=x.rating_code;});
     var pending=api.pendingFollowups(c.id);
     var assessments=(state.caseAssessmentEvents||[]).filter(function(x){return x.case_id===c.id&&['forms_completed','completed'].includes(x.status);});
@@ -143,10 +144,12 @@
       '<div class="field full" id="ccConcernWrap"><label>主要關切事項</label><textarea id="ccConcernNote" rows="3">'+escapeHTML(d.primary_concern_note||'')+'</textarea></div></div>'+
 
       '<div class="import-section">前次待追蹤事項</div>'+
-      (pending.length?'<div class="cc-follow-list">'+pending.map(function(x){
-        return '<div class="cc-follow-row" data-cc-prior-follow="'+x.id+'"><strong>'+escapeHTML(x.content)+'</strong><small>'+(x.due_date?'原訂 '+rocDate(x.due_date+'T00:00:00'):'未設定日期')+'｜負責 '+escapeHTML(api.staffName(x.responsible_staff_id))+'</small>'+
-          '<div class="form-grid" style="margin-top:7px"><div class="field"><label>本次結果</label><select data-cc-follow-result>'+FOLLOW_RESULTS.map(function(o){return ccOpt(o[0],o[1],'not_followed');}).join('')+'</select></div><div class="field"><label>下次追蹤日期</label><input type="date" data-cc-follow-next></div><div class="field full"><label>本次追蹤狀況</label><input data-cc-follow-note placeholder="有追蹤時請簡述"></div></div></div>';
-      }).join('')+'</div>':'<div class="case-empty-inline">目前無待追蹤事項</div>')+
+      (!workflowEditable
+        ?'<div class="case-empty-inline">此為已完成紀錄的內容修正，不重新處理目前待追蹤事項。</div>'
+        :(pending.length?'<div class="cc-follow-list">'+pending.map(function(x){
+          return '<div class="cc-follow-row" data-cc-prior-follow="'+x.id+'"><strong>'+escapeHTML(x.content)+'</strong><small>'+(x.due_date?'原訂 '+rocDate(x.due_date+'T00:00:00'):'未設定日期')+'｜負責 '+escapeHTML(api.staffName(x.responsible_staff_id))+'</small>'+
+            '<div class="form-grid" style="margin-top:7px"><div class="field"><label>本次結果</label><select data-cc-follow-result>'+FOLLOW_RESULTS.map(function(o){return ccOpt(o[0],o[1],'not_followed');}).join('')+'</select></div><div class="field"><label>下次追蹤日期</label><input type="date" data-cc-follow-next></div><div class="field full"><label>本次追蹤狀況</label><input data-cc-follow-note placeholder="有追蹤時請簡述"></div></div></div>';
+        }).join('')+'</div>':'<div class="case-empty-inline">目前無待追蹤事項</div>'))+
 
       '<div class="import-section">評估與後續處理</div>'+
       '<div class="form-grid">'+
@@ -160,7 +163,9 @@
       '</div>'+
 
       '<div class="import-section">新增後續追蹤事項</div>'+
-      '<div id="ccNewFollowups"></div><div style="margin-top:7px"><button type="button" id="ccAddFollowup" class="btn sm">＋ 新增追蹤事項</button></div>';
+      (workflowEditable
+        ?'<div id="ccNewFollowups"></div><div style="margin-top:7px"><button type="button" id="ccAddFollowup" class="btn sm">＋ 新增追蹤事項</button></div>'
+        :'<div class="case-empty-inline">已完成紀錄若需新增工作事項，請另由新家訪／電訪或一般聯繫建立。</div>');
   }
 
   function ccHomeExtraHtml(bundle){
@@ -483,9 +488,10 @@
       var people=type==='home_visit'?ccPeopleHomeHtml(c,contacts,bundle):ccPeoplePhoneHtml(c,contacts,bundle);
       var body=ccRecentContext(c)+main+people+(type==='home_visit'?ccHomeExtraHtml(bundle):ccPhoneExtraHtml(bundle,type));
       if(type!=='general_phone')body+='<div id="ccFormalBody">'+ccFormalHtml(c,bundle)+'</div>';
-      else body+='<div class="import-section">後續追蹤</div><div id="ccNewFollowups"></div><div style="margin-top:7px"><button type="button" id="ccAddFollowup" class="btn sm">＋ 新增追蹤事項</button></div>';
+      else if(!bundle||bundle.main.status==='draft')body+='<div class="import-section">後續追蹤</div><div id="ccNewFollowups"></div><div style="margin-top:7px"><button type="button" id="ccAddFollowup" class="btn sm">＋ 新增追蹤事項</button></div>';
+      else body+='<div class="import-section">後續追蹤</div><div class="case-empty-inline">已完成的一般電話聯繫不在內容修正時重新建立追蹤事項。</div>';
       body+='<div class="import-section">紀錄摘要</div><div class="field"><textarea id="ccSummary" rows="5" placeholder="可自行輸入，或由系統依目前欄位整理">'+escapeHTML(bundle?.main.summary||'')+'</textarea><div class="summary-tools"><button type="button" id="ccBuildSummary" class="btn sm">依填寫內容產生摘要</button></div></div>'+
-        ((!bundle&&type!=='general_phone')?'<div style="margin-top:12px;text-align:right"><button type="button" id="ccSaveDraft" class="btn">儲存草稿</button></div>':'');
+        ((type!=='general_phone'&&(!bundle||bundle.main.status==='draft'))?'<div style="margin-top:12px;text-align:right"><button type="button" id="ccSaveDraft" class="btn">儲存草稿</button></div>':'');
       openModal({title:(bundle?'編輯':'新增')+api.typeLabel(type)+'｜'+c.case_name,large:true,confirmText:bundle?'儲存修改':type==='general_phone'?'儲存聯繫紀錄':'完成紀錄',html:body,onConfirm:function(){return ccSaveFromForm(type,'completed');}});
       window.__ccFormCtx={c:c,contacts:contacts,bundle:bundle,type:type};
       ccBindForm(type);
