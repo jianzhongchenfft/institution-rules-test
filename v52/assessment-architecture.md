@@ -139,3 +139,10 @@ assessment_health_records 仍是一個 event 一筆紀錄；使用者介面只�
 - `assessment_spmsq_records.responses` 欄位暫時保留以維持資料結構相容，但新資料固定為空物件，不再作為評估依據。
 - 新增 `notes jsonb` 儲存逐題備註；修改歷程改追蹤 judgments 與 notes。
 - TEST 既有受訪者回答與其 response 歷程已清空，因現有資料皆為測試資料。
+
+
+## SPMSQ 無法作答原因（2026-10-03）
+- 單題選擇 `unable_answer` 時，前端自動展開「無法作答原因 *」。
+- 草稿允許暫時未填原因。
+- 正式完成時，每一個 `unable_answer` 都必須有非空白逐題備註，前端與 `save_assessment_spmsq` RPC 雙重驗證。
+- 若之後改回「正確／錯誤」，既有備註不自動刪除，並恢復為一般選填備註。
