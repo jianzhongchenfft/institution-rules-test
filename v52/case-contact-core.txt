@@ -63,7 +63,7 @@
   }
   function ccCompletedRecords(caseId,type){
     return (state.caseContactRecords||[])
-      .filter(function(r){return r.case_id===caseId && r.record_type===type && r.status==='completed';})
+      .filter(function(r){return r.case_id===caseId && r.record_type===type && r.status==='completed' && r.counts_for_cycle!==false;})
       .sort(function(a,b){return String(b.record_date).localeCompare(String(a.record_date))||new Date(b.created_at)-new Date(a.created_at);});
   }
   function ccLatest(caseId,type){return ccCompletedRecords(caseId,type)[0]||null;}
