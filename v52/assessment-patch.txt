@@ -637,6 +637,8 @@
   }
 
   function openAssessmentEventModal(existing=null){
+    const creationHook=!existing&&typeof window.__assessmentCreatedHook==='function'?window.__assessmentCreatedHook:null;
+    if(!existing)window.__assessmentCreatedHook=null;
     const cases=assessmentEditableCases(existing);
     if(!cases.length){
       toast(existing?'找不到此評估事件的個案資料':'目前沒有可建立評估的個案','warn');
@@ -863,6 +865,14 @@
           });
           const {error:formsError}=await db.from('assessment_event_forms').insert(formRows);
           if(formsError)throw formsError;
+
+          if(creationHook){
+            try{await creationHook(newEvent);}
+            catch(hookErr){
+              console.error('assessment create hook failed',hookErr);
+              toast('評估已建立，但來源紀錄連結失敗，請稍後從家、電訪紀錄重新連結。','warn');
+            }
+          }
 
           closeModal();
           await loadAssessmentData(false);
