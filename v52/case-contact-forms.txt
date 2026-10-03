@@ -43,6 +43,31 @@
     var row=FOLLOW_RESULTS.find(function(x){return x[0]===v;});return row?row[1]:'—';
   }
   function ccRecordStatusLabel(v){return ({draft:'草稿',completed:'完成',voided:'作廢'})[v]||v||'—';}
+  function ccStaffOptions(current){
+    return (state.caseStaff||[]).filter(function(s){return s.is_active!==false;}).map(function(s){
+      return ccOpt(s.id,s.display_name||s.email||'未命名人員',current);
+    }).join('');
+  }
+  function ccNormalizeTime(value){
+    var v=String(value||'').trim();
+    if(!v)return '';
+    if(/^\d{1,2}:\d{2}$/.test(v)){
+      var p=v.split(':'),h=Number(p[0]),m=Number(p[1]);
+      if(h>=0&&h<=23&&m>=0&&m<=59)return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      return v;
+    }
+    var digits=v.replace(/\D/g,'');
+    if(digits.length===3)digits='0'+digits;
+    if(digits.length===4){
+      var h2=Number(digits.slice(0,2)),m2=Number(digits.slice(2));
+      if(h2>=0&&h2<=23&&m2>=0&&m2<=59)return digits.slice(0,2)+':'+digits.slice(2);
+    }
+    return v;
+  }
+  function ccValidTime(value){
+    if(!value)return true;
+    return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+  }
 
   async function ccLoadCaseContacts(caseId){
     var r=await db.from('case_contacts').select('*').eq('case_id',caseId).order('is_primary_contact',{ascending:false}).order('created_at');
@@ -91,9 +116,9 @@
     var chosen=new Set((bundle?.people||[]).map(function(x){return x.case_contact_id||x.person_type+':'+x.name_snapshot;}));
     var clientChecked=(bundle?.people||[]).some(function(x){return x.person_type==='client';});
     return '<div class="field full"><label>在場／受訪對象 *</label>'+
-      '<div class="assessment-check-grid">'+
-        '<label class="assessment-check"><input type="checkbox" id="ccClientPresent" '+(clientChecked?'checked':'')+'> 個案本人</label>'+
-        contacts.map(function(x){return '<label class="assessment-check"><input type="checkbox" data-cc-contact-id="'+x.id+'" '+(chosen.has(x.id)?'checked':'')+'> '+escapeHTML(x.contact_name)+(x.relationship?'（'+escapeHTML(x.relationship)+'）':'')+'</label>';}).join('')+
+      '<div class="cc-check-grid">'+
+        '<label class="cc-check"><input type="checkbox" id="ccClientPresent" '+(clientChecked?'checked':'')+'> 個案本人</label>'+
+        contacts.map(function(x){return '<label class="cc-check"><input type="checkbox" data-cc-contact-id="'+x.id+'" '+(chosen.has(x.id)?'checked':'')+'> '+escapeHTML(x.contact_name)+(x.relationship?'（'+escapeHTML(x.relationship)+'）':'')+'</label>';}).join('')+
       '</div>'+
       '<div class="form-grid" style="margin-top:8px"><div class="field"><label>其他在場人員</label><input id="ccOtherPerson" placeholder="例如：個管師、護理師、居服員"></div><div class="field"><label>關係／身分</label><input id="ccOtherRelation" placeholder="選填"></div></div></div>';
   }
@@ -109,10 +134,28 @@
       '<div class="field" id="ccPhoneOtherWrap"><label>其他聯絡對象</label><input id="ccPhoneOtherName" value="'+escapeHTML(primary&&value==='other'?primary.name_snapshot:'')+'" placeholder="姓名／稱謂"></div>';
   }
 
+  function ccSatisfactionHtml(bundle){
+    var satMap={},satNoteMap={};
+    (bundle?.satisfaction||[]).forEach(function(x){satMap[x.item_code]=x.rating_code;satNoteMap[x.item_code]=x.note||'';});
+    return '<div class="cc-sat-list">'+SAT_ITEMS.map(function(item){
+      var code=item[0],label=item[1],current=satMap[code]||'',note=satNoteMap[code]||'';
+      return '<div class="cc-sat-row" data-cc-sat-row="'+code+'">'+
+        '<div class="cc-sat-head"><div class="cc-sat-title">'+escapeHTML(label)+' *</div><button type="button" class="btn sm" data-cc-sat-note-toggle="'+code+'">'+(note?'收合補充':'＋ 補充')+'</button></div>'+
+        '<input type="hidden" data-cc-sat="'+code+'" value="'+escapeHTML(current)+'">'+
+        '<div class="cc-sat-options">'+SAT_OPTIONS.filter(function(o){return o[0];}).map(function(o){
+          return '<label class="cc-sat-choice"><input type="radio" name="cc-sat-'+code+'" value="'+o[0]+'" data-cc-sat-choice="'+code+'" '+(current===o[0]?'checked':'')+'><span>'+escapeHTML(o[1])+'</span></label>';
+        }).join('')+'</div>'+
+        '<div class="cc-sat-note-wrap '+(note||['dissatisfied','very_dissatisfied'].includes(current)?'show':'')+'" data-cc-sat-note-wrap="'+code+'">'+
+          '<label data-cc-sat-note-label="'+code+'">'+(['dissatisfied','very_dissatisfied'].includes(current)?'<span class="cc-sat-required">原因 *</span>':'補充說明')+'</label>'+
+          '<textarea rows="2" data-cc-sat-note="'+code+'" placeholder="選填">'+escapeHTML(note)+'</textarea>'+
+        '</div>'+
+      '</div>';
+    }).join('')+'</div>';
+  }
+
   function ccFormalHtml(c,bundle){
     var d=bundle?.formal||{};
     var workflowEditable=!bundle||bundle.main?.status==='draft';
-    var satMap={};(bundle?.satisfaction||[]).forEach(function(x){satMap[x.item_code]=x.rating_code;});
     var pending=api.pendingFollowups(c.id);
     var assessments=(state.caseAssessmentEvents||[]).filter(function(x){return x.case_id===c.id&&['forms_completed','completed'].includes(x.status);});
     return '<div class="import-section">服務使用情形</div>'+
@@ -123,22 +166,20 @@
         '<div class="field"><label>現行服務是否符合需求 *</label><select id="ccServiceFit">'+
           ccOpt('fit','符合',d.service_fit_status)+ccOpt('mostly_fit','大致符合，但有需留意事項',d.service_fit_status)+ccOpt('adjust','建議調整',d.service_fit_status)+'</select></div>'+
         '<div class="field full" id="ccServiceUsageNoteWrap"><label>服務使用狀況說明</label><textarea id="ccServiceUsageNote" rows="2">'+escapeHTML(d.service_usage_note||'')+'</textarea></div>'+
-        '<div class="field full" id="ccAdjustWrap"><label>建議調整方向</label><div class="assessment-check-grid">'+
-          [['increase','增加服務'],['decrease','減少服務'],['item','調整服務項目'],['time','調整服務時間／頻率'],['worker','調整服務人員'],['reassess','需重新評估'],['other','其他']].map(function(x){return '<label class="assessment-check"><input type="checkbox" data-cc-adjust="'+x[0]+'" '+((d.adjustment_directions||[]).includes(x[0])?'checked':'')+'> '+x[1]+'</label>';}).join('')+
+        '<div class="field full" id="ccAdjustWrap"><label>建議調整方向</label><div class="cc-check-grid">'+
+          [['increase','增加服務'],['decrease','減少服務'],['item','調整服務項目'],['time','調整服務時間／頻率'],['worker','調整服務人員'],['reassess','需重新評估'],['other','其他']].map(function(x){return '<label class="cc-check"><input type="checkbox" data-cc-adjust="'+x[0]+'" '+((d.adjustment_directions||[]).includes(x[0])?'checked':'')+'> '+x[1]+'</label>';}).join('')+
         '</div><textarea id="ccAdjustmentNote" rows="2" placeholder="補充說明">'+escapeHTML(d.adjustment_note||'')+'</textarea></div>'+
       '</div>'+
 
       '<div class="import-section">近期重大事件</div>'+
       '<div class="form-grid"><div class="field"><label>自上次正式追蹤後是否有重大事件 *</label><select id="ccMajorEvent">'+ccOpt('false','無',String(!!d.has_major_event))+ccOpt('true','有',String(!!d.has_major_event))+'</select></div>'+
-      '<div class="field full" id="ccMajorEventWrap"><label>重大事件類型</label><div class="assessment-check-grid">'+
-        [['fall','跌倒／受傷'],['er_hospital','急診／住院'],['surgery','手術'],['disease_worse','疾病明顯惡化'],['med_change','用藥重大變更'],['other','其他']].map(function(x){return '<label class="assessment-check"><input type="checkbox" data-cc-major="'+x[0]+'" '+((d.major_event_types||[]).includes(x[0])?'checked':'')+'> '+x[1]+'</label>';}).join('')+
+      '<div class="field full" id="ccMajorEventWrap"><label>重大事件類型</label><div class="cc-check-grid">'+
+        [['fall','跌倒／受傷'],['er_hospital','急診／住院'],['surgery','手術'],['disease_worse','疾病明顯惡化'],['med_change','用藥重大變更'],['other','其他']].map(function(x){return '<label class="cc-check"><input type="checkbox" data-cc-major="'+x[0]+'" '+((d.major_event_types||[]).includes(x[0])?'checked':'')+'> '+x[1]+'</label>';}).join('')+
       '</div><textarea id="ccMajorEventNote" rows="2" placeholder="請簡述事件">'+escapeHTML(d.major_event_note||'')+'</textarea></div></div>'+
 
       '<div class="import-section">服務滿意度</div>'+
       '<div style="text-align:right;margin-bottom:7px"><button type="button" id="ccNotAskedAll" class="btn sm">本次未進行滿意度調查</button></div>'+
-      '<div class="form-grid">'+SAT_ITEMS.map(function(x){return '<div class="field"><label>'+x[1]+' *</label><select data-cc-sat="'+x[0]+'">'+SAT_OPTIONS.map(function(o){return ccOpt(o[0],o[1],satMap[x[0]]||'');}).join('')+'</select></div>';}).join('')+
-        '<div class="field full" id="ccSatNoteWrap"><label>服務意見／補充說明</label><textarea id="ccSatNote" rows="3">'+escapeHTML(d.satisfaction_note||'')+'</textarea></div>'+
-      '</div>'+
+      ccSatisfactionHtml(bundle)+
 
       '<div class="import-section">個案／家屬主要關切事項</div>'+
       '<div class="form-grid"><div class="field"><label>本次是否有主要關切事項 *</label><select id="ccConcern">'+ccOpt('false','無',String(!!d.has_primary_concern))+ccOpt('true','有',String(!!d.has_primary_concern))+'</select></div>'+
@@ -158,8 +199,8 @@
           ccOpt('none','否',d.assessment_action)+ccOpt('completed','是，已完成本次評估',d.assessment_action)+ccOpt('create_now','是，立即建立本次評估',d.assessment_action)+ccOpt('schedule_later','是，待安排評估',d.assessment_action)+'</select></div>'+
         '<div class="field" id="ccAssessmentLinkWrap"><label>連結評估紀錄</label><select id="ccAssessmentLink"><option value="">請選擇評估紀錄</option>'+assessments.map(function(x){return '<option value="'+x.id+'">'+rocDate(x.planned_date+'T00:00:00')+'｜'+escapeHTML(x.assessment_type||'評估')+'</option>';}).join('')+'</select></div>'+
         '<div class="field"><label>本次是否需進一步處理？ *</label><select id="ccRequiresAction">'+ccOpt('false','否，持續原服務即可',String(!!d.requires_action))+ccOpt('true','是，需後續處理',String(!!d.requires_action))+'</select></div>'+
-        '<div class="field full" id="ccActionWrap"><label>後續處理方式</label><div class="assessment-check-grid">'+
-          [['follow','持續追蹤'],['family','聯繫家屬'],['case_manager','聯繫個管師'],['assessor','聯繫照管專員'],['medical','聯繫醫療單位'],['service_adjust','建議調整服務'],['assessment','安排評估'],['event','建立事件追蹤'],['home_visit','安排家訪'],['formal_phone','安排正式電訪'],['other','其他']].map(function(x){return '<label class="assessment-check"><input type="checkbox" data-cc-action="'+x[0]+'" '+((d.action_types||[]).includes(x[0])?'checked':'')+'> '+x[1]+'</label>';}).join('')+
+        '<div class="field full" id="ccActionWrap"><label>後續處理方式</label><div class="cc-check-grid">'+
+          [['follow','持續追蹤'],['family','聯繫家屬'],['case_manager','聯繫個管師'],['assessor','聯繫照管專員'],['medical','聯繫醫療單位'],['service_adjust','建議調整服務'],['assessment','安排評估'],['event','建立事件追蹤'],['home_visit','安排家訪'],['formal_phone','安排正式電訪'],['other','其他']].map(function(x){return '<label class="cc-check"><input type="checkbox" data-cc-action="'+x[0]+'" '+((d.action_types||[]).includes(x[0])?'checked':'')+'> '+x[1]+'</label>';}).join('')+
         '</div><textarea id="ccActionNote" rows="3" placeholder="本次處理／建議內容">'+escapeHTML(d.action_note||'')+'</textarea></div>'+
       '</div>'+
 
@@ -212,8 +253,6 @@
       toggle('ccConcernWrap',$('ccConcern')?.value==='true');
       toggle('ccAssessmentLinkWrap',$('ccAssessmentAction')?.value==='completed');
       toggle('ccActionWrap',$('ccRequiresAction')?.value==='true');
-      var badSat=[...document.querySelectorAll('[data-cc-sat]')].some(function(x){return ['neutral','dissatisfied','very_dissatisfied'].includes(x.value);});
-      toggle('ccSatNoteWrap',badSat);
     }
     if(type==='home_visit'){
       toggle('ccVisitLocationNoteWrap',$('ccVisitLocation')?.value==='other');
@@ -230,8 +269,37 @@
 
   function ccBindForm(type){
     ['ccReason','ccServiceUsage','ccServiceFit','ccMajorEvent','ccConcern','ccAssessmentAction','ccRequiresAction','ccVisitLocation','ccExecDifficulty','ccContactSuccess','ccNeedsRecontact','ccPhonePerson'].forEach(function(id){$(id)?.addEventListener('change',function(){ccToggleForm(type);});});
-    document.querySelectorAll('[data-cc-sat]').forEach(function(el){el.addEventListener('change',function(){ccToggleForm(type);});});
-    $('ccNotAskedAll')?.addEventListener('click',function(){document.querySelectorAll('[data-cc-sat]').forEach(function(x){x.value='not_asked';});ccToggleForm(type);});
+    document.querySelectorAll('[data-cc-sat-choice]').forEach(function(el){
+      el.addEventListener('change',function(){
+        var code=el.dataset.ccSatChoice,hidden=document.querySelector('[data-cc-sat="'+code+'"]');
+        if(hidden)hidden.value=el.value;
+        var bad=['dissatisfied','very_dissatisfied'].includes(el.value);
+        var wrap=document.querySelector('[data-cc-sat-note-wrap="'+code+'"]');
+        var label=document.querySelector('[data-cc-sat-note-label="'+code+'"]');
+        var toggleBtn=document.querySelector('[data-cc-sat-note-toggle="'+code+'"]');
+        if(bad&&wrap)wrap.classList.add('show');
+        if(label)label.innerHTML=bad?'<span class="cc-sat-required">原因 *</span>':'補充說明';
+        if(toggleBtn&&wrap?.classList.contains('show'))toggleBtn.textContent='收合補充';
+      });
+    });
+    document.querySelectorAll('[data-cc-sat-note-toggle]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var code=btn.dataset.ccSatNoteToggle,wrap=document.querySelector('[data-cc-sat-note-wrap="'+code+'"]');
+        if(!wrap)return;
+        var value=document.querySelector('[data-cc-sat="'+code+'"]')?.value||'';
+        if(['dissatisfied','very_dissatisfied'].includes(value)){wrap.classList.add('show');btn.textContent='收合補充';return;}
+        wrap.classList.toggle('show');btn.textContent=wrap.classList.contains('show')?'收合補充':'＋ 補充';
+      });
+    });
+    $('ccNotAskedAll')?.addEventListener('click',function(){
+      document.querySelectorAll('[data-cc-sat]').forEach(function(x){
+        x.value='not_asked';
+        var code=x.dataset.ccSat;
+        var radio=document.querySelector('input[data-cc-sat-choice="'+code+'"][value="not_asked"]');
+        if(radio)radio.checked=true;
+        var label=document.querySelector('[data-cc-sat-note-label="'+code+'"]');if(label)label.textContent='補充說明';
+      });
+    });
     $('ccAddFollowup')?.addEventListener('click',function(){ccAddFollowupRow();});
     $('ccToggleNotes')?.addEventListener('click',function(){
       var wrap=$('ccNotesWrap');if(!wrap)return;
@@ -239,6 +307,7 @@
       $('ccToggleNotes').textContent=wrap.classList.contains('show')?'收合備註':'＋ 補充備註';
     });
     if($('ccNotesWrap')?.classList.contains('show')&&$('ccToggleNotes'))$('ccToggleNotes').textContent='收合備註';
+    $('ccRecordTime')?.addEventListener('blur',function(e){e.target.value=ccNormalizeTime(e.target.value);});
     $('ccBuildSummary')?.addEventListener('click',function(){$('ccSummary').value=ccBuildSummary(type);});
     $('ccSaveDraft')?.addEventListener('click',function(){ccSaveFromForm(type,'draft');});
     ccToggleForm(type);
@@ -309,6 +378,9 @@
 
   function ccValidate(type,status,contacts,c){
     if(!$('ccRecordDate')?.value)return '請填寫日期';
+    var visitTime=ccNormalizeTime($('ccRecordTime')?.value||'');
+    if($('ccRecordTime'))$('ccRecordTime').value=visitTime;
+    if(!ccValidTime(visitTime))return '時間請使用24小時制 HH:MM，例如 09:30 或 16:05';
     if(!$('ccReason')?.value)return '請選擇原因';
     if($('ccReason')?.value==='other'&&!$('ccReasonNote')?.value.trim())return '選擇其他原因時請補充說明';
     var people=ccReadPeople(type,c,contacts);if(!people.length)return type==='home_visit'?'請至少選擇一名在場／受訪對象':'請選擇聯絡對象';
@@ -332,7 +404,12 @@
     if($('ccConcern')?.value==='true'&&!$('ccConcernNote')?.value.trim())return '請填寫個案／家屬主要關切事項';
     var sats=[...document.querySelectorAll('[data-cc-sat]')];
     if(sats.some(function(x){return !x.value;}))return '請完成六項服務滿意度；若本次未詢問可使用「本次未進行滿意度調查」';
-    if(sats.some(function(x){return ['dissatisfied','very_dissatisfied'].includes(x.value);})&&!$('ccSatNote')?.value.trim())return '滿意度有不滿意項目時，請填寫服務意見／補充說明';
+    for(var sat of sats){
+      if(['dissatisfied','very_dissatisfied'].includes(sat.value)){
+        var note=document.querySelector('[data-cc-sat-note="'+sat.dataset.ccSat+'"]')?.value.trim();
+        if(!note)return '選擇「不滿意」或「非常不滿意」時，請填寫該項原因';
+      }
+    }
     if($('ccAssessmentAction')?.value==='completed'&&!$('ccAssessmentLink')?.value)return '請選擇已完成的評估紀錄';
     if(type==='home_visit'){
       if(!$('ccScheduleExec')?.value||!$('ccServiceExec')?.value)return '請完成家訪現場服務執行情形';
@@ -387,8 +464,9 @@
       var successful=type==='home_visit'||$('ccContactSuccess')?.value!=='false';
       var counts=(type==='home_visit'||type==='formal_phone'&&successful);
       var mainPayload={
-        case_id:c.id,record_type:type,record_date:$('ccRecordDate').value,record_time:$('ccRecordTime')?.value||null,
-        performed_by_staff_id:state.profile.id,performed_by_name_snapshot:state.profile.display_name||api.staffName(state.profile.id),
+        case_id:c.id,record_type:type,record_date:$('ccRecordDate').value,record_time:ccNormalizeTime($('ccRecordTime')?.value||'')||null,
+        performed_by_staff_id:(type==='home_visit'&&$('ccPerformedBy')?.value)||bundle?.main.performed_by_staff_id||state.profile.id,
+        performed_by_name_snapshot:api.staffName((type==='home_visit'&&$('ccPerformedBy')?.value)||bundle?.main.performed_by_staff_id||state.profile.id),
         supervisor_staff_id:c.supervisor_id||null,supervisor_name_snapshot:api.staffName(c.supervisor_id),
         reason_code:$('ccReason').value,reason_note:$('ccReasonNote')?.value.trim()||null,
         notes:$('ccNotes')?.value.trim()||null,
@@ -431,7 +509,7 @@
           has_primary_concern:$('ccConcern').value==='true',primary_concern_note:$('ccConcernNote').value.trim()||null,
           assessment_action:$('ccAssessmentAction').value,requires_action:$('ccRequiresAction').value==='true',
           action_types:[...document.querySelectorAll('[data-cc-action]:checked')].map(function(x){return x.dataset.ccAction;}),
-          action_note:$('ccActionNote').value.trim()||null,satisfaction_note:$('ccSatNote').value.trim()||null,
+          action_note:$('ccActionNote').value.trim()||null,satisfaction_note:null,
           service_snapshot:ccServiceSnapshot(c.id),updated_at:new Date().toISOString()
         };
         var fu=await db.from('case_contact_formal_details').upsert(formal,{onConflict:'record_id'});if(fu.error)throw fu.error;
@@ -439,7 +517,10 @@
           var home={record_id:recordId,visit_location:$('ccVisitLocation').value,visit_location_note:$('ccVisitLocationNote').value.trim()||null,schedule_execution_status:$('ccScheduleExec').value,service_execution_status:$('ccServiceExec').value,has_execution_difficulty:$('ccExecDifficulty').value==='true',execution_difficulty_note:$('ccExecDifficultyNote').value.trim()||null,updated_at:new Date().toISOString()};
           var hu=await db.from('case_home_visit_details').upsert(home,{onConflict:'record_id'});if(hu.error)throw hu.error;
         }
-        var satRows=[...document.querySelectorAll('[data-cc-sat]')].filter(function(x){return x.value;}).map(function(x){return {record_id:recordId,item_code:x.dataset.ccSat,rating_code:x.value,updated_at:new Date().toISOString()};});
+        var satRows=[...document.querySelectorAll('[data-cc-sat]')].filter(function(x){return x.value;}).map(function(x){
+          var note=document.querySelector('[data-cc-sat-note="'+x.dataset.ccSat+'"]')?.value.trim()||null;
+          return {record_id:recordId,item_code:x.dataset.ccSat,rating_code:x.value,note:note,updated_at:new Date().toISOString()};
+        });
         if(bundle){
           var satDel=await db.from('case_contact_satisfaction').delete().eq('record_id',recordId);if(satDel.error)throw satDel.error;
         }
@@ -499,10 +580,14 @@
     showLoading(true);
     try{
       var contacts=await ccLoadCaseContacts(c.id),bundle=recordId?await ccLoadBundle(recordId):null;
-      var date=bundle?.main.record_date||isoDate(),time=bundle?.main.record_time||'',reason=bundle?.main.reason_code||(type==='home_visit'?'routine':type==='formal_phone'?'routine':'admin_contact');
+      var date=bundle?.main.record_date||isoDate(),time=String(bundle?.main.record_time||'').slice(0,5),reason=bundle?.main.reason_code||(type==='home_visit'?'routine':type==='formal_phone'?'routine':'admin_contact');
       var staffLabel=type==='home_visit'?'家訪人員':type==='formal_phone'?'電訪人員':'聯繫人員';
-      var main='<div class="form-grid"><div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'日期 *</label><input id="ccRecordDate" type="date" value="'+escapeHTML(date)+'"></div><div class="field"><label>時間</label><input id="ccRecordTime" type="time" value="'+escapeHTML(time||'')+'"></div>'+
-        '<div class="field"><label>'+staffLabel+'</label><input value="'+escapeHTML(bundle?.main.performed_by_name_snapshot||state.profile.display_name||api.staffName(state.profile.id))+'" disabled></div><div class="field"><label>負責督導</label><input value="'+escapeHTML(bundle?.main.supervisor_name_snapshot||api.staffName(c.supervisor_id))+'" disabled></div>'+
+      var currentStaff=bundle?.main.performed_by_staff_id||state.profile.id;
+      var staffControl=type==='home_visit'
+        ?'<select id="ccPerformedBy">'+ccStaffOptions(currentStaff)+'</select>'
+        :'<input value="'+escapeHTML(bundle?.main.performed_by_name_snapshot||state.profile.display_name||api.staffName(currentStaff))+'" disabled>';
+      var main='<div class="form-grid"><div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'日期 *</label><input id="ccRecordDate" type="date" value="'+escapeHTML(date)+'"></div><div class="field"><label>時間（24小時制）</label><input id="ccRecordTime" class="cc-time-text" type="text" inputmode="numeric" maxlength="5" placeholder="例如 14:30" value="'+escapeHTML(time||'')+'"></div>'+
+        '<div class="field"><label>'+staffLabel+'</label>'+staffControl+'</div><div class="field"><label>負責督導</label><input value="'+escapeHTML(bundle?.main.supervisor_name_snapshot||api.staffName(c.supervisor_id))+'" disabled></div>'+
         '<div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'原因 *</label><select id="ccReason">'+ccReasonOptions(type,reason)+'</select></div><div class="field" id="ccReasonNoteWrap"><label>其他原因</label><input id="ccReasonNote" value="'+escapeHTML(bundle?.main.reason_note||'')+'"></div>'+
         '<div class="field full"><button type="button" id="ccToggleNotes" class="btn sm">＋ 補充備註</button><div id="ccNotesWrap" class="cc-notes-wrap '+(bundle?.main.notes?'show':'')+'"><textarea id="ccNotes" rows="3" placeholder="選填">'+escapeHTML(bundle?.main.notes||'')+'</textarea></div></div></div>';
       var people=type==='home_visit'?ccPeopleHomeHtml(c,contacts,bundle):ccPeoplePhoneHtml(c,contacts,bundle);
