@@ -232,6 +232,12 @@
     document.querySelectorAll('[data-cc-sat]').forEach(function(el){el.addEventListener('change',function(){ccToggleForm(type);});});
     $('ccNotAskedAll')?.addEventListener('click',function(){document.querySelectorAll('[data-cc-sat]').forEach(function(x){x.value='not_asked';});ccToggleForm(type);});
     $('ccAddFollowup')?.addEventListener('click',function(){ccAddFollowupRow();});
+    $('ccToggleNotes')?.addEventListener('click',function(){
+      var wrap=$('ccNotesWrap');if(!wrap)return;
+      wrap.classList.toggle('show');
+      $('ccToggleNotes').textContent=wrap.classList.contains('show')?'收合備註':'＋ 補充備註';
+    });
+    if($('ccNotesWrap')?.classList.contains('show')&&$('ccToggleNotes'))$('ccToggleNotes').textContent='收合備註';
     $('ccBuildSummary')?.addEventListener('click',function(){$('ccSummary').value=ccBuildSummary(type);});
     $('ccSaveDraft')?.addEventListener('click',function(){ccSaveFromForm(type,'draft');});
     ccToggleForm(type);
@@ -384,6 +390,7 @@
         performed_by_staff_id:state.profile.id,performed_by_name_snapshot:state.profile.display_name||api.staffName(state.profile.id),
         supervisor_staff_id:c.supervisor_id||null,supervisor_name_snapshot:api.staffName(c.supervisor_id),
         reason_code:$('ccReason').value,reason_note:$('ccReasonNote')?.value.trim()||null,
+        notes:$('ccNotes')?.value.trim()||null,
         summary:$('ccSummary')?.value.trim()||ccBuildSummary(type),status:status,counts_for_cycle:counts,
         draft_payload:status==='draft'?ccReadDraftPayload():{},
         updated_by_staff_id:state.profile.id,updated_at:new Date().toISOString()
@@ -483,8 +490,11 @@
     try{
       var contacts=await ccLoadCaseContacts(c.id),bundle=recordId?await ccLoadBundle(recordId):null;
       var date=bundle?.main.record_date||isoDate(),time=bundle?.main.record_time||'',reason=bundle?.main.reason_code||(type==='home_visit'?'routine':type==='formal_phone'?'routine':'admin_contact');
+      var staffLabel=type==='home_visit'?'家訪人員':type==='formal_phone'?'電訪人員':'聯繫人員';
       var main='<div class="form-grid"><div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'日期 *</label><input id="ccRecordDate" type="date" value="'+escapeHTML(date)+'"></div><div class="field"><label>時間</label><input id="ccRecordTime" type="time" value="'+escapeHTML(time||'')+'"></div>'+
-        '<div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'原因 *</label><select id="ccReason">'+ccReasonOptions(type,reason)+'</select></div><div class="field" id="ccReasonNoteWrap"><label>其他原因</label><input id="ccReasonNote" value="'+escapeHTML(bundle?.main.reason_note||'')+'"></div></div>';
+        '<div class="field"><label>'+staffLabel+'</label><input value="'+escapeHTML(bundle?.main.performed_by_name_snapshot||state.profile.display_name||api.staffName(state.profile.id))+'" disabled></div><div class="field"><label>負責督導</label><input value="'+escapeHTML(bundle?.main.supervisor_name_snapshot||api.staffName(c.supervisor_id))+'" disabled></div>'+
+        '<div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'原因 *</label><select id="ccReason">'+ccReasonOptions(type,reason)+'</select></div><div class="field" id="ccReasonNoteWrap"><label>其他原因</label><input id="ccReasonNote" value="'+escapeHTML(bundle?.main.reason_note||'')+'"></div>'+
+        '<div class="field full"><button type="button" id="ccToggleNotes" class="btn sm">＋ 補充備註</button><div id="ccNotesWrap" class="field-note '+(bundle?.main.notes?'show':'')+'"><textarea id="ccNotes" rows="3" placeholder="選填">'+escapeHTML(bundle?.main.notes||'')+'</textarea></div></div></div>';
       var people=type==='home_visit'?ccPeopleHomeHtml(c,contacts,bundle):ccPeoplePhoneHtml(c,contacts,bundle);
       var body=ccRecentContext(c)+main+people+(type==='home_visit'?ccHomeExtraHtml(bundle):ccPhoneExtraHtml(bundle,type));
       if(type!=='general_phone')body+='<div id="ccFormalBody">'+ccFormalHtml(c,bundle)+'</div>';
