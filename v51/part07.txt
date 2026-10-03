@@ -48,6 +48,19 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       }
       eval(assessmentModuleCode);
 
+      const caseContactFiles=[
+        'v52/case-contact-core.txt',
+        'v52/case-contact-forms.txt',
+        'v52/case-contact-detail.txt'
+      ];
+      let caseContactCode='';
+      for(const path of caseContactFiles){
+        const res=await fetch(`${path}?v=case-contact-v1-20261003`,{cache:'no-store'});
+        if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
+        caseContactCode+='\n'+await res.text();
+      }
+      eval(caseContactCode);
+
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
       eval(await scheduleRes.text());
