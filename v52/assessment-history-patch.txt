@@ -73,7 +73,7 @@
     adequate:'支持充足',partial:'部分不足',insufficient:'明顯不足',
     needs_attention:'部分不足／需追蹤',weak:'支持薄弱／需介入',
     stable:'整體狀況穩定',attention:'有需留意事項',intervention:'有明顯問題／需介入',
-    correct:'正確',wrong:'錯誤',
+    correct:'正確',wrong:'錯誤',unable_answer:'無法作答',
     completed:'已完成',unable:'無法評估',
     applicable:'適用',no_family_caregiver:'不適用：無主要家庭照顧者',
     paid_caregiver:'不適用：主要照顧者為聘僱看護／非家人',
@@ -179,10 +179,10 @@
       if(path==='total_score')return 'IADL 總分';
     }
     if(tool==='spmsq'){
-      let m=path.match(/^responses\.q(\d+)$/);
-      if(m)return `第 ${m[1]} 題－受訪者回答`;
-      m=path.match(/^judgments\.q(\d+)$/);
+      let m=path.match(/^judgments\.q(\d+)$/);
       if(m)return `第 ${m[1]} 題－判定`;
+      m=path.match(/^notes\.q(\d+)$/);
+      if(m)return `第 ${m[1]} 題－備註`;
       if(path==='error_count')return '錯誤題數';
       if(path==='is_unable')return '是否無法評估';
       if(path==='unable_reason')return '無法評估原因';
