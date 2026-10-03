@@ -471,6 +471,15 @@
       if(window.currentCaseDetailId===c.id&&typeof window.refreshCaseDetailPage==='function')await window.refreshCaseDetailPage(c.id,status==='draft'?'草稿已儲存':'紀錄已完成','success','visits');
       else{api.renderPage();toast(status==='draft'?'草稿已儲存':'紀錄已完成','success');}
       if(assessmentNow&&window.v52AssessmentApi?.openAssessmentEventModal){
+        window.__assessmentCreatedHook=async function(newEvent){
+          if(!newEvent||newEvent.case_id!==c.id)return;
+          var link=await db.from('case_record_links').insert({
+            case_id:c.id,from_type:type,from_id:recordId,relation_type:'followup',
+            to_type:'assessment_event',to_id:newEvent.id,created_by_staff_id:state.profile.id
+          });
+          if(link.error&&link.error.code!=='23505')throw link.error;
+          await api.loadData(true);
+        };
         window.v52AssessmentApi.openAssessmentEventModal();
         setTimeout(function(){
           if($('assessmentCase'))$('assessmentCase').value=c.id;
