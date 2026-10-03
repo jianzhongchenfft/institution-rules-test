@@ -197,7 +197,7 @@
         '<article class="stat-card"><div class="stat-head"><span>逾期項目</span><span class="stat-icon">⚠️</span></div><div class="stat-value">'+overdue+'</div><div class="stat-foot">家訪、正式電訪、評估或追蹤逾期</div></article>'+
         '<article class="stat-card"><div class="stat-head"><span>即將到期</span><span class="stat-icon">📅</span></div><div class="stat-value">'+due+'</div><div class="stat-foot">家訪／評估14天、電訪7天內</div></article>'+
         '<article class="stat-card"><div class="stat-head"><span>正式電訪待辦</span><span class="stat-icon">☎️</span></div><div class="stat-value">'+phoneDue+'</div><div class="stat-foot">每1個月一次</div></article>'+
-        '<article class="stat-card"><div class="stat-head"><span>待追蹤事項</span><span class="stat-icon">🔎</span></div><div class="stat-value">'+follow+'</div><div class="stat-foot">跨家訪／電訪持續追蹤</div></article>'+
+        '<article class="stat-card"><div class="stat-head"><span>待追蹤事項</span><span class="stat-icon">🔎</span></div><div class="stat-value">'+follow+'</div><div class="stat-foot">跨家訪與電訪持續追蹤</div></article>'+
       '</section>'+
       '<div class="case-toolbar">'+
         '<span class="case-filter-label">督導</span><select id="caseSupervisorFilter">'+
