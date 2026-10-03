@@ -275,9 +275,9 @@
     const r=local.records.spmsq;
     if(!r)return sectionMissing(form.form_name);
     if(r.is_unable)return toolPage(commonMeta(form.form_name,form)+`<div class="exception"><strong>本次無法評估</strong><br>原因：${html(r.unable_reason)}</div>`);
-    const resp=safe(r.responses),judge=safe(r.judgments);
-    const rows=SPMSQ_ITEMS.map(([key,q],i)=>`<tr><td>${i+1}. ${html(q)}</td><td>${html(resp[key])}</td><td>${html(judge[key]==='correct'?'正確':judge[key]==='wrong'?'錯誤':'—')}</td></tr>`);
-    return toolPage(commonMeta(form.form_name,form)+rowTable(rows,['題目','受訪者回答','判定'])+`<div class="result-box"><strong>錯誤題數：${html(r.error_count)} 題</strong></div>`);
+    const judge=safe(r.judgments),notes=safe(r.notes);
+    const rows=SPMSQ_ITEMS.map(([key,q],i)=>`<tr><td>${i+1}. ${html(q)}</td><td>${html(judge[key]==='correct'?'正確':judge[key]==='wrong'?'錯誤':judge[key]==='unable_answer'?'無法作答':'—')}</td><td>${html(notes[key])}</td></tr>`);
+    return toolPage(commonMeta(form.form_name,form)+rowTable(rows,['題目','判定','備註'])+`<div class="result-box"><strong>錯誤題數：${html(r.error_count)} 題</strong>　｜　錯誤題數包含「無法作答」項目</div>`);
   }
 
   function renderGds(form){
