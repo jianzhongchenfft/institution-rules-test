@@ -59,10 +59,11 @@
       db.from('case_phone_details').select('*').eq('record_id',recordId).maybeSingle(),
       db.from('case_contact_satisfaction').select('*').eq('record_id',recordId),
       db.from('case_record_links').select('*').eq('from_id',recordId),
-      db.from('case_followup_items').select('*').eq('source_id',recordId).order('created_at')
+      db.from('case_followup_items').select('*').eq('source_id',recordId).order('created_at'),
+      db.from('case_followup_updates').select('*').eq('source_id',recordId).order('created_at')
     ]);
     var bad=results.find(function(x){return x.error;});if(bad&&bad.error)throw bad.error;
-    return {main:main.data,people:results[0].data||[],formal:results[1].data||null,home:results[2].data||null,phone:results[3].data||null,satisfaction:results[4].data||[],links:results[5].data||[],createdFollowups:results[6].data||[]};
+    return {main:main.data,people:results[0].data||[],formal:results[1].data||null,home:results[2].data||null,phone:results[3].data||null,satisfaction:results[4].data||[],links:results[5].data||[],createdFollowups:results[6].data||[],processedFollowups:results[7].data||[]};
   }
 
   function ccRecentContext(c){
