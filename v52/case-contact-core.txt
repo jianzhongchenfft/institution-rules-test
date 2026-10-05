@@ -272,7 +272,10 @@
     caseTypeLabel:function(t){return ccTypeLabel(t==='home'?'home_visit':t==='phone'?'formal_phone':t);},
     caseStaffName:ccStaffName,
     isFollowUpResolved:function(){return false;},
-    openVisitModal:function(c,type){if(window.caseContactApi&&window.caseContactApi.openRecordForm)window.caseContactApi.openRecordForm(c,type||'home_visit');},
+    openVisitModal:function(c,type){
+      var mapped=type==='home'?'home_visit':type==='phone'?'formal_phone':type||'home_visit';
+      if(window.caseContactApi&&window.caseContactApi.openRecordForm)window.caseContactApi.openRecordForm(c,mapped);
+    },
     renderCaseVisitsPage:ccRenderPage
   };
 })();
