@@ -89,12 +89,7 @@
   const formById=id=>(state.assessmentEventForms||[]).find(x=>x.assessment_event_id===id&&x.form_code==='gds15')||null;
   const safe=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
 
-  const canEdit=row=>{
-    const c=row?caseById(row.case_id):null;
-    if(!c||!state.profile)return false;
-    return ['business_manager','organization_manager','admin'].includes(state.profile.role)
-      ||(state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id);
-  };
+  const canEdit=row=>!!row&&!!window.v52AssessmentApi?.canEditCase?.(row.case_id);
 
   const optionLabel=value=>value==='yes'?'是':value==='no'?'否':'—';
   const answerCount=()=>ITEMS.filter(x=>['yes','no'].includes(local.answers[x.key])).length;
