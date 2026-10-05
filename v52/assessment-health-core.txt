@@ -126,12 +126,7 @@
   const safe=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   const safeArray=v=>Array.isArray(v)?v:[];
 
-  const canEdit=row=>{
-    const c=row?caseById(row.case_id):null;
-    if(!c||!state.profile)return false;
-    return ['business_manager','organization_manager','admin'].includes(state.profile.role)
-      ||(state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id);
-  };
+  const canEdit=row=>!!row&&!!window.v52AssessmentApi?.canEditCase?.(row.case_id);
 
   const healthStatusLabel=v=>HEALTH_OPTIONS.find(x=>x[0]===v)?.[1]||'—';
   const medStatusLabel=v=>v==='good'?'狀況良好':v==='improve'?'需改善':v==='not_applicable'?'不適用':'—';
