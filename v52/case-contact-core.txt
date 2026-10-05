@@ -32,8 +32,7 @@
   }
   function ccCanEditCase(c){
     if(!state.profile||!c)return false;
-    if(['business_manager','organization_manager','admin'].includes(state.profile.role))return true;
-    return state.profile.role==='supervisor' && state.profile.id===c.supervisor_id;
+    return ['supervisor','business_manager','organization_manager','admin'].includes(state.profile.role);
   }
   function ccStaffName(id){
     return (state.caseStaff||[]).find(function(s){return s.id===id;})?.display_name||'尚未指派';
