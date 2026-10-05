@@ -177,18 +177,57 @@
     }).join('')+'</div></div>';
   }
 
-  function ccGeneralPhonePrint(data){
-    var c=data.c,rows=(data.contactRecords||[]).filter(function(r){return r.record_type==='general_phone'&&r.status==='completed';});
-    if(!rows.length)return toast('此個案目前沒有可列印的一般電話聯繫紀錄。','warn');
-    var w=window.open('','_blank');if(!w)return toast('瀏覽器阻擋列印視窗，請允許彈出式視窗。','warn');
+  function ccCurrentMonthRange(){
+    var now=new Date(),y=now.getFullYear(),m=now.getMonth();
+    function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+    return {start:iso(new Date(y,m,1)),end:iso(new Date(y,m+1,0))};
+  }
+
+  function ccGeneralPhonePrint(data,startDate,endDate){
+    var c=data.c,rows=(data.contactRecords||[]).filter(function(r){
+      return r.record_type==='general_phone'&&r.status==='completed'
+        &&(!startDate||r.record_date>=startDate)
+        &&(!endDate||r.record_date<=endDate);
+    });
+    if(!rows.length){toast('此期間沒有可列印的一般電話聯繫紀錄。','warn');return false;}
+    rows.sort(function(a,b){return String(a.record_date).localeCompare(String(b.record_date))||new Date(a.created_at)-new Date(b.created_at);});
+    var w=window.open('','_blank');if(!w){toast('瀏覽器阻擋列印視窗，請允許彈出式視窗。','warn');return false;}
     var trs=rows.map(function(r){
       var people=(data.ccPeople||[]).filter(function(x){return x.record_id===r.id;}).map(function(x){return x.name_snapshot+(x.relationship_snapshot?'（'+x.relationship_snapshot+'）':'');}).join('、');
       var phone=(data.ccPhone||[]).find(function(x){return x.record_id===r.id;});
       var content=phone?.contact_content||r.summary||'—';
       return '<tr><td>'+rocDate(r.record_date+'T00:00:00')+'</td><td>'+escapeHTML(people||'—')+'</td><td>'+escapeHTML(api.reasonLabel(r.record_type,r.reason_code))+'</td><td>'+escapeHTML(content)+'</td><td>'+escapeHTML(r.performed_by_name_snapshot||api.staffName(r.performed_by_staff_id))+'</td></tr>';
     }).join('');
-    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>個案聯繫紀錄明細</title><style>@page{size:A4 portrait;margin:12mm 14mm}body{font-family:"BiauKai","DFKai-SB",serif;font-size:12px;line-height:1.45;color:#222}h1{text-align:center;font-size:19px;margin:0 0 6px}.sub{text-align:center;margin-bottom:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #555;padding:5px 6px;vertical-align:top}th{background:#f5f5f5}</style></head><body><h1>桃園市私立劉信子居家長照機構<br>個案聯繫紀錄明細</h1><div class="sub">個案：'+escapeHTML(c.case_name)+'</div><table><thead><tr><th>日期</th><th>聯絡對象</th><th>聯繫原因</th><th>聯繫內容／結果</th><th>聯繫人員</th></tr></thead><tbody>'+trs+'</tbody></table></body></html>');
+    var period=(startDate&&endDate)?rocDate(startDate+'T00:00:00')+' ～ '+rocDate(endDate+'T00:00:00'):'全部期間';
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>個案聯繫紀錄明細</title><style>@page{size:A4 portrait;margin:12mm 14mm}body{font-family:"BiauKai","DFKai-SB",serif;font-size:12px;line-height:1.45;color:#222}h1{text-align:center;font-size:19px;margin:0 0 6px}.sub{text-align:center;margin-bottom:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #555;padding:5px 6px;vertical-align:top}th{background:#f5f5f5}</style></head><body><h1>桃園市私立劉信子居家長照機構<br>個案聯繫紀錄明細</h1><div class="sub">個案：'+escapeHTML(c.case_name)+'　期間：'+escapeHTML(period)+'</div><table><thead><tr><th>日期</th><th>聯絡對象</th><th>聯繫原因</th><th>聯繫內容／結果</th><th>聯繫人員</th></tr></thead><tbody>'+trs+'</tbody></table></body></html>');
     w.document.close();setTimeout(function(){w.focus();w.print();},250);
+    return true;
+  }
+
+  function ccOpenGeneralPhonePrintModal(data){
+    var range=ccCurrentMonthRange();
+    openModal({
+      title:'列印一般電話聯繫明細',
+      confirmText:'開啟列印',
+      html:'<div class="form-grid">'+
+        '<div class="field"><label>列印期間 *</label><select id="ccGeneralPrintMode"><option value="month">本月</option><option value="custom">自訂期間</option></select></div>'+
+        '<div class="field full" id="ccGeneralPrintCustom" style="display:none"><div class="form-grid"><div class="field"><label>開始日期 *</label><input id="ccGeneralPrintStart" type="date" value="'+range.start+'"></div><div class="field"><label>結束日期 *</label><input id="ccGeneralPrintEnd" type="date" value="'+range.end+'"></div></div></div>'+
+        '<div class="field full"><div class="case-panel-note">「本月」會列印本月1日至月底的一般電話聯繫；正式電訪不會列入此明細。</div></div>'+
+      '</div>',
+      onConfirm:function(){
+        var mode=$('ccGeneralPrintMode')?.value||'month',start=range.start,end=range.end;
+        if(mode==='custom'){
+          start=$('ccGeneralPrintStart')?.value||'';
+          end=$('ccGeneralPrintEnd')?.value||'';
+          if(!start||!end){toast('請選擇開始與結束日期','warn');return false;}
+          if(start>end){toast('開始日期不可晚於結束日期','warn');return false;}
+        }
+        return ccGeneralPhonePrint(data,start,end);
+      }
+    });
+    $('ccGeneralPrintMode')?.addEventListener('change',function(e){
+      var box=$('ccGeneralPrintCustom');if(box)box.style.display=e.target.value==='custom'?'':'none';
+    });
   }
 
   function ccPrintRecord(c,bundle){
@@ -241,7 +280,7 @@
     document.querySelectorAll('[data-cc-record]').forEach(function(btn){btn.addEventListener('click',function(){ccOpenRecordDetail(data.c,btn.dataset.ccRecord);});});
     document.querySelectorAll('[data-cc-plan]').forEach(function(btn){btn.addEventListener('click',function(){api.setRoutinePlan(data.c,btn.dataset.ccPlan);});});
     document.querySelectorAll('[data-cc-add-general]').forEach(function(btn){btn.addEventListener('click',function(){api.openRecordForm(data.c,'general_phone');});});
-    document.querySelectorAll('[data-cc-print-general]').forEach(function(btn){btn.addEventListener('click',function(){ccGeneralPhonePrint(data);});});
+    document.querySelectorAll('[data-cc-print-general]').forEach(function(btn){btn.addEventListener('click',function(){ccOpenGeneralPhonePrintModal(data);});});
   }
 
   Object.assign(api,{
@@ -252,6 +291,7 @@
     bindCaseDetailPanel:ccBindCaseDetailPanel,
     openRecordDetail:ccOpenRecordDetail,
     printRecord:ccPrintRecord,
-    printGeneralPhoneSummary:ccGeneralPhonePrint
+    printGeneralPhoneSummary:ccGeneralPhonePrint,
+    openGeneralPhonePrintModal:ccOpenGeneralPhonePrintModal
   });
 })();
