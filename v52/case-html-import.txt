@@ -1140,17 +1140,15 @@ async function htmlViewOriginal(path,fileName){
       db.from('case_approved_services').select('*').eq('case_id',caseId).order('is_current',{ascending:false}).order('service_group').order('service_code'),
       db.from('care_plans').select('*').eq('case_id',caseId).order('plan_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}),
       db.from('service_budgets').select('*').eq('case_id',caseId).order('is_current',{ascending:false}).order('category'),
-      db.from('case_imports').select('*').eq('case_id',caseId).order('imported_at',{ascending:false}),
-      db.from('case_visits').select('*').eq('case_id',caseId).order('visit_date',{ascending:false}).order('created_at',{ascending:false})
+      db.from('case_imports').select('*').eq('case_id',caseId).order('imported_at',{ascending:false})
     ]);
     var err=results.find(function(x){return x.error;});
     if(err&&err.error)throw err.error;
     var data={
       c:results[0].data,contacts:results[1].data||[],services:results[2].data||[],plans:results[3].data||[],
-      budgets:results[4].data||[],imports:results[5].data||[],visits:results[6].data||[]
+      budgets:results[4].data||[],imports:results[5].data||[],visits:[]
     };
     if(!data.c)throw new Error('找不到個案資料');
-    state.caseVisits=(state.caseVisits||[]).filter(function(v){return v.case_id!==caseId;}).concat(data.visits);
     if(window.caseContactApi&&typeof window.caseContactApi.enrichCaseDetailData==='function'){
       data=await window.caseContactApi.enrichCaseDetailData(data);
     }
@@ -1168,10 +1166,6 @@ async function htmlViewOriginal(path,fileName){
       var d=p.plan_date?p.plan_date+'T12:00:00':p.created_at;
       items.push({date:d,title:'照管平台照顧計畫'+(p.is_current?'（目前使用）':p.is_voided?'（已作廢）':''),text:(p.plan_date?'計畫日期 '+htmlFormatPlanDate(p.plan_date):'未辨識計畫日期')+(p.is_voided&&p.void_reason?'｜作廢原因：'+p.void_reason:''),sort:new Date(d||0).getTime()});
       if(p.is_voided&&p.voided_at)items.push({date:p.voided_at,title:'作廢照管平台照顧計畫',text:'版本 '+htmlFormatPlanDate(p.plan_date)+'｜原因：'+(p.void_reason||'未填寫')+(p.voided_by_staff_id?'｜作廢者：'+htmlGetCaseVisitsApi().caseStaffName(p.voided_by_staff_id):''),sort:new Date(p.voided_at).getTime()});
-    });
-    (data.visits||[]).forEach(function(v){
-      var d=(v.visit_date||'1970-01-01')+'T12:00:00';
-      items.push({date:d,title:htmlGetCaseVisitsApi().caseTypeLabel(v.visit_type),text:v.summary||v.follow_up_item||'訪視紀錄',sort:new Date(d).getTime()});
     });
     if(window.caseContactApi&&typeof window.caseContactApi.extendCaseTimeline==='function'){
       items=window.caseContactApi.extendCaseTimeline(items,data)||items;
