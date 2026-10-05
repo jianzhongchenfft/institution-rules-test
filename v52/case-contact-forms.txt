@@ -296,7 +296,7 @@
   }
 
   function ccBindForm(type){
-    ['ccReason','ccServiceUsage','ccServiceFit','ccMajorEvent','ccConcern','ccAssessmentAction','ccRequiresAction','ccVisitLocation','ccExecDifficulty','ccContactSuccess','ccNeedsRecontact','ccPhonePerson'].forEach(function(id){$(id)?.addEventListener('change',function(){ccToggleForm(type);});});
+    ['ccReason','ccServiceUsage','ccServiceFit','ccMajorEvent','ccConcern','ccAssessmentAction','ccRequiresAction','ccVisitLocation','ccExecDifficulty','ccContactSuccess','ccFailureReason','ccNeedsRecontact','ccPhonePerson'].forEach(function(id){$(id)?.addEventListener('change',function(){ccToggleForm(type);});});
     document.querySelectorAll('[data-cc-sat-choice]').forEach(function(el){
       el.addEventListener('change',function(){
         var code=el.dataset.ccSatChoice,hidden=document.querySelector('[data-cc-sat="'+code+'"]');
