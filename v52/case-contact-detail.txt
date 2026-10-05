@@ -146,7 +146,7 @@
       ccField('本次處理／建議',d.action_note||'—',true)+
       '</div>'+
       (services.length?'<div style="margin-top:10px"><div class="case-panel-note">當次服務快照</div><div class="approved-chip-wrap" style="margin-top:5px">'+services.map(function(x){return '<span class="approved-chip">'+escapeHTML(x.service_code||'')+(x.service_name?' '+escapeHTML(x.service_name):'')+(x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):'')+'</span>';}).join('')+'</div></div>':'')+
-      (satHtml?'<div style="margin-top:10px"><div class="case-panel-note">服務滿意度</div>'+satHtml+(d.satisfaction_note?'<div class="visit-summary">'+escapeHTML(d.satisfaction_note)+'</div>':'')+'</div>':'')+
+      (satHtml?'<div style="margin-top:10px"><div class="case-panel-note">服務滿意度</div>'+satHtml+'</div>':'')+
       '</div>';
   }
 
@@ -158,7 +158,7 @@
       :(d.contact_success?'本次通話內容／重點':'未成功聯繫補充說明');
     return '<div class="import-detail-block"><strong>聯繫結果</strong><div class="case-data-grid" style="margin-top:8px">'+
       ccField('是否成功聯繫',d.contact_success?'成功':'未成功')+
-      (d.contact_success?'':ccField('未成功原因',({no_answer:'未接聽',off:'關機',busy:'忙線',invalid:'電話錯誤／無效',other:'其他'})[d.failure_reason]||'—'))+
+      (d.contact_success?'':ccField('未成功原因',(({no_answer:'未接聽',off:'關機',busy:'忙線',invalid:'電話錯誤／無效',other:'其他'})[d.failure_reason]||'—')+(d.failure_reason==='other'&&d.failure_note?'：'+d.failure_note:'')))+
       (!d.contact_success?ccField('再次聯繫',d.needs_recontact?(d.recontact_date?rocDate(d.recontact_date+'T00:00:00'):'是'):'否'):'')+
       ccField(contentLabel,d.contact_content||'—',true)+'</div></div>';
   }
@@ -245,10 +245,12 @@
     w.document.write('<table><tr><th>個案姓名</th><td>'+escapeHTML(c.case_name)+'</td><th>日期</th><td>'+rocDate(m.record_date+'T00:00:00')+'</td></tr><tr><th>'+(m.record_type==='home_visit'?'家訪人員':'電訪人員')+'</th><td>'+escapeHTML(m.performed_by_name_snapshot||api.staffName(m.performed_by_staff_id))+'</td><th>原因</th><td>'+escapeHTML(api.reasonLabel(m.record_type,m.reason_code))+'</td></tr><tr><th>'+(m.record_type==='home_visit'?'在場／受訪對象':'聯絡對象')+'</th><td colspan="3">'+escapeHTML(people||'—')+'</td></tr></table>');
     if(bundle.phone){
       var phoneLabel=bundle.phone.contact_success?'本次通話內容／重點':'未成功聯繫補充說明';
-      w.document.write('<div class="sec">聯繫結果</div><table><tr><th>聯繫結果</th><td>'+(bundle.phone.contact_success?'成功聯繫':'未成功聯繫')+'</td><th>再次聯繫</th><td>'+(bundle.phone.needs_recontact?(bundle.phone.recontact_date?rocDate(bundle.phone.recontact_date+'T00:00:00'):'是'):'否')+'</td></tr>'+(bundle.phone.contact_content?'<tr><th>'+phoneLabel+'</th><td colspan="3">'+escapeHTML(bundle.phone.contact_content)+'</td></tr>':'')+'</table>');
+      var failureText=({no_answer:'未接聽',off:'關機',busy:'忙線',invalid:'電話錯誤／無效',other:'其他'})[bundle.phone.failure_reason]||'—';
+      if(bundle.phone.failure_reason==='other'&&bundle.phone.failure_note)failureText+='：'+bundle.phone.failure_note;
+      w.document.write('<div class="sec">聯繫結果</div><table><tr><th>聯繫結果</th><td>'+(bundle.phone.contact_success?'成功聯繫':'未成功聯繫')+'</td><th>再次聯繫</th><td>'+(bundle.phone.needs_recontact?(bundle.phone.recontact_date?rocDate(bundle.phone.recontact_date+'T00:00:00'):'是'):'否')+'</td></tr>'+(!bundle.phone.contact_success?'<tr><th>未成功原因</th><td colspan="3">'+escapeHTML(failureText)+'</td></tr>':'')+(bundle.phone.contact_content?'<tr><th>'+phoneLabel+'</th><td colspan="3">'+escapeHTML(bundle.phone.contact_content)+'</td></tr>':'')+'</table>');
     }
     if(d)w.document.write('<div class="sec">服務使用與追蹤</div><table><tr><th>服務使用情形</th><td>'+escapeHTML(({normal:'正常使用',partial:'部分未使用',changed:'已有變化',suspended:'全面暫停',other:'其他'})[d.service_usage_status]||'—')+'</td><th>服務符合需求</th><td>'+escapeHTML(({fit:'符合',mostly_fit:'大致符合需留意',adjust:'建議調整'})[d.service_fit_status]||'—')+'</td></tr><tr><th>近期重大事件</th><td colspan="3">'+escapeHTML(d.has_major_event?(d.major_event_note||'有'):'無')+'</td></tr><tr><th>主要關切事項</th><td colspan="3">'+escapeHTML(d.has_primary_concern?(d.primary_concern_note||'有'):'無')+'</td></tr><tr><th>本次處理／建議</th><td colspan="3">'+escapeHTML(d.action_note||'—')+'</td></tr></table>');
-    if(satRows)w.document.write('<div class="sec">服務滿意度</div><table><thead><tr><th>項目</th><th>結果</th><th>補充／原因</th></tr></thead><tbody>'+satRows+'</tbody></table>'+(d.satisfaction_note?'<div>'+escapeHTML(d.satisfaction_note)+'</div>':''));
+    if(satRows)w.document.write('<div class="sec">服務滿意度</div><table><thead><tr><th>項目</th><th>結果</th><th>補充／原因</th></tr></thead><tbody>'+satRows+'</tbody></table>');
     var processed=bundle.processedFollowups||[];
     if(processed.length)w.document.write('<div class="sec">前次追蹤事項</div><table><thead><tr><th>事項</th><th>本次結果</th><th>本次追蹤狀況</th></tr></thead><tbody>'+processed.map(function(x){var item=(state.caseFollowupItems||[]).find(function(i){return i.id===x.followup_item_id;});return '<tr><td>'+escapeHTML(item?.content||'追蹤事項')+'</td><td>'+escapeHTML(api.followResultLabel(x.result_code))+'</td><td>'+escapeHTML(x.note||'—')+(x.next_due_date?'<br>下次：'+rocDate(x.next_due_date+'T00:00:00'):'')+'</td></tr>';}).join('')+'</tbody></table>');
     if((bundle.createdFollowups||[]).length)w.document.write('<div class="sec">新增後續追蹤事項</div><table><thead><tr><th>事項</th><th>預計追蹤日</th><th>負責人</th></tr></thead><tbody>'+(bundle.createdFollowups||[]).map(function(x){return '<tr><td>'+escapeHTML(x.content)+'</td><td>'+(x.due_date?rocDate(x.due_date+'T00:00:00'):'未設定')+'</td><td>'+escapeHTML(api.staffName(x.responsible_staff_id))+'</td></tr>';}).join('')+'</tbody></table>');
