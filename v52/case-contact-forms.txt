@@ -61,7 +61,7 @@
       '<select id="ccRecordHour">'+hours.map(function(x){return ccOpt(x,x,h);}).join('')+'</select>'+
       '<span class="cc-time-sep">時</span>'+
       '<select id="ccRecordMinute">'+mins.map(function(x){return ccOpt(x,x,m);}).join('')+'</select>'+
-      '<span class="cc-time-sep" style="grid-column:3;justify-self:end;margin-top:-34px;pointer-events:none">分</span>'+
+      '<span class="cc-time-sep">分</span>'+
     '</div>';
   }
   function ccReadTime(){
