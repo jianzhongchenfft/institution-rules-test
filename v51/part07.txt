@@ -129,6 +129,19 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimeWithdrawRes.ok) throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${overtimeWithdrawRes.status}）`);
       eval(await overtimeWithdrawRes.text());
 
+      const attendanceModuleFiles=[
+        'v52/annual-leave-patch.txt',
+        'v52/annual-leave-summary-cards-patch.txt',
+        'v52/annual-leave-auto-patch.txt',
+        'v52/annual-leave-business-manager-access-patch.txt',
+        'v52/annual-leave-expiry-patch.txt'
+      ];
+      for(const path of attendanceModuleFiles){
+        const attendanceRes=await fetch(`${path}?v=attendance-loader-stable-20261005`,{cache:'no-store'});
+        if(!attendanceRes.ok) throw new Error(`${path} 載入失敗（${attendanceRes.status}）`);
+        eval(await attendanceRes.text());
+      }
+
       const eventTrackingFiles=[
         'v52/event-core.txt',
         'v52/event-detail.txt',
