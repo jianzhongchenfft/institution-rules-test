@@ -166,13 +166,7 @@
     const forms=formsByEvent(id);
     return !!forms.length&&forms.every(x=>['completed','unable','not_applicable'].includes(x.status));
   };
-  const canEdit=row=>{
-    if(!row||!state.profile)return false;
-    const c=caseById(row.case_id);
-    if(!c)return false;
-    return ['business_manager','organization_manager','admin'].includes(state.profile.role)
-      ||(state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id);
-  };
+  const canEdit=row=>!!row&&!!window.v52AssessmentApi?.canEditCase?.(row.case_id);
   const boolText=v=>v===true?'是':v===false?'否':'—';
   const text=v=>v===null||v===undefined||v===''?'—':String(v);
   const joinList=(arr,empty='無')=>arr.length?arr.join('、'):empty;
