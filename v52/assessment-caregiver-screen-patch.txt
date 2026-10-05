@@ -85,12 +85,7 @@
   const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
   const eventForms=id=>(state.assessmentEventForms||[]).filter(x=>x.assessment_event_id===id);
   const formById=id=>eventForms(id).find(x=>x.form_code==='caregiver_burden')||null;
-  const canEdit=row=>{
-    if(!row||!state.profile)return false;
-    const c=caseById(row.case_id);if(!c)return false;
-    return ['business_manager','organization_manager','admin'].includes(state.profile.role)
-      ||(state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id);
-  };
+  const canEdit=row=>!!row&&!!window.v52AssessmentApi?.canEditCase?.(row.case_id);
   const answer=key=>local.answers?.[key]||null;
   const previousAnswer=key=>local.previous?.answers?.[key]||null;
   const positiveCount=()=>INDICATORS.filter(([key])=>answer(key)==='yes').length;
