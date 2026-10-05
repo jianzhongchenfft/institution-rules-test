@@ -41,11 +41,7 @@
   const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
   const formById=id=>(state.assessmentEventForms||[]).find(x=>x.assessment_event_id===id&&x.form_code==='spmsq')||null;
   const safe=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
-  const canEdit=row=>{
-    const c=row?caseById(row.case_id):null;
-    if(!c||!state.profile)return false;
-    return ['business_manager','organization_manager','admin'].includes(state.profile.role)||(state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id);
-  };
+  const canEdit=row=>!!row&&!!window.v52AssessmentApi?.canEditCase?.(row.case_id);
   const errorCount=()=>ITEMS.filter(([k])=>['wrong','unable_answer'].includes(local.judgments[k])).length;
   const completedCount=()=>ITEMS.filter(([k])=>['correct','wrong','unable_answer'].includes(local.judgments[k])).length;
   const judgmentLabel=v=>v==='correct'?'正確':v==='wrong'?'錯誤':v==='unable_answer'?'無法作答':'—';
