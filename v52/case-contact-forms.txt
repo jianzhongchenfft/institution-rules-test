@@ -25,6 +25,133 @@
     ['suspend_service','需暫停服務'],['close_report','需結報'],['revise_care_plan','需修正照顧計畫']
   ];
 
+  if(!document.getElementById('v52-case-contact-page-form-style')){
+    var ccPageStyle=document.createElement('style');
+    ccPageStyle.id='v52-case-contact-page-form-style';
+    ccPageStyle.textContent=
+      '.cc-page-form{max-width:1180px;margin:0 auto;padding-bottom:96px}'+
+      '.cc-page-form-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}'+
+      '.cc-page-form-title-wrap{display:flex;align-items:flex-start;gap:12px}.cc-page-form-title{font-size:21px;font-weight:900;color:#344054;line-height:1.25}.cc-page-form-sub{margin-top:5px;color:#667085;font-size:11.5px;line-height:1.55}'+
+      '.cc-page-form-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 1px 2px rgba(16,24,40,.03)}'+
+      '.cc-page-form-status{display:inline-flex;align-items:center;gap:5px;margin-top:7px;border-radius:999px;padding:4px 8px;background:#f2f4f7;color:#667085;font-size:10px;font-weight:900}.cc-page-form-status.dirty{background:#fffaeb;color:#b54708}.cc-page-form-status.restored{background:#eff8ff;color:#175cd3}'+
+      '.cc-page-form-footer{position:sticky;bottom:10px;z-index:20;display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.96);box-shadow:0 8px 24px rgba(16,24,40,.10);backdrop-filter:blur(8px)}'+
+      '.cc-page-form-footer .spacer{flex:1}.cc-page-form-back{white-space:nowrap}'+
+      '@media(max-width:760px){.cc-page-form-head{display:block}.cc-page-form-title-wrap{display:block}.cc-page-form-back{margin-bottom:10px}.cc-page-form-card{padding:12px}.cc-page-form-footer{bottom:6px;flex-wrap:wrap}.cc-page-form-footer .spacer{display:none}}';
+    document.head.appendChild(ccPageStyle);
+  }
+
+  window.__ccPageDraftStore=window.__ccPageDraftStore||{};
+  window.__ccPageFormState=window.__ccPageFormState||null;
+
+  function ccPageDraftKey(c,type,recordId){
+    return String(c.id)+'|'+String(type)+'|'+String(recordId||'new');
+  }
+
+  function ccPageControlsSnapshot(){
+    var root=$('ccPageFormBody');
+    if(!root)return [];
+    return [...root.querySelectorAll('input,select,textarea')].map(function(el){
+      return {value:el.value,checked:!!el.checked};
+    });
+  }
+
+  function ccPageCaptureDraft(){
+    var s=window.__ccPageFormState,root=$('ccPageFormBody');
+    if(!s||!s.active||!root)return;
+    var otherPeople=[...root.querySelectorAll('[data-cc-other-row]')].map(function(row){
+      return {name:row.querySelector('[data-cc-other-name]')?.value||'',relation:row.querySelector('[data-cc-other-relation]')?.value||''};
+    });
+    var payload=ccReadDraftPayload();
+    window.__ccPageDraftStore[s.key]={
+      controls:ccPageControlsSnapshot(),
+      other_people:otherPeople,
+      new_followups:payload.new_followups||[],
+      prior_followups:payload.prior_followups||[]
+    };
+  }
+
+  function ccPageRestoreDraft(draft){
+    if(!draft)return false;
+    var other=$('ccOtherPeople');
+    if(other&&Array.isArray(draft.other_people)){
+      other.innerHTML='';
+      draft.other_people.forEach(function(x){ccAddOtherPersonRow({name_snapshot:x.name||'',relationship_snapshot:x.relation||''});});
+    }
+    var newFollow=$('ccNewFollowups');
+    if(newFollow&&Array.isArray(draft.new_followups)){
+      newFollow.innerHTML='';
+      draft.new_followups.forEach(function(x){ccAddFollowupRow(x);});
+    }
+    var controls=[...($('ccPageFormBody')?.querySelectorAll('input,select,textarea')||[])];
+    (draft.controls||[]).forEach(function(x,i){
+      var el=controls[i];if(!el)return;
+      if(['checkbox','radio'].includes(el.type))el.checked=!!x.checked;
+      else el.value=x.value??'';
+    });
+    (draft.prior_followups||[]).forEach(function(x){
+      var row=document.querySelector('[data-cc-prior-follow="'+x.id+'"]');if(!row)return;
+      var result=row.querySelector('[data-cc-follow-result]');if(result)result.value=x.result||'not_followed';
+      var note=row.querySelector('[data-cc-follow-note]');if(note)note.value=x.note||'';
+      var next=row.querySelector('[data-cc-follow-next]');if(next)next.value=x.next_due_date||'';
+    });
+    return true;
+  }
+
+  function ccPageSetDirty(dirty,restored){
+    var s=window.__ccPageFormState;if(!s)return;
+    s.dirty=!!dirty;
+    var el=$('ccPageSaveState');if(!el)return;
+    el.className='cc-page-form-status'+(restored?' restored':dirty?' dirty':'');
+    el.textContent=restored?'已恢復未送出內容':dirty?'尚有未儲存變更':'目前內容尚未變更';
+  }
+
+  function ccPageMarkDirty(){
+    var s=window.__ccPageFormState;if(!s||!s.active)return;
+    ccPageSetDirty(true,false);
+    ccPageCaptureDraft();
+  }
+
+  function ccPageClearDraft(){
+    var s=window.__ccPageFormState;if(!s)return;
+    delete window.__ccPageDraftStore[s.key];
+    s.dirty=false;s.active=false;
+  }
+
+  function ccPageConfirmLeave(){
+    var s=window.__ccPageFormState;
+    if(!s||!s.active||!s.dirty)return true;
+    ccPageCaptureDraft();
+    return window.confirm('目前有尚未儲存的內容。\n\n離開後內容會暫存在目前瀏覽工作階段，重新整理網頁後暫存會清除。確定離開嗎？');
+  }
+
+  function ccPageLeaveToCase(c){
+    if(!ccPageConfirmLeave())return;
+    if(window.__ccPageFormState)window.__ccPageFormState.active=false;
+    if(typeof window.openCaseDetailPage==='function')window.openCaseDetailPage(c.id,'visits',true);
+    else navigate('cases');
+  }
+
+  function ccBindPageDraft(c,type,recordId){
+    var key=ccPageDraftKey(c,type,recordId);
+    window.__ccPageFormState={active:true,dirty:false,key:key,caseId:c.id,type:type,recordId:recordId||null};
+    var root=$('ccPageFormBody');
+    if(!root)return;
+    var restored=ccPageRestoreDraft(window.__ccPageDraftStore[key]);
+    ccToggleForm(type);
+    ccPageSetDirty(restored,restored);
+    root.addEventListener('input',ccPageMarkDirty);
+    root.addEventListener('change',ccPageMarkDirty);
+    root.addEventListener('click',function(e){
+      if(e.target.closest?.('#ccAddFollowup,#ccAddOtherPerson,[data-cc-remove-follow],[data-cc-remove-other],#ccNotAskedAll,#ccBuildSummary')){
+        setTimeout(ccPageMarkDirty,0);
+      }
+    });
+    $('ccPageBack')?.addEventListener('click',function(){ccPageLeaveToCase(c);});
+    $('ccPageCancel')?.addEventListener('click',function(){ccPageLeaveToCase(c);});
+    $('ccPageSaveDraft')?.addEventListener('click',function(){ccSaveFromForm(type,'draft');});
+    $('ccPageSubmit')?.addEventListener('click',function(){ccSaveFromForm(type,'completed');});
+  }
+
   function ccOpt(value,label,current){
     return '<option value="'+escapeHTML(value)+'" '+(String(current||'')===String(value)?'selected':'')+'>'+escapeHTML(label)+'</option>';
   }
@@ -583,6 +710,7 @@
       }
 
       var assessmentNow=status==='completed'&&type!=='general_phone'&&successful&&$('ccAssessmentAction')?.value==='create_now';
+      ccPageClearDraft();
       closeModal();
       await api.loadData(true);
       if(window.currentCaseDetailId===c.id&&typeof window.refreshCaseDetailPage==='function')await window.refreshCaseDetailPage(c.id,status==='draft'?'草稿已儲存':'紀錄已完成','success','visits');
@@ -629,9 +757,32 @@
       if(type!=='general_phone')body+='<div id="ccFormalBody">'+ccFormalHtml(c,bundle)+'</div>';
       else if(!bundle||bundle.main.status==='draft')body+='<div class="import-section">後續追蹤</div><div id="ccNewFollowups"></div><div style="margin-top:7px"><button type="button" id="ccAddFollowup" class="btn sm">＋ 新增追蹤事項</button></div>';
       else body+='<div class="import-section">後續追蹤</div><div class="case-empty-inline">已完成的一般電話聯繫不在內容修正時重新建立追蹤事項。</div>';
-      body+='<div class="import-section">紀錄摘要</div><div class="field"><textarea id="ccSummary" rows="5" placeholder="可自行輸入，或由系統依目前欄位整理">'+escapeHTML(bundle?.main.summary||'')+'</textarea><div class="summary-tools"><button type="button" id="ccBuildSummary" class="btn sm">依填寫內容產生摘要</button></div></div>'+
-        ((type!=='general_phone'&&(!bundle||bundle.main.status==='draft'))?'<div style="margin-top:12px;text-align:right"><button type="button" id="ccSaveDraft" class="btn">儲存草稿</button></div>':'');
-      openModal({title:(bundle?'編輯':'新增')+api.typeLabel(type)+'｜'+c.case_name,large:true,confirmText:bundle?'儲存修改':type==='general_phone'?'儲存聯繫紀錄':'完成紀錄',html:body,onConfirm:function(){return ccSaveFromForm(type,'completed');}});
+      body+='<div class="import-section">紀錄摘要</div><div class="field"><textarea id="ccSummary" rows="5" placeholder="可自行輸入，或由系統依目前欄位整理">'+escapeHTML(bundle?.main.summary||'')+'</textarea><div class="summary-tools"><button type="button" id="ccBuildSummary" class="btn sm">依填寫內容產生摘要</button></div></div>';
+
+      state.page='cases';
+      renderNav();
+      $('topTitle').textContent='家、電訪';
+      $('crumb').textContent='個案管理 / '+c.case_name+' / '+api.typeLabel(type);
+      $('sidebar').classList.remove('open');
+      var submitText=bundle?'儲存修改':type==='general_phone'?'儲存聯繫紀錄':'完成紀錄';
+      var canDraft=type!=='general_phone'&&(!bundle||bundle.main.status==='draft');
+      $('content').innerHTML=
+        '<div class="cc-page-form">'+
+          '<div class="cc-page-form-head">'+
+            '<div class="cc-page-form-title-wrap"><button type="button" id="ccPageBack" class="btn cc-page-form-back">← 返回家、電訪</button><div>'+
+              '<div class="cc-page-form-title">'+escapeHTML((bundle?'編輯':'新增')+api.typeLabel(type))+'｜'+escapeHTML(c.case_name)+'</div>'+
+              '<div class="cc-page-form-sub">負責督導：'+escapeHTML(bundle?.main.supervisor_name_snapshot||api.staffName(c.supervisor_id))+'　｜　'+(bundle?'修改既有紀錄':'建立新紀錄')+'</div>'+
+              '<span id="ccPageSaveState" class="cc-page-form-status">目前內容尚未變更</span>'+
+            '</div></div>'+
+          '</div>'+
+          '<div id="ccPageFormBody" class="cc-page-form-card">'+body+'</div>'+
+          '<div class="cc-page-form-footer">'+
+            '<button type="button" id="ccPageCancel" class="btn">返回</button><span class="spacer"></span>'+
+            (canDraft?'<button type="button" id="ccPageSaveDraft" class="btn">儲存草稿</button>':'')+
+            '<button type="button" id="ccPageSubmit" class="btn primary">'+escapeHTML(submitText)+'</button>'+
+          '</div>'+
+        '</div>';
+
       window.__ccFormCtx={c:c,contacts:contacts,bundle:bundle,type:type};
       ccBindForm(type);
       if(bundle?.main?.status==='draft')ccApplyDraftPayload(bundle.main.draft_payload||{});
@@ -639,6 +790,8 @@
         var l=bundle.links.find(function(x){return x.to_type==='assessment_event';});
         if(l&&$('ccAssessmentLink'))$('ccAssessmentLink').value=l.to_id;
       }
+      ccBindPageDraft(c,type,recordId);
+      window.scrollTo({top:0,behavior:'auto'});
     }catch(e){console.error(e);toast('開啟紀錄表單失敗：'+(e?.message||e),'error');}
     finally{showLoading(false);}
   }
@@ -670,6 +823,16 @@
       }catch(e){toast('儲存安排失敗：'+(e?.message||e),'error');}finally{showLoading(false);}
     }});
   }
+
+  var ccFormBaseNavigate=navigate;
+  navigate=function(id){
+    var s=window.__ccPageFormState;
+    if(s&&s.active){
+      if(!ccPageConfirmLeave())return;
+      s.active=false;
+    }
+    return ccFormBaseNavigate(id);
+  };
 
   Object.assign(api,{
     openRecordForm:ccOpenRecordForm,
