@@ -248,6 +248,7 @@
     return '<div class="import-section">聯繫結果</div><div class="form-grid">'+
       '<div class="field"><label>本次是否成功聯繫？ *</label><select id="ccContactSuccess">'+ccOpt('true','成功聯繫',String(d.contact_success!==false))+ccOpt('false','未成功聯繫',String(d.contact_success===false))+'</select></div>'+
       '<div class="field" id="ccFailureReasonWrap"><label>未成功原因</label><select id="ccFailureReason">'+ccOpt('no_answer','未接聽',d.failure_reason)+ccOpt('off','關機',d.failure_reason)+ccOpt('busy','忙線',d.failure_reason)+ccOpt('invalid','電話錯誤／無效',d.failure_reason)+ccOpt('other','其他',d.failure_reason)+'</select></div>'+
+      '<div class="field" id="ccFailureNoteWrap"><label>其他未成功原因 *</label><input id="ccFailureNote" value="'+escapeHTML(d.failure_note||'')+'" placeholder="請說明其他未成功原因"></div>'+
       '<div class="field" id="ccRecontactWrap"><label>是否需再次聯繫？</label><select id="ccNeedsRecontact">'+ccOpt('false','否',String(!!d.needs_recontact))+ccOpt('true','是',String(!!d.needs_recontact))+'</select></div>'+
       '<div class="field" id="ccRecontactDateWrap"><label>預計再次聯繫日期</label><input id="ccRecontactDate" type="date" value="'+escapeHTML(d.recontact_date||'')+'"></div>'+
       '<div class="field full"><label id="ccContactContentLabel">'+(type==='general_phone'?'聯繫內容／結果':(d.contact_success===false?'未成功聯繫補充說明':'本次通話內容／重點'))+'</label><textarea id="ccContactContent" rows="3" placeholder="'+(type==='general_phone'?'請簡述本次聯繫內容與結果':(d.contact_success===false?'選填，例如：另以LINE留言、電話顯示停用等':'請簡述本次與個案／家屬實際討論的內容與重點'))+'">'+escapeHTML(d.contact_content||'')+'</textarea></div>'+
@@ -281,6 +282,7 @@
     }else{
       var success=$('ccContactSuccess')?.value!=='false';
       toggle('ccFailureReasonWrap',!success);
+      toggle('ccFailureNoteWrap',!success&&$('ccFailureReason')?.value==='other');
       toggle('ccRecontactWrap',!success);
       toggle('ccRecontactDateWrap',!success&&$('ccNeedsRecontact')?.value==='true');
       toggle('ccPhoneOtherWrap',$('ccPhonePerson')?.value==='other');
@@ -420,6 +422,7 @@
     if(status==='draft')return null;
     if(type!=='home_visit'&&$('ccContactSuccess')?.value==='false'){
       if(!$('ccFailureReason')?.value)return '請選擇未成功聯繫原因';
+      if($('ccFailureReason')?.value==='other'&&!$('ccFailureNote')?.value.trim())return '選擇其他未成功原因時請補充說明';
       if($('ccNeedsRecontact')?.value==='true'&&!$('ccRecontactDate')?.value)return '請填寫預計再次聯繫日期';
       return null;
     }
@@ -520,7 +523,7 @@
       if(people.length){var pr=await db.from('case_contact_record_people').insert(people);if(pr.error)throw pr.error;}
 
       if(type!=='home_visit'){
-        var phone={record_id:recordId,contact_success:$('ccContactSuccess').value!=='false',failure_reason:$('ccContactSuccess').value==='false'?$('ccFailureReason').value:null,failure_note:null,needs_recontact:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true',recontact_date:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true'?$('ccRecontactDate').value:null,contact_content:$('ccContactContent').value.trim()||null,updated_at:new Date().toISOString()};
+        var phone={record_id:recordId,contact_success:$('ccContactSuccess').value!=='false',failure_reason:$('ccContactSuccess').value==='false'?$('ccFailureReason').value:null,failure_note:$('ccContactSuccess').value==='false'&&$('ccFailureReason').value==='other'?$('ccFailureNote').value.trim()||null:null,needs_recontact:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true',recontact_date:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true'?$('ccRecontactDate').value:null,contact_content:$('ccContactContent').value.trim()||null,updated_at:new Date().toISOString()};
         var pu=await db.from('case_phone_details').upsert(phone,{onConflict:'record_id'});if(pu.error)throw pu.error;
       }
 
@@ -542,7 +545,7 @@
           has_primary_concern:$('ccConcern').value==='true',primary_concern_note:$('ccConcernNote').value.trim()||null,
           assessment_action:$('ccAssessmentAction').value,requires_action:$('ccRequiresAction').value==='true',
           action_types:[...document.querySelectorAll('[data-cc-action]:checked')].map(function(x){return x.dataset.ccAction;}),
-          action_note:$('ccActionNote').value.trim()||null,satisfaction_note:null,
+          action_note:$('ccActionNote').value.trim()||null,
           service_snapshot:ccServiceSnapshot(c.id),updated_at:new Date().toISOString()
         };
         var fu=await db.from('case_contact_formal_details').upsert(formal,{onConflict:'record_id'});if(fu.error)throw fu.error;
@@ -677,5 +680,4 @@
     ratingLabel:ccRatingLabel,
     followResultLabel:ccFollowResultLabel
   });
-  window.caseVisitsApi.openVisitModal=function(c,type){ccOpenRecordForm(c,type==='phone'?'formal_phone':type==='home'?'home_visit':type||'home_visit');};
 })();
