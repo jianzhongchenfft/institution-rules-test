@@ -181,8 +181,7 @@
     if(!state.profile)return false;
     const c=assessmentCase(caseId);
     if(!c)return false;
-    if(canManageAllAssessments())return true;
-    return state.profile.role==='supervisor'&&c.supervisor_id===state.profile.id;
+    return canUseAssessments();
   }
 
   function assessmentIsOverdue(row){
@@ -952,6 +951,7 @@
       title:'作廢評估事件',
       confirmText:'確認作廢',
       html:`
+        ${row.status==='completed'?'<div class="assessment-detail-note" style="margin-bottom:10px">此評估已完成。作廢後仍保留原始紀錄與歷程，但不再列入最新有效評估及三個月評估週期。</div>':''}
         <div class="field">
           <label>作廢原因 *</label>
           <textarea id="assessmentVoidReason" rows="4" placeholder="請說明為何作廢此評估事件"></textarea>
@@ -972,7 +972,16 @@
           if(error)throw error;
           closeModal();
           await loadAssessmentData(false);
-          renderAssessmentPage();
+          if(window.caseContactApi&&typeof window.caseContactApi.loadData==='function'){
+            await window.caseContactApi.loadData(true);
+          }
+          const returnCaseId=window.__assessmentReturnCaseId;
+          if(returnCaseId&&typeof window.openCaseDetailPage==='function'){
+            window.__assessmentReturnCaseId=null;
+            await window.openCaseDetailPage(returnCaseId,'assessment',true);
+          }else{
+            renderAssessmentPage();
+          }
           toast('評估事件已作廢','success');
           return true;
         }catch(err){
@@ -1038,7 +1047,7 @@
             :''}
           ${canEdit?'<button id="assessmentEdit" class="btn">編輯事件</button>':''}
           ${canEdit&&row.status==='pending'?'<button id="assessmentStart" class="btn primary">開始評估</button>':''}
-          ${canEdit&&!['completed','voided'].includes(row.status)?'<button id="assessmentVoid" class="btn">作廢</button>':''}
+          ${canEdit&&row.status!=='voided'?'<button id="assessmentVoid" class="btn">作廢</button>':''}
         </div>
       </div>
 
