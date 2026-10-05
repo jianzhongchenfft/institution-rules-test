@@ -1360,7 +1360,11 @@ function htmlRenderServicesTab(data){
     document.querySelectorAll('[data-set-current-plan]').forEach(function(btn){btn.addEventListener('click',function(){htmlSetPreferredPlan(btn.dataset.setCurrentPlan);});});
     document.querySelectorAll('[data-edit-plan]').forEach(function(btn){btn.addEventListener('click',function(){htmlOpenPlanEdit(btn.dataset.editPlan);});});
     document.querySelectorAll('[data-void-plan]').forEach(function(btn){btn.addEventListener('click',function(){htmlOpenPlanVoid(btn.dataset.voidPlan);});});
-    document.querySelectorAll('[data-add-visit]').forEach(function(btn){btn.addEventListener('click',function(){htmlGetCaseVisitsApi().openVisitModal(data.c);setTimeout(function(){var sel=$('visitType');if(sel)sel.value=btn.dataset.addVisit;},0);});});
+    document.querySelectorAll('[data-add-visit]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        htmlGetCaseVisitsApi().openVisitModal(data.c,btn.dataset.addVisit);
+      });
+    });
     document.querySelectorAll('[data-document-index]').forEach(function(btn){btn.addEventListener('click',function(){var x=data.imports[Number(btn.dataset.documentIndex)];if(x)htmlViewOriginal(x.storage_path,x.file_name);});});
     if(window.caseContactApi&&typeof window.caseContactApi.bindCaseDetailPanel==='function'){
       window.caseContactApi.bindCaseDetailPanel(data,htmlCaseDetailState.tab);
