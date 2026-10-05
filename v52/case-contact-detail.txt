@@ -152,11 +152,15 @@
 
   function ccPhoneDetailHtml(bundle){
     var d=bundle.phone;if(!d)return '';
+    var type=bundle.main?.record_type||'formal_phone';
+    var contentLabel=type==='general_phone'
+      ?'聯繫內容／結果'
+      :(d.contact_success?'本次通話內容／重點':'未成功聯繫補充說明');
     return '<div class="import-detail-block"><strong>聯繫結果</strong><div class="case-data-grid" style="margin-top:8px">'+
       ccField('是否成功聯繫',d.contact_success?'成功':'未成功')+
       (d.contact_success?'':ccField('未成功原因',({no_answer:'未接聽',off:'關機',busy:'忙線',invalid:'電話錯誤／無效',other:'其他'})[d.failure_reason]||'—'))+
       (!d.contact_success?ccField('再次聯繫',d.needs_recontact?(d.recontact_date?rocDate(d.recontact_date+'T00:00:00'):'是'):'否'):'')+
-      ccField('電話內容／結果',d.contact_content||'—',true)+'</div></div>';
+      ccField(contentLabel,d.contact_content||'—',true)+'</div></div>';
   }
 
   function ccHomeDetailHtml(bundle){
@@ -239,7 +243,10 @@
     w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+title+'</title><style>@page{size:A4;margin:12mm 16mm}body{font-family:"BiauKai","DFKai-SB",serif;font-size:13px;line-height:1.55;color:#222}h1{text-align:center;font-size:20px;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin:7px 0 12px}th,td{border:1px solid #555;padding:5px 7px;vertical-align:top}th{background:#f5f5f5;width:18%}.sec{font-weight:bold;font-size:14px;margin:12px 0 4px}.summary{border:1px solid #555;padding:8px;min-height:55px;white-space:pre-wrap}.sign{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px}.muted{font-size:10px;color:#666;margin-top:10px}</style></head><body>');
     w.document.write('<h1>桃園市私立劉信子居家長照機構<br>'+title+'</h1>');
     w.document.write('<table><tr><th>個案姓名</th><td>'+escapeHTML(c.case_name)+'</td><th>日期</th><td>'+rocDate(m.record_date+'T00:00:00')+'</td></tr><tr><th>'+(m.record_type==='home_visit'?'家訪人員':'電訪人員')+'</th><td>'+escapeHTML(m.performed_by_name_snapshot||api.staffName(m.performed_by_staff_id))+'</td><th>原因</th><td>'+escapeHTML(api.reasonLabel(m.record_type,m.reason_code))+'</td></tr><tr><th>'+(m.record_type==='home_visit'?'在場／受訪對象':'聯絡對象')+'</th><td colspan="3">'+escapeHTML(people||'—')+'</td></tr></table>');
-    if(bundle.phone)w.document.write('<div class="sec">聯繫結果</div><table><tr><th>聯繫結果</th><td>'+(bundle.phone.contact_success?'成功聯繫':'未成功聯繫')+'</td><th>再次聯繫</th><td>'+(bundle.phone.needs_recontact?(bundle.phone.recontact_date?rocDate(bundle.phone.recontact_date+'T00:00:00'):'是'):'否')+'</td></tr></table>');
+    if(bundle.phone){
+      var phoneLabel=bundle.phone.contact_success?'本次通話內容／重點':'未成功聯繫補充說明';
+      w.document.write('<div class="sec">聯繫結果</div><table><tr><th>聯繫結果</th><td>'+(bundle.phone.contact_success?'成功聯繫':'未成功聯繫')+'</td><th>再次聯繫</th><td>'+(bundle.phone.needs_recontact?(bundle.phone.recontact_date?rocDate(bundle.phone.recontact_date+'T00:00:00'):'是'):'否')+'</td></tr>'+(bundle.phone.contact_content?'<tr><th>'+phoneLabel+'</th><td colspan="3">'+escapeHTML(bundle.phone.contact_content)+'</td></tr>':'')+'</table>');
+    }
     if(d)w.document.write('<div class="sec">服務使用與追蹤</div><table><tr><th>服務使用情形</th><td>'+escapeHTML(({normal:'正常使用',partial:'部分未使用',changed:'已有變化',suspended:'全面暫停',other:'其他'})[d.service_usage_status]||'—')+'</td><th>服務符合需求</th><td>'+escapeHTML(({fit:'符合',mostly_fit:'大致符合需留意',adjust:'建議調整'})[d.service_fit_status]||'—')+'</td></tr><tr><th>近期重大事件</th><td colspan="3">'+escapeHTML(d.has_major_event?(d.major_event_note||'有'):'無')+'</td></tr><tr><th>主要關切事項</th><td colspan="3">'+escapeHTML(d.has_primary_concern?(d.primary_concern_note||'有'):'無')+'</td></tr><tr><th>本次處理／建議</th><td colspan="3">'+escapeHTML(d.action_note||'—')+'</td></tr></table>');
     if(satRows)w.document.write('<div class="sec">服務滿意度</div><table><thead><tr><th>項目</th><th>結果</th><th>補充／原因</th></tr></thead><tbody>'+satRows+'</tbody></table>'+(d.satisfaction_note?'<div>'+escapeHTML(d.satisfaction_note)+'</div>':''));
     var processed=bundle.processedFollowups||[];
