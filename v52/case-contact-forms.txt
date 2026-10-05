@@ -48,25 +48,25 @@
       return ccOpt(s.id,s.display_name||s.email||'未命名人員',current);
     }).join('');
   }
-  function ccNormalizeTime(value){
-    var v=String(value||'').trim();
-    if(!v)return '';
-    if(/^\d{1,2}:\d{2}$/.test(v)){
-      var p=v.split(':'),h=Number(p[0]),m=Number(p[1]);
-      if(h>=0&&h<=23&&m>=0&&m<=59)return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-      return v;
-    }
-    var digits=v.replace(/\D/g,'');
-    if(digits.length===3)digits='0'+digits;
-    if(digits.length===4){
-      var h2=Number(digits.slice(0,2)),m2=Number(digits.slice(2));
-      if(h2>=0&&h2<=23&&m2>=0&&m2<=59)return digits.slice(0,2)+':'+digits.slice(2);
-    }
-    return v;
+  function ccDefaultTime(){
+    var now=new Date(),h=now.getHours(),m=Math.floor(now.getMinutes()/10)*10;
+    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
   }
-  function ccValidTime(value){
-    if(!value)return true;
-    return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+  function ccTimeSelectHtml(value){
+    var v=String(value||ccDefaultTime()),parts=v.split(':'),h=parts[0]||'00',m=parts[1]||'00';
+    var hours=Array.from({length:24},function(_,i){return String(i).padStart(2,'0');});
+    var mins=['00','10','20','30','40','50'];
+    if(!mins.includes(m))m=String(Math.floor(Number(m||0)/10)*10).padStart(2,'0');
+    return '<div class="cc-time-selects">'+
+      '<select id="ccRecordHour">'+hours.map(function(x){return ccOpt(x,x,h);}).join('')+'</select>'+
+      '<span class="cc-time-sep">時</span>'+
+      '<select id="ccRecordMinute">'+mins.map(function(x){return ccOpt(x,x,m);}).join('')+'</select>'+
+      '<span class="cc-time-sep" style="grid-column:3;justify-self:end;margin-top:-34px;pointer-events:none">分</span>'+
+    '</div>';
+  }
+  function ccReadTime(){
+    var h=$('ccRecordHour')?.value,m=$('ccRecordMinute')?.value;
+    return h!=null&&m!=null?h+':'+m:'';
   }
 
   async function ccLoadCaseContacts(caseId){
@@ -112,15 +112,36 @@
     return '<div class="approved-chip-wrap">'+rows.map(function(x){return '<span class="approved-chip">'+escapeHTML(x.service_code||'')+(x.service_name?' '+escapeHTML(x.service_name):'')+(x.approved_quantity!=null?' ×'+escapeHTML(x.approved_quantity):'')+'</span>';}).join('')+'</div>';
   }
 
+  function ccOtherPersonRowHtml(person){
+    person=person||{};
+    return '<div class="cc-other-person-row" data-cc-other-row>'+
+      '<div class="field"><label>姓名／稱謂</label><input data-cc-other-name value="'+escapeHTML(person.name_snapshot||'')+'" placeholder="例如：王小姐"></div>'+
+      '<div class="field"><label>關係／身分</label><input data-cc-other-relation value="'+escapeHTML(person.relationship_snapshot||'')+'" placeholder="例如：案女、個管師、護理師"></div>'+
+      '<button type="button" class="btn sm" data-cc-remove-other>刪除</button>'+
+    '</div>';
+  }
+  function ccAddOtherPersonRow(person){
+    var box=$('ccOtherPeople');if(!box)return;
+    var wrap=document.createElement('div');
+    wrap.innerHTML=ccOtherPersonRowHtml(person);
+    var row=wrap.firstElementChild;
+    box.appendChild(row);
+    row.querySelector('[data-cc-remove-other]')?.addEventListener('click',function(){row.remove();});
+  }
+
   function ccPeopleHomeHtml(c,contacts,bundle){
     var chosen=new Set((bundle?.people||[]).map(function(x){return x.case_contact_id||x.person_type+':'+x.name_snapshot;}));
     var clientChecked=(bundle?.people||[]).some(function(x){return x.person_type==='client';});
+    var others=(bundle?.people||[]).filter(function(x){return x.person_type==='other'&&!x.case_contact_id;});
     return '<div class="field full"><label>在場／受訪對象 *</label>'+
       '<div class="cc-check-grid">'+
         '<label class="cc-check"><input type="checkbox" id="ccClientPresent" '+(clientChecked?'checked':'')+'> 個案本人</label>'+
         contacts.map(function(x){return '<label class="cc-check"><input type="checkbox" data-cc-contact-id="'+x.id+'" '+(chosen.has(x.id)?'checked':'')+'> '+escapeHTML(x.contact_name)+(x.relationship?'（'+escapeHTML(x.relationship)+'）':'')+'</label>';}).join('')+
       '</div>'+
-      '<div class="form-grid" style="margin-top:8px"><div class="field"><label>其他在場人員</label><input id="ccOtherPerson" placeholder="例如：個管師、護理師、居服員"></div><div class="field"><label>關係／身分</label><input id="ccOtherRelation" placeholder="選填"></div></div></div>';
+      '<div style="margin-top:10px"><div class="case-panel-note">其他在場人員可逐一新增，姓名會與各自關係／身分配對保存。</div>'+
+        '<div id="ccOtherPeople" class="cc-other-people">'+others.map(function(x){return ccOtherPersonRowHtml(x);}).join('')+'</div>'+
+        '<button type="button" id="ccAddOtherPerson" class="btn sm" style="margin-top:8px">＋ 新增其他在場人員</button>'+
+      '</div></div>';
   }
   function ccPeoplePhoneHtml(c,contacts,bundle){
     var primary=(bundle?.people||[]).find(function(x){return x.is_primary;})||(bundle?.people||[])[0]||null;
@@ -278,8 +299,9 @@
         var label=document.querySelector('[data-cc-sat-note-label="'+code+'"]');
         var toggleBtn=document.querySelector('[data-cc-sat-note-toggle="'+code+'"]');
         if(bad&&wrap)wrap.classList.add('show');
+        if(!bad&&wrap)wrap.classList.remove('show');
         if(label)label.innerHTML=bad?'<span class="cc-sat-required">原因 *</span>':'補充說明';
-        if(toggleBtn&&wrap?.classList.contains('show'))toggleBtn.textContent='收合補充';
+        if(toggleBtn)toggleBtn.textContent=wrap?.classList.contains('show')?'收合補充':'＋ 補充';
       });
     });
     document.querySelectorAll('[data-cc-sat-note-toggle]').forEach(function(btn){
@@ -301,13 +323,16 @@
       });
     });
     $('ccAddFollowup')?.addEventListener('click',function(){ccAddFollowupRow();});
+    $('ccAddOtherPerson')?.addEventListener('click',function(){ccAddOtherPersonRow();});
+    document.querySelectorAll('[data-cc-remove-other]').forEach(function(btn){
+      btn.addEventListener('click',function(){btn.closest('[data-cc-other-row]')?.remove();});
+    });
     $('ccToggleNotes')?.addEventListener('click',function(){
       var wrap=$('ccNotesWrap');if(!wrap)return;
       wrap.classList.toggle('show');
       $('ccToggleNotes').textContent=wrap.classList.contains('show')?'收合備註':'＋ 補充備註';
     });
     if($('ccNotesWrap')?.classList.contains('show')&&$('ccToggleNotes'))$('ccToggleNotes').textContent='收合備註';
-    $('ccRecordTime')?.addEventListener('blur',function(e){e.target.value=ccNormalizeTime(e.target.value);});
     $('ccBuildSummary')?.addEventListener('click',function(){$('ccSummary').value=ccBuildSummary(type);});
     $('ccSaveDraft')?.addEventListener('click',function(){ccSaveFromForm(type,'draft');});
     ccToggleForm(type);
@@ -362,7 +387,11 @@
       document.querySelectorAll('[data-cc-contact-id]:checked').forEach(function(el){
         var x=contacts.find(function(z){return z.id===el.dataset.ccContactId;});if(x)rows.push({person_type:x.is_primary_caregiver?'primary_caregiver':'family',case_contact_id:x.id,name_snapshot:x.contact_name,relationship_snapshot:x.relationship||null,is_primary:rows.length===0});
       });
-      var other=$('ccOtherPerson')?.value.trim();if(other)rows.push({person_type:'other',name_snapshot:other,relationship_snapshot:$('ccOtherRelation')?.value.trim()||null,is_primary:rows.length===0});
+      document.querySelectorAll('[data-cc-other-row]').forEach(function(row){
+        var name=row.querySelector('[data-cc-other-name]')?.value.trim()||'';
+        var relation=row.querySelector('[data-cc-other-relation]')?.value.trim()||'';
+        if(name)rows.push({person_type:'other',name_snapshot:name,relationship_snapshot:relation||null,is_primary:rows.length===0});
+      });
     }else{
       var v=$('ccPhonePerson')?.value||'client';
       if(v==='client')rows.push({person_type:'client',name_snapshot:c.case_name,relationship_snapshot:'本人',is_primary:true});
@@ -378,9 +407,8 @@
 
   function ccValidate(type,status,contacts,c){
     if(!$('ccRecordDate')?.value)return '請填寫日期';
-    var visitTime=ccNormalizeTime($('ccRecordTime')?.value||'');
-    if($('ccRecordTime'))$('ccRecordTime').value=visitTime;
-    if(!ccValidTime(visitTime))return '時間請使用24小時制 HH:MM，例如 09:30 或 16:05';
+    var visitTime=ccReadTime();
+    if(!visitTime)return '請選擇時間';
     if(!$('ccReason')?.value)return '請選擇原因';
     if($('ccReason')?.value==='other'&&!$('ccReasonNote')?.value.trim())return '選擇其他原因時請補充說明';
     var people=ccReadPeople(type,c,contacts);if(!people.length)return type==='home_visit'?'請至少選擇一名在場／受訪對象':'請選擇聯絡對象';
@@ -464,7 +492,7 @@
       var successful=type==='home_visit'||$('ccContactSuccess')?.value!=='false';
       var counts=(type==='home_visit'||type==='formal_phone'&&successful);
       var mainPayload={
-        case_id:c.id,record_type:type,record_date:$('ccRecordDate').value,record_time:ccNormalizeTime($('ccRecordTime')?.value||'')||null,
+        case_id:c.id,record_type:type,record_date:$('ccRecordDate').value,record_time:ccReadTime()||null,
         performed_by_staff_id:(type==='home_visit'&&$('ccPerformedBy')?.value)||bundle?.main.performed_by_staff_id||state.profile.id,
         performed_by_name_snapshot:api.staffName((type==='home_visit'&&$('ccPerformedBy')?.value)||bundle?.main.performed_by_staff_id||state.profile.id),
         supervisor_staff_id:c.supervisor_id||null,supervisor_name_snapshot:api.staffName(c.supervisor_id),
@@ -580,13 +608,13 @@
     showLoading(true);
     try{
       var contacts=await ccLoadCaseContacts(c.id),bundle=recordId?await ccLoadBundle(recordId):null;
-      var date=bundle?.main.record_date||isoDate(),time=String(bundle?.main.record_time||'').slice(0,5),reason=bundle?.main.reason_code||(type==='home_visit'?'routine':type==='formal_phone'?'routine':'admin_contact');
+      var date=bundle?.main.record_date||isoDate(),time=String(bundle?.main.record_time||'').slice(0,5)||ccDefaultTime(),reason=bundle?.main.reason_code||(type==='home_visit'?'routine':type==='formal_phone'?'routine':'admin_contact');
       var staffLabel=type==='home_visit'?'家訪人員':type==='formal_phone'?'電訪人員':'聯繫人員';
       var currentStaff=bundle?.main.performed_by_staff_id||state.profile.id;
       var staffControl=type==='home_visit'
         ?'<select id="ccPerformedBy">'+ccStaffOptions(currentStaff)+'</select>'
         :'<input value="'+escapeHTML(bundle?.main.performed_by_name_snapshot||state.profile.display_name||api.staffName(currentStaff))+'" disabled>';
-      var main='<div class="form-grid"><div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'日期 *</label><input id="ccRecordDate" type="date" value="'+escapeHTML(date)+'"></div><div class="field"><label>時間（24小時制）</label><input id="ccRecordTime" class="cc-time-text" type="text" inputmode="numeric" maxlength="5" placeholder="例如 14:30" value="'+escapeHTML(time||'')+'"></div>'+
+      var main='<div class="form-grid"><div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'日期 *</label><input id="ccRecordDate" type="date" value="'+escapeHTML(date)+'"></div><div class="field"><label>時間（24小時制）*</label>'+ccTimeSelectHtml(time)+'</div>'+
         '<div class="field"><label>'+staffLabel+'</label>'+staffControl+'</div><div class="field"><label>負責督導</label><input value="'+escapeHTML(bundle?.main.supervisor_name_snapshot||api.staffName(c.supervisor_id))+'" disabled></div>'+
         '<div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'原因 *</label><select id="ccReason">'+ccReasonOptions(type,reason)+'</select></div><div class="field" id="ccReasonNoteWrap"><label>其他原因</label><input id="ccReasonNote" value="'+escapeHTML(bundle?.main.reason_note||'')+'"></div>'+
         '<div class="field full"><button type="button" id="ccToggleNotes" class="btn sm">＋ 補充備註</button><div id="ccNotesWrap" class="cc-notes-wrap '+(bundle?.main.notes?'show':'')+'"><textarea id="ccNotes" rows="3" placeholder="選填">'+escapeHTML(bundle?.main.notes||'')+'</textarea></div></div></div>';
