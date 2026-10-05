@@ -250,7 +250,7 @@
       '<div class="field" id="ccFailureReasonWrap"><label>未成功原因</label><select id="ccFailureReason">'+ccOpt('no_answer','未接聽',d.failure_reason)+ccOpt('off','關機',d.failure_reason)+ccOpt('busy','忙線',d.failure_reason)+ccOpt('invalid','電話錯誤／無效',d.failure_reason)+ccOpt('other','其他',d.failure_reason)+'</select></div>'+
       '<div class="field" id="ccRecontactWrap"><label>是否需再次聯繫？</label><select id="ccNeedsRecontact">'+ccOpt('false','否',String(!!d.needs_recontact))+ccOpt('true','是',String(!!d.needs_recontact))+'</select></div>'+
       '<div class="field" id="ccRecontactDateWrap"><label>預計再次聯繫日期</label><input id="ccRecontactDate" type="date" value="'+escapeHTML(d.recontact_date||'')+'"></div>'+
-      '<div class="field full"><label>'+(type==='general_phone'?'聯繫內容／結果':'電話補充內容')+'</label><textarea id="ccContactContent" rows="3">'+escapeHTML(d.contact_content||'')+'</textarea></div>'+
+      '<div class="field full"><label id="ccContactContentLabel">'+(type==='general_phone'?'聯繫內容／結果':(d.contact_success===false?'未成功聯繫補充說明':'本次通話內容／重點'))+'</label><textarea id="ccContactContent" rows="3" placeholder="'+(type==='general_phone'?'請簡述本次聯繫內容與結果':(d.contact_success===false?'選填，例如：另以LINE留言、電話顯示停用等':'請簡述本次與個案／家屬實際討論的內容與重點'))+'">'+escapeHTML(d.contact_content||'')+'</textarea></div>'+
     '</div>';
   }
 
@@ -284,6 +284,11 @@
       toggle('ccRecontactWrap',!success);
       toggle('ccRecontactDateWrap',!success&&$('ccNeedsRecontact')?.value==='true');
       toggle('ccPhoneOtherWrap',$('ccPhonePerson')?.value==='other');
+      if(type==='formal_phone'){
+        var contentLabel=$('ccContactContentLabel'),contentBox=$('ccContactContent');
+        if(contentLabel)contentLabel.textContent=success?'本次通話內容／重點':'未成功聯繫補充說明';
+        if(contentBox)contentBox.placeholder=success?'請簡述本次與個案／家屬實際討論的內容與重點':'選填，例如：另以LINE留言、電話顯示停用等';
+      }
       var formalBody=$('ccFormalBody');if(formalBody)formalBody.style.display=success?'':'none';
     }
   }
