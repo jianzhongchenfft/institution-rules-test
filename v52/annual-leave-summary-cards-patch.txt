@@ -44,7 +44,7 @@
 
     const desired=`
       <article class="stat-card"><div class="stat-head"><span>特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${grantedText}</div></article>
-      <article class="stat-card al-summary-action" role="button" tabindex="0" data-al-summary-usage><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${remainingText}</div><div class="stat-foot">已使用 ${usedText}・點擊查看明細</div></article>
+      <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-summary-usage><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${remainingText}</div><div class="stat-foot">已使用 ${usedText}・點擊查看明細</div></article>
       <article class="stat-card"><div class="stat-head"><span>全部待審核</span><span class="stat-icon">⏳</span></div><div class="stat-value">${pendingText}</div></article>`;
 
     if(summary.dataset.summaryVersion!=='three-cards-v2'){
@@ -61,6 +61,7 @@
     }
 
     const usageCard=summary.querySelector('[data-al-summary-usage]');
+    if(usageCard)usageCard.classList.toggle('active',state.annualLeaveView==='usage');
     if(usageCard&&!usageCard.dataset.bound){
       usageCard.dataset.bound='1';
       const openUsage=()=>{
