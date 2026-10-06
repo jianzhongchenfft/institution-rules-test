@@ -25,7 +25,7 @@
     .attendance-switch{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
     .attendance-switch .btn{min-width:116px}
     .attendance-switch .active{background:var(--green-700);border-color:var(--green-700);color:#fff}
-    .al-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .al-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
     .al-summary-action{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;user-select:none}.al-summary-action:hover{border-color:#dc9479;box-shadow:0 3px 10px rgba(16,24,40,.08)}.al-summary-action:focus{outline:2px solid rgba(220,148,121,.35);outline-offset:2px}.al-summary-action.active{border-color:#dc9479;box-shadow:0 0 0 2px rgba(220,148,121,.14);background:#fff8f5}
     .al-usage-context{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;padding:11px 12px;border:1px solid #f0ded7;border-radius:11px;background:#fff8f5}.al-usage-context strong{display:block;color:#7d4b3b;font-size:12px}.al-usage-context small{display:block;margin-top:3px;color:#667085;line-height:1.5}
     .al-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
@@ -294,9 +294,7 @@
       ${attendanceTabs('annual')}
       <section class="al-summary">
         <article class="stat-card"><div class="stat-head"><span>本期特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${escapeHTML(alDuration(balance.granted))}</div></article>
-        <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-open-usage aria-pressed="${state.annualLeaveView==='usage'}"><div class="stat-head"><span>已使用特休</span><span class="stat-icon">➖</span></div><div class="stat-value">${escapeHTML(alDuration(balance.used))}</div><div class="stat-foot">點擊查看實際扣抵明細</div></article>
-        <article class="stat-card"><div class="stat-head"><span>待審核特休</span><span class="stat-icon">⏳</span></div><div class="stat-value">${escapeHTML(alDuration(balance.pending))}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>目前可用特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${escapeHTML(alDuration(balance.available))}</div></article>
+        <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-open-usage aria-pressed="${state.annualLeaveView==='usage'}"><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${escapeHTML(alDuration(balance.remaining))}</div><div class="stat-foot">已使用 ${escapeHTML(alDuration(balance.used))}・點擊查看明細</div></article>
       </section>
       <div class="al-toolbar">
         <div class="al-tabs">
