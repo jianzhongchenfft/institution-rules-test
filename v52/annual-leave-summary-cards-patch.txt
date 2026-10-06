@@ -3,7 +3,7 @@
   const style=document.createElement('style');
   style.id='v52-annual-leave-summary-cards-style';
   style.textContent=`
-    .al-summary{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    .al-summary{grid-template-columns:repeat(2,minmax(0,1fr))!important}
     @media(max-width:820px){.al-summary{grid-template-columns:1fr 1fr!important}}
     @media(max-width:560px){.al-summary{grid-template-columns:1fr!important}}
   `;
@@ -43,18 +43,16 @@
     const pendingText=String(pendingCount);
 
     const desired=`
-      <article class="stat-card"><div class="stat-head"><span>特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${grantedText}</div></article>
-      <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-summary-usage><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${remainingText}</div><div class="stat-foot">已使用 ${usedText}・點擊查看明細</div></article>
-      <article class="stat-card"><div class="stat-head"><span>全部待審核</span><span class="stat-icon">⏳</span></div><div class="stat-value">${pendingText}</div></article>`;
+      <article class="stat-card"><div class="stat-head"><span>本期特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${grantedText}</div></article>
+      <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-summary-usage><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${remainingText}</div><div class="stat-foot">已使用 ${usedText}・點擊查看明細</div></article>`;
 
-    if(summary.dataset.summaryVersion!=='three-cards-v2'){
+    if(summary.dataset.summaryVersion!=='two-cards-v1'){
       summary.innerHTML=desired;
-      summary.dataset.summaryVersion='three-cards-v2';
+      summary.dataset.summaryVersion='two-cards-v1';
     }else{
       const values=summary.querySelectorAll('.stat-value');
       if(values[0]&&values[0].textContent!==grantedText)values[0].textContent=grantedText;
       if(values[1]&&values[1].textContent!==remainingText)values[1].textContent=remainingText;
-      if(values[2]&&values[2].textContent!==pendingText)values[2].textContent=pendingText;
       const foot=summary.querySelector('[data-al-summary-usage] .stat-foot');
       const footText='已使用 '+usedText+'・點擊查看明細';
       if(foot&&foot.textContent!==footText)foot.textContent=footText;
