@@ -4,7 +4,7 @@
   overtimeStyle.id = 'v52-overtime-style';
   overtimeStyle.textContent = `
     .ot-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-    .ot-summary-main{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .ot-summary-main{grid-template-columns:repeat(2,minmax(0,1fr))}
     .ot-summary-action{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;user-select:none}.ot-summary-action:hover{border-color:#dc9479;box-shadow:0 3px 10px rgba(16,24,40,.08)}.ot-summary-action:focus{outline:2px solid rgba(220,148,121,.35);outline-offset:2px}.ot-summary-action.active{border-color:#dc9479;box-shadow:0 0 0 2px rgba(220,148,121,.14);background:#fff8f5}
     .ot-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
     .ot-toolbar .spacer{flex:1}
@@ -634,7 +634,6 @@
       <section class="ot-summary ot-summary-main">
         <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看我的申請</div></article>
         <article class="stat-card ot-summary-action ${state.overtimeView==='usage'?'active':''}" role="button" tabindex="0" data-ot-summary-view="usage"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div><div class="stat-foot">累計已使用 ${overtimeDurationLabel(summary.balance.used)}・點擊查看紀錄</div></article>
-        <article class="stat-card ${canReview?'ot-summary-action '+(state.overtimeView==='review'?'active':''):''}" ${canReview?'role="button" tabindex="0" data-ot-summary-view="review"':''}><div class="stat-head"><span>${canReview?'全部待審核':'我的待審核'}</span><span class="stat-icon">📄</span></div><div class="stat-value">${canReview?reviewCount:summary.ownPending}</div><div class="stat-foot">${canReview?'點擊查看待審核申請':'加班及換休使用申請'}</div></article>
       </section>`:`
       <section class="ot-summary">
         <article class="stat-card"><div class="stat-head"><span>待審核加班／換休</span><span class="stat-icon">⏱</span></div><div class="stat-value">${summary.pendingOvertime}</div></article>
@@ -643,13 +642,12 @@
       <div class="ot-toolbar">
         <div class="ot-tabs">
           ${canSubmit?`<button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">我的申請</button>
-          <button class="ot-tab ${state.overtimeView==='balance'?'active':''}" data-ot-view="balance">我的換休</button>
+          <button class="ot-tab ${state.overtimeView==='balance'?'active':''}" data-ot-view="balance">換休帳本</button>
           <button class="ot-tab ${state.overtimeView==='usage'?'active':''}" data-ot-view="usage">換休使用紀錄</button>`:''}
           ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${reviewCount}</button><button class="ot-tab ${state.overtimeView==='payroll'?'active':''}" data-ot-view="payroll">薪資結算</button>`:''}
         </div>
         <span class="spacer"></span>
-        <label class="schedule-filter-label" for="otMonth">月份</label>
-        <input id="otMonth" type="month" value="${escapeHTML(state.overtimeMonth)}">
+        ${['mine','payroll'].includes(state.overtimeView)?`<label class="schedule-filter-label" for="otMonth">月份</label><input id="otMonth" type="month" value="${escapeHTML(state.overtimeMonth)}">`:''}
         <button id="otReload" class="btn">↻ 重新整理</button>
       </div>
       <div id="otMain">
@@ -668,7 +666,7 @@
     $('otAddBtn')?.addEventListener('click',()=>openOvertimeModal());
     $('clAddBtn')?.addEventListener('click',()=>openCompLeaveUsageModal());
     document.querySelectorAll('[data-ot-view]').forEach(btn=>btn.addEventListener('click',()=>{state.overtimeView=btn.dataset.otView;renderOvertimePage();}));
-    $('otMonth').addEventListener('change',e=>{state.overtimeMonth=e.target.value||isoDate(new Date()).slice(0,7);renderOvertimePage();});
+    $('otMonth')?.addEventListener('change',e=>{state.overtimeMonth=e.target.value||isoDate(new Date()).slice(0,7);renderOvertimePage();});
     $('otReload').addEventListener('click',async()=>{await loadOvertimeRows();renderOvertimePage();toast('已重新整理加班／換休資料','success');});
     wireOvertimeTableActions();
     wireCompLeaveActions();
