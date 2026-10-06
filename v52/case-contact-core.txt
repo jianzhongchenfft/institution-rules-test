@@ -5,6 +5,7 @@
   ccStyle.id='v52-case-contact-v1-style';
   ccStyle.textContent=
     '.cc-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}'+
+    '.cc-stat-filter{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;user-select:none}.cc-stat-filter:hover{border-color:#dc9479;box-shadow:0 3px 10px rgba(16,24,40,.08)}.cc-stat-filter:focus{outline:2px solid rgba(220,148,121,.35);outline-offset:2px}.cc-stat-filter.active{border-color:#dc9479;box-shadow:0 0 0 2px rgba(220,148,121,.14);background:#fff8f5}.cc-stat-filter.active .stat-foot:after{content:" ・ 已套用";font-weight:900;color:#9b4f3d}'+
     '.cc-status-grid{display:flex;gap:6px;flex-wrap:wrap}'+
     '.cc-chip{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:900;white-space:nowrap}'+
     '.cc-chip.normal{background:#eef7f1;color:#237a4b}.cc-chip.due{background:#fffaeb;color:#b54708}.cc-chip.overdue{background:#fef3f2;color:#b42318}.cc-chip.muted{background:#f2f4f7;color:#667085}.cc-chip.followup{background:#eff8ff;color:#175cd3}'+
@@ -24,7 +25,8 @@
     caseFollowupItems:[],
     caseRoutinePlans:[],
     caseAssessmentEvents:[],
-    caseContactDataLoaded:false
+    caseContactDataLoaded:false,
+    caseDashboardFilter:''
   });
 
   function ccCanUse(){
@@ -184,6 +186,15 @@
     if(state.caseStatusFilter&&state.caseStatusFilter!=='all'){
       rows=rows.filter(function(c){return (c.service_status||'active')===state.caseStatusFilter;});
     }
+    if(state.caseDashboardFilter){
+      rows=rows.filter(function(c){
+        if(state.caseDashboardFilter==='overdue')return ccWorstStatus(c).key==='overdue';
+        if(state.caseDashboardFilter==='due')return ccWorstStatus(c).key==='due';
+        if(state.caseDashboardFilter==='formal_phone')return ['overdue','due'].includes(ccCycle(c,'formal_phone').key);
+        if(state.caseDashboardFilter==='followup')return ccPendingFollowups(c.id).length>0;
+        return true;
+      });
+    }
     rows.sort(function(a,b){
       var rank={overdue:0,due:1,followup:2,normal:3,muted:4};
       var sa=ccWorstStatus(a),sb=ccWorstStatus(b);
@@ -197,10 +208,10 @@
     $('content').innerHTML=
       '<div class="page-head"><div><h1>👤 個案管理</h1><p>家、電訪採正式家訪、正式電訪與一般電話聯繫分流；一般電話不計入正式電訪週期。</p></div><div class="actions"><button id="addCaseBtn" class="btn primary">＋ 新增個案</button></div></div>'+
       '<section class="cc-stats">'+
-        '<article class="stat-card"><div class="stat-head"><span>逾期項目</span><span class="stat-icon">⚠️</span></div><div class="stat-value">'+overdue+'</div><div class="stat-foot">家訪、正式電訪、評估或追蹤逾期</div></article>'+
-        '<article class="stat-card"><div class="stat-head"><span>即將到期</span><span class="stat-icon">📅</span></div><div class="stat-value">'+due+'</div><div class="stat-foot">家訪／評估14天、電訪7天內</div></article>'+
-        '<article class="stat-card"><div class="stat-head"><span>正式電訪待辦</span><span class="stat-icon">☎️</span></div><div class="stat-value">'+phoneDue+'</div><div class="stat-foot">每1個月一次</div></article>'+
-        '<article class="stat-card"><div class="stat-head"><span>待追蹤事項</span><span class="stat-icon">🔎</span></div><div class="stat-value">'+follow+'</div><div class="stat-foot">跨家訪與電訪持續追蹤</div></article>'+
+        '<article class="stat-card cc-stat-filter '+(state.caseDashboardFilter==='overdue'?'active':'')+'" role="button" tabindex="0" data-cc-dashboard-filter="overdue" aria-pressed="'+(state.caseDashboardFilter==='overdue')+'"><div class="stat-head"><span>逾期項目</span><span class="stat-icon">⚠️</span></div><div class="stat-value">'+overdue+'</div><div class="stat-foot">家訪、正式電訪、評估或追蹤逾期</div></article>'+
+        '<article class="stat-card cc-stat-filter '+(state.caseDashboardFilter==='due'?'active':'')+'" role="button" tabindex="0" data-cc-dashboard-filter="due" aria-pressed="'+(state.caseDashboardFilter==='due')+'"><div class="stat-head"><span>即將到期</span><span class="stat-icon">📅</span></div><div class="stat-value">'+due+'</div><div class="stat-foot">家訪／評估14天、電訪7天內</div></article>'+
+        '<article class="stat-card cc-stat-filter '+(state.caseDashboardFilter==='formal_phone'?'active':'')+'" role="button" tabindex="0" data-cc-dashboard-filter="formal_phone" aria-pressed="'+(state.caseDashboardFilter==='formal_phone')+'"><div class="stat-head"><span>正式電訪待辦</span><span class="stat-icon">☎️</span></div><div class="stat-value">'+phoneDue+'</div><div class="stat-foot">每1個月一次</div></article>'+
+        '<article class="stat-card cc-stat-filter '+(state.caseDashboardFilter==='followup'?'active':'')+'" role="button" tabindex="0" data-cc-dashboard-filter="followup" aria-pressed="'+(state.caseDashboardFilter==='followup')+'"><div class="stat-head"><span>待追蹤事項</span><span class="stat-icon">🔎</span></div><div class="stat-value">'+follow+'</div><div class="stat-foot">跨家訪與電訪持續追蹤</div></article>'+
       '</section>'+
       '<div class="case-toolbar">'+
         '<span class="case-filter-label">督導</span><select id="caseSupervisorFilter">'+
@@ -212,6 +223,20 @@
         '<select id="caseStatusFilter"><option value="all">全部狀態</option><option value="active" '+(state.caseStatusFilter==='active'?'selected':'')+'>服務中</option><option value="suspended" '+(state.caseStatusFilter==='suspended'?'selected':'')+'>暫停</option><option value="closed" '+(state.caseStatusFilter==='closed'?'selected':'')+'>已結案</option></select>'+
         '<button id="reloadCases" class="btn">↻ 重新整理</button>'+
       '</div><div id="caseList"></div>';
+
+    function toggleDashboardFilter(value){
+      state.caseDashboardFilter=state.caseDashboardFilter===value?'':value;
+      ccRenderPage();
+    }
+    document.querySelectorAll('[data-cc-dashboard-filter]').forEach(function(card){
+      card.addEventListener('click',function(){toggleDashboardFilter(card.dataset.ccDashboardFilter);});
+      card.addEventListener('keydown',function(e){
+        if(e.key==='Enter'||e.key===' '){
+          e.preventDefault();
+          toggleDashboardFilter(card.dataset.ccDashboardFilter);
+        }
+      });
+    });
 
     $('caseSupervisorFilter').addEventListener('change',function(e){state.caseSupervisorFilter=e.target.value;ccRenderPage();});
     $('caseStatusFilter').addEventListener('change',function(e){state.caseStatusFilter=e.target.value;ccRenderPage();});
