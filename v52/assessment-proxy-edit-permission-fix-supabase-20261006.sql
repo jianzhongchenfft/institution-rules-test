@@ -5,6 +5,188 @@
 
 begin;
 
+-- RLS normalization: keep the UI/DB permission model aligned.
+-- Supervisors may edit assessments for any case; manager roles keep the same capability.
+alter policy "assessment_adl_history_insert" on public.assessment_adl_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_adl_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_adl_insert" on public.assessment_adl_records
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_adl_records.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_adl_update" on public.assessment_adl_records
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_adl_records.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_adl_records.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_caregiver_screen_history_insert" on public.assessment_caregiver_screen_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_caregiver_screen_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_caregiver_screen_insert" on public.assessment_caregiver_screen_records
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_caregiver_screen_records.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_caregiver_screen_update" on public.assessment_caregiver_screen_records
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_caregiver_screen_records.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_caregiver_screen_records.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_event_forms_delete" on public.assessment_event_forms
+  using ((EXISTS ( SELECT 1
+   FROM (assessment_events ae
+     JOIN care_cases c ON ((c.id = ae.case_id)))
+  WHERE ((ae.id = assessment_event_forms.assessment_event_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_event_forms_insert" on public.assessment_event_forms
+  with check ((EXISTS ( SELECT 1
+   FROM (assessment_events ae
+     JOIN care_cases c ON ((c.id = ae.case_id)))
+  WHERE ((ae.id = assessment_event_forms.assessment_event_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_event_forms_update" on public.assessment_event_forms
+  using ((EXISTS ( SELECT 1
+   FROM (assessment_events ae
+     JOIN care_cases c ON ((c.id = ae.case_id)))
+  WHERE ((ae.id = assessment_event_forms.assessment_event_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM (assessment_events ae
+     JOIN care_cases c ON ((c.id = ae.case_id)))
+  WHERE ((ae.id = assessment_event_forms.assessment_event_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_event_summaries_insert" on public.assessment_event_summaries
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_event_summaries.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_event_summaries_update" on public.assessment_event_summaries
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_event_summaries.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_event_summaries.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_event_summary_history_insert" on public.assessment_event_summary_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_event_summary_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_events_insert" on public.assessment_events
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_events.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_events_update" on public.assessment_events
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_events.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_events.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_gds15_history_insert" on public.assessment_gds15_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_gds15_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_gds15_insert" on public.assessment_gds15_records
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_gds15_records.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_gds15_update" on public.assessment_gds15_records
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_gds15_records.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_gds15_records.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_home_safety_history_insert" on public.assessment_home_safety_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_home_safety_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_home_safety_insert" on public.assessment_home_safety_records
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_home_safety_records.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_home_safety_update" on public.assessment_home_safety_records
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_home_safety_records.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_home_safety_records.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_iadl_history_insert" on public.assessment_iadl_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_iadl_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_iadl_insert" on public.assessment_iadl_records
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_iadl_records.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_iadl_update" on public.assessment_iadl_records
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_iadl_records.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_iadl_records.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_spmsq_history_insert" on public.assessment_spmsq_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_spmsq_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_spmsq_insert" on public.assessment_spmsq_records
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_spmsq_records.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_spmsq_update" on public.assessment_spmsq_records
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_spmsq_records.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_spmsq_records.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+alter policy "assessment_support_history_insert" on public.assessment_support_history
+  with check (((changed_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_support_history.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_support_insert" on public.assessment_support_records
+  with check (((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_support_records.case_id) AND private.can_edit_assessment_case(c.id))))));
+
+alter policy "assessment_support_update" on public.assessment_support_records
+  using ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_support_records.case_id) AND private.can_edit_assessment_case(c.id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM care_cases c
+  WHERE ((c.id = assessment_support_records.case_id) AND private.can_edit_assessment_case(c.id)))));
+
+
 -- save_assessment_adl
 CREATE OR REPLACE FUNCTION public.save_assessment_adl(p_event_id uuid, p_answers jsonb, p_notes jsonb, p_finalize boolean DEFAULT false, p_copied_from_id uuid DEFAULT NULL::uuid)
  RETURNS assessment_adl_records
