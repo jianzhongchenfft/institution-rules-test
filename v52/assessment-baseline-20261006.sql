@@ -26,7 +26,7 @@ AS $function$
         and s.is_active=true
         and s.role in ('supervisor','business_manager','organization_manager','admin')
     );
-$function$
+$function$;
 revoke all on function private.can_edit_assessment_case(uuid) from public, anon, authenticated;
 grant execute on function private.can_edit_assessment_case(uuid) to authenticated;
 grant execute on function private.can_edit_assessment_case(uuid) to service_role;
@@ -44,7 +44,7 @@ AS $function$
       and s.is_active=true
       and s.role in ('business_manager','organization_manager','admin')
   );
-$function$
+$function$;
 revoke all on function private.can_view_assessment_history() from public, anon, authenticated;
 grant execute on function private.can_view_assessment_history() to authenticated;
 grant execute on function private.can_view_assessment_history() to service_role;
@@ -5974,7 +5974,7 @@ begin
       updated_at = now()
   where id = p_case_id;
 end;
-$function$
+$function$;
 revoke all on function private.update_case_health_from_assessment(uuid, text, text) from public, anon, authenticated;
 grant execute on function private.update_case_health_from_assessment(uuid, text, text) to authenticated;
 grant execute on function private.update_case_health_from_assessment(uuid, text, text) to service_role;
@@ -6143,7 +6143,7 @@ begin
 
   return jsonb_build_object('case_id',v_case_id,'updated',true);
 end;
-$function$
+$function$;
 revoke all on function public.update_case_profile(jsonb) from public, anon, authenticated;
 grant execute on function public.update_case_profile(jsonb) to authenticated;
 grant execute on function public.update_case_profile(jsonb) to service_role;
