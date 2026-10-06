@@ -3,7 +3,8 @@
   const overtimeStyle = document.createElement('style');
   overtimeStyle.id = 'v52-overtime-style';
   overtimeStyle.textContent = `
-    .ot-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .ot-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+    .ot-summary-action{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;user-select:none}.ot-summary-action:hover{border-color:#dc9479;box-shadow:0 3px 10px rgba(16,24,40,.08)}.ot-summary-action:focus{outline:2px solid rgba(220,148,121,.35);outline-offset:2px}.ot-summary-action.active{border-color:#dc9479;box-shadow:0 0 0 2px rgba(220,148,121,.14);background:#fff8f5}
     .ot-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
     .ot-toolbar .spacer{flex:1}
     .ot-tabs{display:flex;gap:7px;flex-wrap:wrap}
@@ -630,10 +631,9 @@
       </div>
       ${canSubmit?`
       <section class="ot-summary">
-        <article class="stat-card"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>可再申請換休</span><span class="stat-icon">✅</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>${canReview?'全部待審核':'我的待審核'}</span><span class="stat-icon">📄</span></div><div class="stat-value">${canReview?reviewCount:summary.ownPending}</div></article>
+        <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看我的申請</div></article>
+        <article class="stat-card ot-summary-action ${state.overtimeView==='usage'?'active':''}" role="button" tabindex="0" data-ot-summary-view="usage"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div><div class="stat-foot">已使用 ${overtimeDurationLabel(summary.balance.used)}・點擊查看紀錄</div></article>
+        <article class="stat-card ${canReview?'ot-summary-action '+(state.overtimeView==='review'?'active':''):''}" ${canReview?'role="button" tabindex="0" data-ot-summary-view="review"':''}><div class="stat-head"><span>${canReview?'全部待審核':'我的待審核'}</span><span class="stat-icon">📄</span></div><div class="stat-value">${canReview?reviewCount:summary.ownPending}</div><div class="stat-foot">${canReview?'點擊查看待審核申請':'加班及換休使用申請'}</div></article>
       </section>`:`
       <section class="ot-summary">
         <article class="stat-card"><div class="stat-head"><span>待審核加班／換休</span><span class="stat-icon">⏱</span></div><div class="stat-value">${summary.pendingOvertime}</div></article>
@@ -659,6 +659,11 @@
           : overtimeRenderTable(own)}
       </div>`;
 
+    document.querySelectorAll('[data-ot-summary-view]').forEach(card=>{
+      const openView=()=>{state.overtimeView=card.dataset.otSummaryView;renderOvertimePage();};
+      card.addEventListener('click',openView);
+      card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openView();}});
+    });
     $('otAddBtn')?.addEventListener('click',()=>openOvertimeModal());
     $('clAddBtn')?.addEventListener('click',()=>openCompLeaveUsageModal());
     document.querySelectorAll('[data-ot-view]').forEach(btn=>btn.addEventListener('click',()=>{state.overtimeView=btn.dataset.otView;renderOvertimePage();}));
