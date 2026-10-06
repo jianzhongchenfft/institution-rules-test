@@ -92,7 +92,7 @@
     if(!res.ok) throw new Error(`v52/annual-leave-patch.txt 載入失敗（${res.status}）`);
     eval(await res.text());
 
-    const summaryRes=await fetch('v52/annual-leave-summary-cards-patch.txt?v=attendance-summary-cards-v1-20261006',{cache:'no-store'});
+    const summaryRes=await fetch('v52/annual-leave-summary-cards-patch.txt?v=attendance-summary-cards-v2-20261006',{cache:'no-store'});
     if(!summaryRes.ok) throw new Error(`v52/annual-leave-summary-cards-patch.txt 載入失敗（${summaryRes.status}）`);
     eval(await summaryRes.text());
 
