@@ -77,7 +77,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!mobileScheduleRes.ok) throw new Error(`v52/schedule-mobile-patch.txt 載入失敗（${mobileScheduleRes.status}）`);
       eval(await mobileScheduleRes.text());
 
-      const overtimeRes = await fetch('v52/overtime-patch.txt?v=attendance-ui-two-cards-v1-20261006',{cache:'no-store'});
+      const overtimeRes = await fetch('v52/overtime-patch.txt?v=attendance-ui-clean-v1-20261006',{cache:'no-store'});
       if(!overtimeRes.ok) throw new Error(`v52/overtime-patch.txt 載入失敗（${overtimeRes.status}）`);
       eval(await overtimeRes.text());
 
@@ -121,11 +121,11 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimePersonalHoursRes.ok) throw new Error(`v52/overtime-personal-hours-patch.txt 載入失敗（${overtimePersonalHoursRes.status}）`);
       eval(await overtimePersonalHoursRes.text());
 
-      const overtimeMonthFilterRes = await fetch('v52/overtime-month-filter-patch.txt?v=attendance-ui-two-cards-v1-20261006',{cache:'no-store'});
+      const overtimeMonthFilterRes = await fetch('v52/overtime-month-filter-patch.txt?v=attendance-ui-clean-v1-20261006',{cache:'no-store'});
       if(!overtimeMonthFilterRes.ok) throw new Error(`v52/overtime-month-filter-patch.txt 載入失敗（${overtimeMonthFilterRes.status}）`);
       eval(await overtimeMonthFilterRes.text());
 
-      const overtimeWithdrawRes = await fetch('v52/overtime-withdraw-patch.txt?v=attendance-ui-two-cards-v1-20261006',{cache:'no-store'});
+      const overtimeWithdrawRes = await fetch('v52/overtime-withdraw-patch.txt?v=attendance-ui-clean-v1-20261006',{cache:'no-store'});
       if(!overtimeWithdrawRes.ok) throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${overtimeWithdrawRes.status}）`);
       eval(await overtimeWithdrawRes.text());
 
