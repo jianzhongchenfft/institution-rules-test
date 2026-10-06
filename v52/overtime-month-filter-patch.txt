@@ -38,7 +38,7 @@
   }
 
   function toggleMonthControl(){
-    const show=['mine','usage','payroll'].includes(state.overtimeView);
+    const show=['mine','payroll'].includes(state.overtimeView);
     document.getElementById('otMonth')?.classList.toggle('ot-month-filter-hidden',!show);
     document.querySelector('label[for="otMonth"]')?.classList.toggle('ot-month-filter-hidden',!show);
   }
@@ -72,14 +72,15 @@
   function applyTableMonthFilter(){
     if(state.page!=='overtime')return;
     const view=state.overtimeView;
-    if(!['mine','usage'].includes(view)){
+    if(view!=='mine'){
       clearEmptyNotice();
       document.querySelector('#otMain .ot-table-shell')?.classList.remove('ot-month-filter-hidden');
+      document.querySelectorAll('#otMain .ot-table tbody tr').forEach(tr=>tr.classList.remove('ot-month-filter-hidden'));
       return;
     }
 
-    const items=view==='mine'?ownOvertimeRows():ownLeaveRows();
-    const dateKey=view==='mine'?'work_date':'leave_date';
+    const items=ownOvertimeRows();
+    const dateKey='work_date';
     const tableShell=document.querySelector('#otMain .ot-table-shell');
     const domRows=[...document.querySelectorAll('#otMain .ot-table tbody tr')];
     if(!tableShell||!domRows.length){
