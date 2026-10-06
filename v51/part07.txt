@@ -125,7 +125,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!overtimeMonthFilterRes.ok) throw new Error(`v52/overtime-month-filter-patch.txt 載入失敗（${overtimeMonthFilterRes.status}）`);
       eval(await overtimeMonthFilterRes.text());
 
-      const overtimeWithdrawRes = await fetch('v52/overtime-withdraw-patch.txt?v=attendance-runtime-v4-20261005',{cache:'no-store'});
+      const overtimeWithdrawRes = await fetch('v52/overtime-withdraw-patch.txt?v=annual-leave-usage-v1-20261006',{cache:'no-store'});
       if(!overtimeWithdrawRes.ok) throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${overtimeWithdrawRes.status}）`);
       eval(await overtimeWithdrawRes.text());
 
