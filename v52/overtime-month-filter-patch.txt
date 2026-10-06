@@ -130,7 +130,7 @@
   }
 
   function ensureStableStatusRows(){
-    const modal=document.getElementById('otWorkDate')?.closest('.modal');
+    const modal=document.getElementById('otWorkDate')?.closest('.modal,.ot-page-form');
     if(!modal)return;
     const type=document.getElementById('otType')?.value;
     if(type==='holiday_visit_comp'){
