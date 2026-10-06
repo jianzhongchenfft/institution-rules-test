@@ -3151,6 +3151,10 @@ $$;
 revoke all on function public.save_assessment_caregiver_screen(uuid,text,jsonb,jsonb,jsonb,jsonb,boolean) from public,anon;
 grant execute on function public.save_assessment_caregiver_screen(uuid,text,jsonb,jsonb,jsonb,jsonb,boolean) to authenticated;
 
+-- Live-only index present in TEST and not created by the historical caregiver-screen SQL.
+create index if not exists assessment_caregiver_screen_history_event_idx
+  on public.assessment_caregiver_screen_history(assessment_event_id);
+
 -- ===== v52/assessment-summary-supabase-20261002.sql =====
 -- V5.2 評估管理：整體評估總結
 -- 測試環境：LiuXinZi-TEST
