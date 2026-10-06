@@ -64,9 +64,8 @@
     if(usageCard&&!usageCard.dataset.bound){
       usageCard.dataset.bound='1';
       const openUsage=()=>{
-        state.annualLeaveView='usage';
-        state.annualLeaveUsageCreditId=null;
-        if(typeof renderAnnualLeavePage==='function')renderAnnualLeavePage();
+        const tab=document.querySelector('[data-al-view="usage"]');
+        if(tab)tab.click();
       };
       usageCard.addEventListener('click',openUsage);
       usageCard.addEventListener('keydown',e=>{
