@@ -73,7 +73,7 @@
     const settled=selectedMonthSettledFromState();
     const items=currentApprovedRows();
     openModal({
-      title:`核准紀錄更正｜${monthLabel(state.overtimeMonth)}`,
+      title:`核准紀錄調整｜${monthLabel(state.overtimeMonth)}`,
       html:`
         <div class="ot-rule-highlight" style="margin-top:0">${settled
           ?'此月份已完成薪資結算，所有原始資料均已鎖定，不能直接作廢；若需調整，後續請使用「月結更正」流程。'
@@ -182,8 +182,8 @@
     const btn=document.createElement('button');
     btn.id='otCorrectionBtn';
     btn.className='btn';
-    btn.textContent='↺ 更正／作廢';
-    btn.title='處理尚未月結月份中的已核准錯誤紀錄';
+    btn.textContent='↺ 核准紀錄調整';
+    btn.title='處理尚未月結月份中的已核准紀錄調整';
     btn.addEventListener('click',openCorrectionCenter);
     reload.insertAdjacentElement('afterend',btn);
   }
