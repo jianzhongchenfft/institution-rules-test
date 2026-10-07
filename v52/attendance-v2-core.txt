@@ -1,0 +1,36 @@
+// Attendance V2 lifecycle core
+(() => {
+  if(window.AttendanceV2Lifecycle) return;
+
+  const hooks=new Map();
+
+  function register(event,key,fn){
+    if(!event||!key||typeof fn!=='function') return;
+    if(!hooks.has(event)) hooks.set(event,new Map());
+    hooks.get(event).set(key,fn);
+  }
+
+  function unregister(event,key){
+    hooks.get(event)?.delete(key);
+  }
+
+  function run(event,context={}){
+    const list=[...(hooks.get(event)?.entries()||[])];
+    for(const [key,fn] of list){
+      try{
+        const out=fn(context);
+        if(out&&typeof out.then==='function'){
+          out.catch(err=>console.error(`AttendanceV2 hook failed: ${event}/${key}`,err));
+        }
+      }catch(err){
+        console.error(`AttendanceV2 hook failed: ${event}/${key}`,err);
+      }
+    }
+  }
+
+  function runSoon(event,context={}){
+    queueMicrotask(()=>run(event,context));
+  }
+
+  window.AttendanceV2Lifecycle={register,unregister,run,runSoon};
+})();
