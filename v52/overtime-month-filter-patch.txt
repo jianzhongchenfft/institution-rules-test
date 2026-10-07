@@ -185,7 +185,6 @@
     removeRequestableCard();
     ensureStableStatusRows();
     toggleMonthControl();
-    applyTableMonthFilter();
   }
 
   window.AttendanceV2Lifecycle?.register('overtime:render','overtime-month-filter',enhance);
