@@ -1,5 +1,5 @@
-// Attendance V2 consolidated module
-// Generated from refactored source modules; legacy source files remain for history.
+// Attendance V2 overtime / comp-leave module.
+// Authoritative runtime source.
 
 
 /* ===== v52/overtime-patch.txt ===== */
