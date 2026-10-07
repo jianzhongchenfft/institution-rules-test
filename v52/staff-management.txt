@@ -1,0 +1,452 @@
+(function staffManagementModule(){
+  const staffModule=modules.find(x=>x.id==='staff');
+  if(staffModule) staffModule.ready=true;
+
+  const WEEKDAYS=['週日','週一','週二','週三','週四','週五','週六'];
+  const WORKER_STATUS={active:'在職',leave:'留職停薪',resigned:'離職'};
+  const SYSTEM_EDIT_ROLES=['organization_manager','admin'];
+  const WORKER_EDIT_ROLES=['business_manager','organization_manager','admin'];
+
+  Object.assign(state,{
+    staffMgmtSystem:state.staffMgmtSystem||[],
+    staffMgmtWorkers:state.staffMgmtWorkers||[],
+    staffMgmtLoaded:false,
+    staffMgmtLoading:false,
+    staffMgmtQuery:'',
+    staffMgmtShowInactive:false
+  });
+
+  const canEditSystem=()=>SYSTEM_EDIT_ROLES.includes(state.profile?.role);
+  const canEditWorkers=()=>WORKER_EDIT_ROLES.includes(state.profile?.role);
+  const roleText=role=>roleLabels?.[role]||role||'—';
+  const dateText=value=>value?rocDate(String(value).slice(0,10)+'T00:00:00'):'—';
+  const weekdayText=value=>value===null||value===undefined?'—':(WEEKDAYS[Number(value)]||'—');
+  const hoursText=value=>{
+    const n=Number(value);
+    return Number.isFinite(n)&&n>0?`${n} 小時`:'—';
+  };
+  const workerStatusText=value=>WORKER_STATUS[value]||value||'—';
+  const systemActiveText=value=>value===false?'停用':'啟用';
+  const esc=value=>escapeHTML(value??'');
+
+  if(!document.getElementById('v52-staff-management-style')){
+    const style=document.createElement('style');
+    style.id='v52-staff-management-style';
+    style.textContent=`
+      .sm-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+      .sm-toolbar .spacer{flex:1}
+      .sm-search{min-width:240px;max-width:360px}
+      .sm-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+      .sm-summary-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 15px}
+      .sm-summary-label{font-size:11px;color:#667085;font-weight:850}
+      .sm-summary-value{font-size:24px;line-height:1.05;font-weight:950;color:#344054;margin-top:4px}
+      .sm-panel{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
+      .sm-panel-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);background:#fffaf8}
+      .sm-panel-head h3{margin:0;font-size:14px;color:#344054}
+      .sm-panel-head small{color:#667085;font-size:10.5px}
+      .sm-panel-head .spacer{flex:1}
+      .sm-table-shell{overflow:auto}
+      .sm-table{width:100%;min-width:860px;border-collapse:collapse}
+      .sm-table th{padding:9px 12px;background:#faf8f7;color:#667085;font-size:10.5px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+      .sm-table td{padding:10px 12px;border-bottom:1px solid var(--line);font-size:11.5px;color:#344054;vertical-align:middle}
+      .sm-table tr:last-child td{border-bottom:0}
+      .sm-table tbody tr[data-sm-kind]{cursor:pointer}
+      .sm-table tbody tr[data-sm-kind]:hover{background:#fffaf8}
+      .sm-name{font-weight:900;color:#344054}
+      .sm-sub{font-size:10px;color:#98a2b3;margin-top:2px}
+      .sm-chip{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap;background:#f2f4f7;color:#475467}
+      .sm-chip.ok{background:#ecfdf3;color:#027a48}
+      .sm-chip.warn{background:#fffaeb;color:#b54708}
+      .sm-chip.off{background:#f2f4f7;color:#667085}
+      .sm-empty{padding:28px 16px;text-align:center;color:#667085;font-size:12px}
+      .sm-detail{max-width:980px;margin:0 auto}
+      .sm-detail-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+      .sm-detail-head .spacer{flex:1}
+      .sm-detail-title{font-size:20px;font-weight:950;color:#344054}
+      .sm-detail-sub{font-size:11px;color:#667085;margin-top:3px}
+      .sm-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+      .sm-card h3{margin:0 0 12px;font-size:14px;color:#344054}
+      .sm-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+      .sm-field{min-width:0}
+      .sm-field.full{grid-column:1/-1}
+      .sm-field label{display:block;font-size:11px;font-weight:900;color:#475467;margin-bottom:6px}
+      .sm-field input,.sm-field select,.sm-field textarea{width:100%;box-sizing:border-box}
+      .sm-field textarea{min-height:110px;resize:vertical;line-height:1.55}
+      .sm-readonly{min-height:40px;display:flex;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fafafa;color:#475467;font-size:12px;box-sizing:border-box}
+      .sm-help{font-size:10.5px;color:#667085;line-height:1.55;margin-top:5px}
+      .sm-footer{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+      .sm-note{border:1px solid #eaded9;background:#fffaf8;border-radius:10px;padding:10px 12px;color:#667085;font-size:11px;line-height:1.6;margin-bottom:12px}
+      @media(max-width:760px){.sm-summary{grid-template-columns:1fr}.sm-form-grid{grid-template-columns:1fr}.sm-field.full{grid-column:auto}.sm-search{min-width:0;max-width:none;width:100%}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  async function loadStaffManagement(force=false){
+    if(state.staffMgmtLoading)return;
+    if(state.staffMgmtLoaded&&!force)return;
+    state.staffMgmtLoading=true;
+    try{
+      const [systemRes,workersRes]=await Promise.all([
+        db.from('staff_users')
+          .select('id,email,display_name,role,is_active,hire_date,agreed_daily_hours,can_supervise,regular_day_weekday,created_at,updated_at')
+          .order('is_active',{ascending:false})
+          .order('display_name',{ascending:true}),
+        db.from('care_workers')
+          .select('id,staff_user_id,worker_name,phone,employment_status,hire_date,leave_date,transportation,service_areas,notes,created_at,updated_at')
+          .order('employment_status',{ascending:true})
+          .order('worker_name',{ascending:true})
+      ]);
+      if(systemRes.error)throw systemRes.error;
+      if(workersRes.error)throw workersRes.error;
+      state.staffMgmtSystem=systemRes.data||[];
+      state.staffMgmtWorkers=workersRes.data||[];
+      state.staffMgmtLoaded=true;
+    }catch(err){
+      console.error('讀取人員管理資料失敗',err);
+      toast('讀取人員資料失敗：'+(err?.message||err),'error');
+      throw err;
+    }finally{
+      state.staffMgmtLoading=false;
+    }
+  }
+
+  function filteredSystem(){
+    const q=String(state.staffMgmtQuery||'').trim().toLowerCase();
+    return (state.staffMgmtSystem||[]).filter(s=>{
+      if(!state.staffMgmtShowInactive&&s.is_active===false)return false;
+      if(!q)return true;
+      return [s.display_name,s.email,roleText(s.role)].some(v=>String(v||'').toLowerCase().includes(q));
+    });
+  }
+
+  function filteredWorkers(){
+    const q=String(state.staffMgmtQuery||'').trim().toLowerCase();
+    return (state.staffMgmtWorkers||[]).filter(w=>{
+      if(!state.staffMgmtShowInactive&&w.employment_status!=='active')return false;
+      if(!q)return true;
+      return [w.worker_name,w.phone,w.service_areas,w.transportation,workerStatusText(w.employment_status)].some(v=>String(v||'').toLowerCase().includes(q));
+    });
+  }
+
+  function systemCompleteness(s){
+    const missing=[];
+    if(!s.hire_date)missing.push('到職日');
+    if(!(Number(s.agreed_daily_hours)>0))missing.push('每日工時');
+    if(s.regular_day_weekday===null||s.regular_day_weekday===undefined)missing.push('固定例假');
+    return missing;
+  }
+
+  function renderStaffManagement(){
+    if(state.page!=='staff')return;
+    const activeSystem=(state.staffMgmtSystem||[]).filter(x=>x.is_active!==false).length;
+    const activeWorkers=(state.staffMgmtWorkers||[]).filter(x=>x.employment_status==='active').length;
+    const missingSystem=(state.staffMgmtSystem||[]).filter(x=>x.is_active!==false&&systemCompleteness(x).length).length;
+    const systemRows=filteredSystem();
+    const workerRows=filteredWorkers();
+
+    $('content').innerHTML=`
+      <div class="sm-toolbar">
+        <input id="smSearch" class="sm-search" type="search" placeholder="搜尋姓名、角色、帳號、電話或服務區域" value="${esc(state.staffMgmtQuery)}">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#667085;font-weight:800">
+          <input id="smShowInactive" type="checkbox" ${state.staffMgmtShowInactive?'checked':''}> 顯示停用／離職人員
+        </label>
+        <span class="spacer"></span>
+        <button id="smReload" class="btn">重新整理</button>
+      </div>
+
+      <section class="sm-summary">
+        <div class="sm-summary-card"><div class="sm-summary-label">行政／管理人員</div><div class="sm-summary-value">${activeSystem}</div></div>
+        <div class="sm-summary-card"><div class="sm-summary-label">在職居服員</div><div class="sm-summary-value">${activeWorkers}</div></div>
+        <div class="sm-summary-card"><div class="sm-summary-label">待補出勤基本資料</div><div class="sm-summary-value">${missingSystem}</div></div>
+      </section>
+
+      <div class="sm-note">「到職日、約定每日工時、固定例假日」以本模組為唯一設定入口；加班／換休與特休會直接讀取這裡的資料，不再各自建立設定頁。</div>
+
+      <section class="sm-panel">
+        <div class="sm-panel-head">
+          <div><h3>行政／管理人員</h3><small>系統帳號人員與出勤共用資料</small></div>
+          <span class="spacer"></span>
+        </div>
+        <div class="sm-table-shell">
+          ${systemRows.length?`
+          <table class="sm-table">
+            <thead><tr><th>姓名／角色</th><th>到職日</th><th>每日工時</th><th>固定例假</th><th>帳號狀態</th><th>資料狀態</th></tr></thead>
+            <tbody>${systemRows.map(s=>{
+              const missing=systemCompleteness(s);
+              return `<tr data-sm-kind="system" data-sm-id="${esc(s.id)}">
+                <td><div class="sm-name">${esc(s.display_name||'未命名')}</div><div class="sm-sub">${esc(roleText(s.role))}｜${esc(s.email||'—')}</div></td>
+                <td>${esc(dateText(s.hire_date))}</td>
+                <td>${esc(hoursText(s.agreed_daily_hours))}</td>
+                <td>${esc(weekdayText(s.regular_day_weekday))}</td>
+                <td><span class="sm-chip ${s.is_active===false?'off':'ok'}">${esc(systemActiveText(s.is_active))}</span></td>
+                <td>${missing.length?`<span class="sm-chip warn">待補 ${esc(missing.join('、'))}</span>`:'<span class="sm-chip ok">完整</span>'}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`:'<div class="sm-empty">目前沒有符合條件的行政／管理人員。</div>'}
+        </div>
+      </section>
+
+      <section class="sm-panel">
+        <div class="sm-panel-head">
+          <div><h3>居服員</h3><small>沿用既有居服員主檔，不建立第二套資料</small></div>
+          <span class="spacer"></span>
+          ${canEditWorkers()?'<button id="smAddWorker" class="btn primary">＋新增居服員</button>':''}
+        </div>
+        <div class="sm-table-shell">
+          ${workerRows.length?`
+          <table class="sm-table">
+            <thead><tr><th>姓名</th><th>電話</th><th>到職日</th><th>交通方式</th><th>服務區域</th><th>狀態</th></tr></thead>
+            <tbody>${workerRows.map(w=>`<tr data-sm-kind="worker" data-sm-id="${esc(w.id)}">
+              <td><div class="sm-name">${esc(w.worker_name||'未命名')}</div></td>
+              <td>${esc(w.phone||'—')}</td>
+              <td>${esc(dateText(w.hire_date))}</td>
+              <td>${esc(w.transportation||'—')}</td>
+              <td>${esc(w.service_areas||'—')}</td>
+              <td><span class="sm-chip ${w.employment_status==='active'?'ok':w.employment_status==='resigned'?'off':'warn'}">${esc(workerStatusText(w.employment_status))}</span></td>
+            </tr>`).join('')}</tbody>
+          </table>`:'<div class="sm-empty">目前沒有符合條件的居服員。</div>'}
+        </div>
+      </section>
+    `;
+
+    $('smSearch')?.addEventListener('input',e=>{
+      state.staffMgmtQuery=e.target.value||'';
+      renderStaffManagement();
+      queueMicrotask(()=>{const input=$('smSearch');if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);}});
+    });
+    $('smShowInactive')?.addEventListener('change',e=>{
+      state.staffMgmtShowInactive=!!e.target.checked;
+      renderStaffManagement();
+    });
+    $('smReload')?.addEventListener('click',async()=>{
+      showLoading(true);
+      try{
+        await loadStaffManagement(true);
+        renderStaffManagement();
+        toast('人員資料已重新整理','success');
+      }finally{showLoading(false);}
+    });
+    $('smAddWorker')?.addEventListener('click',()=>renderWorkerForm(null));
+
+    document.querySelectorAll('[data-sm-kind][data-sm-id]').forEach(row=>{
+      row.addEventListener('click',()=>{
+        if(row.dataset.smKind==='system')renderSystemDetail(row.dataset.smId);
+        else renderWorkerForm(row.dataset.smId);
+      });
+    });
+  }
+
+  function renderSystemDetail(id){
+    const s=(state.staffMgmtSystem||[]).find(x=>String(x.id)===String(id));
+    if(!s){toast('找不到人員資料','error');return;}
+    const editable=canEditSystem();
+    $('content').innerHTML=`
+      <div class="sm-detail">
+        <div class="sm-detail-head">
+          <button id="smBack" class="btn">← 返回人員管理</button>
+          <div>
+            <div class="sm-detail-title">${esc(s.display_name||'未命名')}</div>
+            <div class="sm-detail-sub">${esc(roleText(s.role))}</div>
+          </div>
+          <span class="spacer"></span>
+        </div>
+
+        <section class="sm-card">
+          <h3>帳號與身分</h3>
+          <div class="sm-form-grid">
+            <div class="sm-field"><label>姓名</label><div class="sm-readonly">${esc(s.display_name||'—')}</div></div>
+            <div class="sm-field"><label>角色</label><div class="sm-readonly">${esc(roleText(s.role))}</div></div>
+            <div class="sm-field"><label>Google 登入帳號</label><div class="sm-readonly">${esc(s.email||'—')}</div></div>
+            <div class="sm-field"><label>帳號狀態</label><div class="sm-readonly">${esc(systemActiveText(s.is_active))}</div></div>
+          </div>
+          <div class="sm-help">登入帳號、角色與帳號啟停目前仍由帳號權限機制管理，這一階段不在此頁直接修改，避免誤改造成無法登入或權限變動。</div>
+        </section>
+
+        <section class="sm-card">
+          <h3>出勤共用資料</h3>
+          <div class="sm-note">這裡的資料會直接提供加班／換休與特休使用。修改後不會建立另一份額度資料。</div>
+          <div class="sm-form-grid">
+            <div class="sm-field">
+              <label>到職日 *</label>
+              ${editable?`<input id="smHireDate" type="date" value="${esc(s.hire_date||'')}">`:`<div class="sm-readonly">${esc(dateText(s.hire_date))}</div>`}
+            </div>
+            <div class="sm-field">
+              <label>約定每日工時 *</label>
+              ${editable?`<input id="smDailyHours" type="number" min="0.5" max="8" step="0.5" value="${esc(s.agreed_daily_hours??'')}" placeholder="例如 8">`:`<div class="sm-readonly">${esc(hoursText(s.agreed_daily_hours))}</div>`}
+              <div class="sm-help">特休天數會依該期生效時的每日工時快照換算。</div>
+            </div>
+            <div class="sm-field">
+              <label>固定例假日 *</label>
+              ${editable?`<select id="smRegularDay">${WEEKDAYS.map((x,i)=>`<option value="${i}" ${Number(s.regular_day_weekday)===i?'selected':''}>${x}</option>`).join('')}</select>`:`<div class="sm-readonly">${esc(weekdayText(s.regular_day_weekday))}</div>`}
+              <div class="sm-help">加班申請遇到此星期時只會提示，仍依實際排班與出勤原因判斷。</div>
+            </div>
+            <div class="sm-field">
+              <label>可擔任督導</label>
+              <div class="sm-readonly">${s.can_supervise?'是':'否'}</div>
+            </div>
+          </div>
+        </section>
+
+        <div class="sm-footer">
+          <button id="smCancel" class="btn">返回</button>
+          ${editable?'<button id="smSaveSystem" class="btn primary">儲存</button>':''}
+        </div>
+      </div>
+    `;
+    $('smBack')?.addEventListener('click',renderStaffManagement);
+    $('smCancel')?.addEventListener('click',renderStaffManagement);
+    $('smSaveSystem')?.addEventListener('click',()=>saveSystemStaff(s));
+    window.scrollTo({top:0,behavior:'auto'});
+  }
+
+  async function saveSystemStaff(s){
+    if(!canEditSystem()){toast('目前帳號沒有修改此資料的權限','warn');return;}
+    const hireDate=$('smHireDate')?.value||null;
+    const dailyRaw=$('smDailyHours')?.value;
+    const dailyHours=dailyRaw===''||dailyRaw===null?null:Number(dailyRaw);
+    const weekday=Number($('smRegularDay')?.value);
+
+    if(dailyHours!==null&&(!Number.isFinite(dailyHours)||dailyHours<=0||dailyHours>8)){
+      toast('約定每日工時需大於0且不超過8小時','warn');
+      return;
+    }
+    if(!Number.isInteger(weekday)||weekday<0||weekday>6){
+      toast('請選擇固定例假日','warn');
+      return;
+    }
+
+    showLoading(true);
+    try{
+      const {error}=await db.from('staff_users')
+        .update({
+          hire_date:hireDate,
+          agreed_daily_hours:dailyHours,
+          regular_day_weekday:weekday,
+          updated_at:new Date().toISOString()
+        })
+        .eq('id',s.id);
+      if(error)throw error;
+
+      state.staffMgmtLoaded=false;
+      state.compLeaveExpiryLoaded=false;
+      state.compLeaveExpiryStaff=[];
+      state.annualAutoLoadedAt=0;
+      state.personalHoursLoaded=false;
+
+      await loadStaffManagement(true);
+      const updated=(state.staffMgmtSystem||[]).find(x=>String(x.id)===String(s.id));
+      renderSystemDetail(updated?.id||s.id);
+      toast('人員出勤基本資料已更新','success');
+    }catch(err){
+      console.error(err);
+      toast('儲存人員資料失敗：'+(err?.message||err),'error');
+    }finally{showLoading(false);}
+  }
+
+  function renderWorkerForm(id){
+    const isNew=!id;
+    const w=isNew?{
+      worker_name:'',phone:'',employment_status:'active',hire_date:'',leave_date:'',
+      transportation:'',service_areas:'',notes:''
+    }:(state.staffMgmtWorkers||[]).find(x=>String(x.id)===String(id));
+    if(!w){toast('找不到居服員資料','error');return;}
+    const editable=canEditWorkers();
+
+    $('content').innerHTML=`
+      <div class="sm-detail">
+        <div class="sm-detail-head">
+          <button id="smWorkerBack" class="btn">← 返回人員管理</button>
+          <div>
+            <div class="sm-detail-title">${isNew?'新增居服員':esc(w.worker_name||'未命名')}</div>
+            <div class="sm-detail-sub">居服員主檔</div>
+          </div>
+          <span class="spacer"></span>
+        </div>
+
+        <section class="sm-card">
+          <h3>基本資料</h3>
+          <div class="sm-form-grid">
+            <div class="sm-field"><label>姓名 *</label>${editable?`<input id="smWorkerName" value="${esc(w.worker_name||'')}">`:`<div class="sm-readonly">${esc(w.worker_name||'—')}</div>`}</div>
+            <div class="sm-field"><label>電話</label>${editable?`<input id="smWorkerPhone" value="${esc(w.phone||'')}">`:`<div class="sm-readonly">${esc(w.phone||'—')}</div>`}</div>
+            <div class="sm-field"><label>任職狀態 *</label>${editable?`<select id="smWorkerStatus">${Object.entries(WORKER_STATUS).map(([v,t])=>`<option value="${v}" ${w.employment_status===v?'selected':''}>${t}</option>`).join('')}</select>`:`<div class="sm-readonly">${esc(workerStatusText(w.employment_status))}</div>`}</div>
+            <div class="sm-field"><label>到職日</label>${editable?`<input id="smWorkerHire" type="date" value="${esc(w.hire_date||'')}">`:`<div class="sm-readonly">${esc(dateText(w.hire_date))}</div>`}</div>
+            <div class="sm-field"><label>離職／留停日期</label>${editable?`<input id="smWorkerLeave" type="date" value="${esc(w.leave_date||'')}">`:`<div class="sm-readonly">${esc(dateText(w.leave_date))}</div>`}</div>
+            <div class="sm-field"><label>交通方式</label>${editable?`<input id="smWorkerTransport" value="${esc(w.transportation||'')}" placeholder="例如：機車">`:`<div class="sm-readonly">${esc(w.transportation||'—')}</div>`}</div>
+            <div class="sm-field full"><label>服務區域</label>${editable?`<input id="smWorkerAreas" value="${esc(w.service_areas||'')}" placeholder="例如：觀音區、大園區">`:`<div class="sm-readonly">${esc(w.service_areas||'—')}</div>`}</div>
+            <div class="sm-field full"><label>備註</label>${editable?`<textarea id="smWorkerNotes">${esc(w.notes||'')}</textarea>`:`<div class="sm-readonly" style="white-space:pre-wrap">${esc(w.notes||'—')}</div>`}</div>
+          </div>
+        </section>
+
+        <div class="sm-footer">
+          <button id="smWorkerCancel" class="btn">返回</button>
+          ${editable?`<button id="smWorkerSave" class="btn primary">${isNew?'建立居服員':'儲存'}</button>`:''}
+        </div>
+      </div>
+    `;
+    $('smWorkerBack')?.addEventListener('click',renderStaffManagement);
+    $('smWorkerCancel')?.addEventListener('click',renderStaffManagement);
+    $('smWorkerSave')?.addEventListener('click',()=>saveWorker(w,isNew));
+    window.scrollTo({top:0,behavior:'auto'});
+  }
+
+  async function saveWorker(w,isNew){
+    if(!canEditWorkers()){toast('目前帳號沒有修改居服員資料的權限','warn');return;}
+    const payload={
+      worker_name:String($('smWorkerName')?.value||'').trim(),
+      phone:String($('smWorkerPhone')?.value||'').trim()||null,
+      employment_status:$('smWorkerStatus')?.value||'active',
+      hire_date:$('smWorkerHire')?.value||null,
+      leave_date:$('smWorkerLeave')?.value||null,
+      transportation:String($('smWorkerTransport')?.value||'').trim()||null,
+      service_areas:String($('smWorkerAreas')?.value||'').trim()||null,
+      notes:String($('smWorkerNotes')?.value||'').trim()||null,
+      updated_at:new Date().toISOString()
+    };
+    if(!payload.worker_name){toast('請填寫居服員姓名','warn');return;}
+    if(!Object.prototype.hasOwnProperty.call(WORKER_STATUS,payload.employment_status)){
+      toast('任職狀態不正確','warn');return;
+    }
+
+    showLoading(true);
+    try{
+      let result;
+      if(isNew){
+        const insertPayload={...payload};
+        delete insertPayload.updated_at;
+        result=await db.from('care_workers').insert(insertPayload).select('id').single();
+      }else{
+        result=await db.from('care_workers').update(payload).eq('id',w.id).select('id').single();
+      }
+      if(result.error)throw result.error;
+      state.staffMgmtLoaded=false;
+      await loadStaffManagement(true);
+      if(isNew&&result.data?.id)renderWorkerForm(result.data.id);
+      else renderWorkerForm(w.id);
+      toast(isNew?'居服員已建立':'居服員資料已更新','success');
+    }catch(err){
+      console.error(err);
+      toast((isNew?'建立':'儲存')+'居服員失敗：'+(err?.message||err),'error');
+    }finally{showLoading(false);}
+  }
+
+  const baseNavigateForStaff=navigate;
+  navigate=function(id){
+    if(id!=='staff')return baseNavigateForStaff(id);
+
+    const m=modules.find(x=>x.id==='staff')||modules[0];
+    state.page='staff';
+    renderNav();
+    $('topTitle').textContent=m.label;
+    $('crumb').textContent=m.crumb;
+    $('sidebar').classList.remove('open');
+    window.scrollTo({top:0,behavior:'auto'});
+
+    $('content').innerHTML='<div class="sm-empty">正在載入人員資料…</div>';
+    loadStaffManagement(false).then(renderStaffManagement).catch(()=>{});
+  };
+
+  window.v52StaffManagementRefresh=async()=>{
+    await loadStaffManagement(true);
+    if(state.page==='staff')renderStaffManagement();
+  };
+})();
