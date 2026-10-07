@@ -122,17 +122,6 @@
   },true);
 
   function update(){updateMineCard();applySnapshotMoney();}
-  let q=false;
-  const obs=new MutationObserver(ms=>{
-    if(q)return;
-    const relevant=ms.some(m=>Array.from(m.addedNodes||[]).some(n=>{
-      if(n.nodeType!==1)return false;
-      if(n.id==='payrollAmountSnapshotNotice'||n.closest?.('#payrollAmountSnapshotNotice'))return false;
-      return n.id==='otMain'||n.id==='payrollCorrectionPanel'||n.matches?.('.ot-table,.ot-rule-card,.stat-card')||!!n.querySelector?.('#otMain,#payrollCorrectionPanel,[data-payroll-detail],.ot-table,.stat-card');
-    }));
-    if(!relevant)return;
-    q=true;setTimeout(()=>{q=false;update();},30);
-  });
-  obs.observe(document.body,{childList:true,subtree:true});
-  setTimeout(update,250);
+  window.AttendanceV2Lifecycle?.register('overtime:render','overtime-payroll-summary',update);
+  update();
 })();
