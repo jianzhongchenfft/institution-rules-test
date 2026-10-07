@@ -243,6 +243,19 @@
     };
   }
 
+  function compLeaveSourceBreakdown(staffId,asOfDate=null){
+    const fallback=isoDate(new Date());
+    const rawDate=String(asOfDate||fallback);
+    const asOf=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:fallback;
+    const credits=(state.compLeaveCredits||[])
+      .filter(x=>String(x.staff_id)===String(staffId))
+      .filter(x=>String(x.earned_date||'')<=asOf&&(!x.expires_on||String(x.expires_on)>=asOf));
+    const isHoliday=x=>String(x.source_label||'').includes('假日家訪');
+    const ordinary=credits.filter(x=>!isHoliday(x)).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
+    const holidayVisit=credits.filter(isHoliday).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
+    return {ordinary,holidayVisit,total:ordinary+holidayVisit};
+  }
+
   function compLeaveDurationParts(minutes){
     const n=Math.max(0,Number(minutes)||0);
     return {hour:String(Math.floor(n/60)).padStart(2,'0'),minute:String(n%60).padStart(2,'0')};
@@ -356,13 +369,14 @@
 
   function renderCompLeaveOverview(){
     const balance=compLeaveBalance(state.profile?.id,isoDate(new Date()));
+    const breakdown=compLeaveSourceBreakdown(state.profile?.id,isoDate(new Date()));
     const sources=overtimeOwnRows().filter(r=>r.status==='approved' && r.compensation_method==='comp_leave');
     return `
       <section class="ot-summary">
         <article class="stat-card"><div class="stat-head"><span>已取得換休</span><span class="stat-icon">➕</span></div><div class="stat-value">${overtimeDurationLabel(balance.earned)}</div></article>
         <article class="stat-card"><div class="stat-head"><span>已使用換休</span><span class="stat-icon">➖</span></div><div class="stat-value">${overtimeDurationLabel(balance.used)}</div></article>
         <article class="stat-card"><div class="stat-head"><span>待審核使用</span><span class="stat-icon">⏳</span></div><div class="stat-value">${overtimeDurationLabel(balance.pending)}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(balance.requestable)}</div></article>
+        <article class="stat-card"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(balance.requestable)}</div><div class="stat-foot">一般加班換休 ${overtimeDurationLabel(breakdown.ordinary)}・假日家訪換休 ${overtimeDurationLabel(breakdown.holidayVisit)}</div></article>
       </section>
       <section class="ot-rule-card">
         <h3>換休取得明細</h3>
@@ -697,7 +711,7 @@
       <div class="page-head">
         <div><h1>🗓 加班休假</h1></div>
         <div class="actions">
-          ${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 申請加班</button><button id="clAddBtn" class="btn">＋ 使用換休</button>':''}
+          ${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 新增申請</button><button id="clAddBtn" class="btn">＋ 使用換休</button>':''}
         </div>
       </div>
       ${canSubmit?`
@@ -830,8 +844,8 @@
   function openOvertimeModal(existing=null){
     if(!overtimeCanSubmit()){ toast('目前帳號沒有加班申請權限','warn'); return; }
     state.workflowEditingOvertimeId=existing?.id||null;
-    const title=existing?'編輯加班申請':'申請加班';
-    const subtitle=existing?'修改既有申請內容；送出後依原審核流程處理。':'填寫加班日期、時段、類型與處理方式後送出審核。';
+    const title=existing?'編輯申請':'新增申請';
+    const subtitle=existing?'修改既有申請內容；送出後依原審核流程處理。':'請先選擇一般加班或假日家訪換休，再填寫對應資料後送出審核。';
     otRenderPageForm(title,subtitle,overtimeFormHTML(existing),{existing,kind:'overtime'});
     const typeEl=$('otType');
     const compensationEl=$('otCompensation');
@@ -2207,10 +2221,19 @@
       .filter(c=>String(c.staff_id)===String(staffId))
       .filter(c=>String(c.earned_date||'')<=date&&(!c.expires_on||String(c.expires_on)>=date));
     const ledgerRemaining=credits.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
+    const ordinaryRemaining=credits
+      .filter(c=>!String(c.source_label||'').includes('假日家訪'))
+      .reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
+    const holidayVisitRemaining=credits
+      .filter(c=>String(c.source_label||'').includes('假日家訪'))
+      .reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
     const pending=(state.compLeaveRows||[])
       .filter(r=>String(r.applicant_staff_id)===String(staffId)&&r.status==='pending')
       .reduce((s,r)=>s+(Number(r.minutes)||0),0);
-    return {credits,ledgerRemaining,pending,available:Math.max(0,ledgerRemaining-pending)};
+    return {
+      credits,ledgerRemaining,ordinaryRemaining,holidayVisitRemaining,
+      pending,available:Math.max(0,ledgerRemaining-pending)
+    };
   }
   function currentAnnualBalance(staffId,credits,requests,date=today()){
     const current=credits.filter(c=>String(c.staff_id)===String(staffId)&&String(c.period_start||'')<=date&&String(c.period_end||'')>=date&&c.settlement_status==='active');
@@ -2245,7 +2268,7 @@
         '</tbody></table></div>'
       : '<div class="ot-empty"><p>目前沒有有效的特休額度。</p></div>';
     return '<div class="lab-detail-summary"><strong>'+escapeHTML(staff.display_name||'未命名')+'</strong><span>'+escapeHTML(roleLabel(staff.role))+'</span></div>'+
-      '<section class="ot-rule-card"><h3>換休</h3><div class="lab-detail-metrics"><span>帳面剩餘 <strong>'+escapeHTML(dur(comp.ledgerRemaining))+'</strong></span><span>待審核 <strong>'+escapeHTML(dur(comp.pending))+'</strong></span><span>目前可用 <strong>'+escapeHTML(dur(comp.available))+'</strong></span></div>'+compRows+'</section>'+
+      '<section class="ot-rule-card"><h3>換休</h3><div class="lab-detail-metrics"><span>帳面剩餘 <strong>'+escapeHTML(dur(comp.ledgerRemaining))+'</strong></span><span>一般加班換休 <strong>'+escapeHTML(dur(comp.ordinaryRemaining))+'</strong></span><span>假日家訪換休 <strong>'+escapeHTML(dur(comp.holidayVisitRemaining))+'</strong></span><span>待審核 <strong>'+escapeHTML(dur(comp.pending))+'</strong></span><span>目前可用 <strong>'+escapeHTML(dur(comp.available))+'</strong></span></div>'+compRows+'</section>'+
       '<section class="ot-rule-card"><h3>特休</h3><div class="lab-detail-metrics"><span>剩餘 <strong>'+escapeHTML(daysText(annual.remaining))+'</strong></span><span>待審核 <strong>'+escapeHTML(daysText(annual.pending))+'</strong></span><span>目前可用 <strong>'+escapeHTML(daysText(annual.available))+'</strong></span></div>'+annualRows+'</section>';
   }
 
@@ -2271,7 +2294,7 @@
           '<div class="ot-page-form-card">'+
             (rows.length
               ? '<div class="ot-table-shell"><table class="ot-table lab-table"><thead><tr><th>員工</th><th>目前可用換休</th><th>待審核換休</th><th>目前剩餘特休</th><th>待審核特休</th><th>操作</th></tr></thead><tbody>'+
-                rows.map(x=>'<tr><td><div class="ot-review-name">'+escapeHTML(x.staff.display_name||'未命名')+'</div><div class="ot-detail">'+escapeHTML(roleLabel(x.staff.role))+'</div></td><td><strong>'+escapeHTML(dur(x.comp.available))+'</strong></td><td>'+escapeHTML(dur(x.comp.pending))+'</td><td><strong>'+escapeHTML(dur(x.annual.remaining))+'</strong></td><td>'+escapeHTML(dur(x.annual.pending))+'</td><td><button type="button" class="btn sm" data-lab-detail="'+escapeHTML(String(x.staff.id))+'">查看明細</button></td></tr>').join('')+
+                rows.map(x=>'<tr><td><div class="ot-review-name">'+escapeHTML(x.staff.display_name||'未命名')+'</div><div class="ot-detail">'+escapeHTML(roleLabel(x.staff.role))+'</div></td><td><strong>'+escapeHTML(dur(x.comp.available))+'</strong><div class="ot-detail">一般 '+escapeHTML(dur(x.comp.ordinaryRemaining))+'｜假日家訪 '+escapeHTML(dur(x.comp.holidayVisitRemaining))+'</div></td><td>'+escapeHTML(dur(x.comp.pending))+'</td><td><strong>'+escapeHTML(daysText(x.annual.remaining))+'</strong></td><td>'+escapeHTML(daysText(x.annual.pending))+'</td><td><button type="button" class="btn sm" data-lab-detail="'+escapeHTML(String(x.staff.id))+'">查看明細</button></td></tr>').join('')+
                 '</tbody></table></div>'
               : '<div class="ot-empty"><div class="icon">🕒</div><h3>目前沒有可顯示的員工資料</h3></div>')+
           '</div>'+
