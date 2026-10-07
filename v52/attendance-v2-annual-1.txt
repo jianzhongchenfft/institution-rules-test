@@ -17,6 +17,7 @@
     annualLeaveCredits: state.annualLeaveCredits || [],
     annualLeaveAllocations: state.annualLeaveAllocations || [],
     annualLeaveStaff: state.annualLeaveStaff || [],
+    annualLeaveWorkHours: state.annualLeaveWorkHours || [],
     annualLeaveCancellationRows: state.annualLeaveCancellationRows || [],
     annualLeaveLoaded: false,
     annualLeaveView: state.annualLeaveView || 'mine',
@@ -83,6 +84,29 @@
     if(h) return `${h}小時`;
     return `${m}分鐘`;
   }
+  function alDays(value){
+    const n=Math.max(0,Number(value)||0);
+    const rounded=Math.round(n*100)/100;
+    return `${String(rounded).replace(/\.0+$/,'')}天`;
+  }
+  function alWorkHoursOn(staffId,date){
+    const rows=(state.annualLeaveWorkHours||[])
+      .filter(x=>String(x.staff_id)===String(staffId)&&String(x.effective_from)<=String(date))
+      .sort((a,b)=>String(b.effective_from).localeCompare(String(a.effective_from))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    const fromTimeline=Number(rows[0]?.agreed_daily_hours);
+    if(Number.isFinite(fromTimeline)&&fromTimeline>0)return fromTimeline;
+    const staff=(state.annualLeaveStaff||[]).find(x=>String(x.id)===String(staffId));
+    const current=Number(staff?.agreed_daily_hours);
+    if(Number.isFinite(current)&&current>0)return current;
+    const credit=(state.annualLeaveCredits||[]).find(x=>String(x.staff_id)===String(staffId)&&String(x.period_start)<=String(date)&&String(x.period_end)>=String(date));
+    const snapshot=Number(credit?.daily_hours_snapshot);
+    return Number.isFinite(snapshot)&&snapshot>0?snapshot:null;
+  }
+  function alLeaveDaysFor(minutes,date,staffId=state.profile?.id){
+    const hours=alWorkHoursOn(staffId,date);
+    if(!hours)return 0;
+    return Math.round(Math.min(1,(Math.max(0,Number(minutes)||0)/(hours*60)))*1000000)/1000000;
+  }
   function alDate(value){
     if(!value) return '—';
     const d=new Date(`${String(value).slice(0,10)}T00:00:00`);
@@ -122,15 +146,17 @@
   function alOwnRows(){ return (state.annualLeaveRows||[]).filter(r=>String(r.applicant_staff_id)===String(state.profile?.id)); }
   function alOwnCredits(){ return (state.annualLeaveCredits||[]).filter(c=>String(c.staff_id)===String(state.profile?.id)); }
   function alBalance(staffId,date=isoDate(new Date())){
-    const credits=(state.annualLeaveCredits||[]).filter(c=>String(c.staff_id)===String(staffId) && String(c.period_start)<=date && String(c.period_end)>=date);
-    const granted=credits.reduce((s,c)=>s+(Number(c.granted_minutes)||0),0);
-    const remaining=credits.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
-    const pending=(state.annualLeaveRows||[]).filter(r=>String(r.applicant_staff_id)===String(staffId) && r.status==='pending' && credits.some(c=>String(r.leave_date)>=String(c.period_start)&&String(r.leave_date)<=String(c.period_end))).reduce((s,r)=>s+(Number(r.minutes)||0),0);
+    const credits=(state.annualLeaveCredits||[]).filter(c=>String(c.staff_id)===String(staffId) && String(c.period_start)<=date && String(c.period_end)>=date && c.settlement_status!=='settled' && c.settlement_status!=='carried_over');
+    const granted=credits.reduce((s,c)=>s+(Number(c.granted_days)||Number(c.entitlement_days)||0),0);
+    const remaining=credits.reduce((s,c)=>s+(Number(c.remaining_days)||0),0);
+    const pending=(state.annualLeaveRows||[])
+      .filter(r=>String(r.applicant_staff_id)===String(staffId) && r.status==='pending' && credits.some(c=>String(r.leave_date)>=String(c.period_start)&&String(r.leave_date)<=String(c.period_end)))
+      .reduce((s,r)=>s+(Number(r.leave_days)||alLeaveDaysFor(r.minutes,r.leave_date,staffId)||0),0);
     return {granted,used:Math.max(0,granted-remaining),remaining,pending,available:Math.max(0,remaining-pending)};
   }
 
-  function alCreditUsedMinutes(credit){
-    return Math.max(0,(Number(credit?.granted_minutes)||0)-(Number(credit?.remaining_minutes)||0));
+  function alCreditUsedDays(credit){
+    return Math.max(0,(Number(credit?.granted_days)||Number(credit?.entitlement_days)||0)-(Number(credit?.remaining_days)||0));
   }
   function alCurrentCredits(staffId,date=isoDate(new Date())){
     return (state.annualLeaveCredits||[]).filter(c=>
@@ -177,17 +203,17 @@
     }else{
       credits=alCurrentCredits(state.profile?.id);
     }
-    const total=rows.reduce((s,x)=>s+(Number(x.allocation?.minutes)||0),0);
+    const totalDays=rows.reduce((s,x)=>s+(Number(x.allocation?.days)||0),0);
     const context=creditId&&credits[0]
-      ?`<div class="al-usage-context"><div><strong>${escapeHTML(alStaffName(credits[0].staff_id))}｜${escapeHTML(credits[0].label||'特休額度')}</strong><small>額度期間：${escapeHTML(alDate(credits[0].period_start))}～${escapeHTML(alDate(credits[0].period_end))}｜原始額度 ${escapeHTML(alDuration(credits[0].granted_minutes))}｜已使用 ${escapeHTML(alDuration(alCreditUsedMinutes(credits[0])))}｜剩餘 ${escapeHTML(alDuration(credits[0].remaining_minutes))}</small></div><button type="button" class="btn sm" data-al-usage-clear>回到我的本期明細</button></div>`
-      :`<div class="al-usage-context"><div><strong>我的本期特休使用明細</strong><small>${credits.length?credits.map(x=>escapeHTML(alDate(x.period_start))+'～'+escapeHTML(alDate(x.period_end))).join('、'):'目前沒有有效的特休額度'}｜實際扣抵合計 ${escapeHTML(alDuration(total))}</small></div></div>`;
+      ?`<div class="al-usage-context"><div><strong>${escapeHTML(alStaffName(credits[0].staff_id))}｜${escapeHTML(credits[0].label||'特休額度')}</strong><small>額度期間：${escapeHTML(alDate(credits[0].period_start))}～${escapeHTML(alDate(credits[0].period_end))}｜原始額度 ${escapeHTML(alDays(credits[0].granted_days))}｜已使用 ${escapeHTML(alDays(alCreditUsedDays(credits[0])))}｜剩餘 ${escapeHTML(alDays(credits[0].remaining_days))}</small></div><button type="button" class="btn sm" data-al-usage-clear>回到我的本期明細</button></div>`
+      :`<div class="al-usage-context"><div><strong>我的本期特休使用明細</strong><small>${credits.length?credits.map(x=>escapeHTML(alDate(x.period_start))+'～'+escapeHTML(alDate(x.period_end))).join('、'):'目前沒有有效的特休額度'}｜實際扣抵合計 ${escapeHTML(alDays(totalDays))}</small></div></div>`;
     if(!rows.length)return context+'<div class="al-empty"><div class="icon">📒</div><h3>目前沒有實際扣抵的特休使用紀錄</h3></div>';
     return context+`<div class="al-table-shell"><table class="al-table"><thead><tr><th>特休日期</th><th>時間</th><th>實際扣抵</th><th>扣抵額度</th><th>申請狀態</th><th>備註</th></tr></thead><tbody>${rows.map(x=>{
       const r=x.request,c=x.credit,a=x.allocation;
       return `<tr>
         <td>${escapeHTML(alDate(r?.leave_date||a.allocation_date))}</td>
         <td>${r?escapeHTML(alTime(r.start_time))+'–'+escapeHTML(alTime(r.end_time)):'—'}</td>
-        <td><span class="al-amount">${escapeHTML(alDuration(a.minutes))}</span></td>
+        <td><span class="al-amount">${escapeHTML(alDays(a.days))}</span><div class="al-detail">${escapeHTML(alDuration(a.minutes))}${r?.work_hours_snapshot?`｜當日每日工時 ${escapeHTML(String(Number(r.work_hours_snapshot)))} 小時`:''}</div></td>
         <td>${escapeHTML(c?.label||'特休額度')}<div class="al-detail">${escapeHTML(alDate(c?.period_start))}～${escapeHTML(alDate(c?.period_end))}</div></td>
         <td>${r?`<span class="al-status ${escapeHTML(r.status)}">${escapeHTML(alStatusLabel(r.status))}</span>`:'—'}</td>
         <td>${escapeHTML(r?.reason||r?.notes||'—')}</td>
@@ -231,20 +257,25 @@
     if(!state.profile) return;
     showLoading(true);
     try{
+      const staffQuery=alCanManage()
+        ? db.from('staff_users').select('id,display_name,role,hire_date,is_active,agreed_daily_hours').eq('is_active',true).order('display_name',{ascending:true})
+        : db.from('staff_users').select('id,display_name,role,hire_date,is_active,agreed_daily_hours').eq('id',state.profile.id).limit(1);
       const tasks=[
-        db.from('annual_leave_requests').select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,start_time,end_time,minutes,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at').order('leave_date',{ascending:false}).order('created_at',{ascending:false}),
-        db.from('annual_leave_credits').select('id,staff_id,period_start,period_end,granted_minutes,remaining_minutes,label,note,created_by_name,created_at,updated_at').order('period_end',{ascending:true}).order('created_at',{ascending:true}),
-        db.from('annual_leave_allocations').select('id,credit_id,request_id,allocation_date,minutes,is_active,reversed_at,created_at').order('created_at',{ascending:false}),
-        db.from('leave_cancellation_requests').select('id,source_type,source_id,applicant_staff_id,applicant_name,leave_date,minutes,reason,status,requested_at,reviewed_at,review_note,created_at').eq('source_type','annual_leave').order('requested_at',{ascending:false})
+        db.from('annual_leave_requests').select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,start_time,end_time,minutes,work_hours_snapshot,leave_days,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at').order('leave_date',{ascending:false}).order('created_at',{ascending:false}),
+        db.from('annual_leave_credits').select('id,staff_id,period_start,period_end,granted_days,remaining_days,granted_minutes,remaining_minutes,label,note,created_by_name,entitlement_days,daily_hours_snapshot,generation_source,settlement_status,created_at,updated_at').order('period_end',{ascending:true}).order('created_at',{ascending:true}),
+        db.from('annual_leave_allocations').select('id,credit_id,request_id,allocation_date,minutes,days,is_active,reversed_at,created_at').order('created_at',{ascending:false}),
+        db.from('leave_cancellation_requests').select('id,source_type,source_id,applicant_staff_id,applicant_name,leave_date,minutes,reason,status,requested_at,reviewed_at,review_note,created_at').eq('source_type','annual_leave').order('requested_at',{ascending:false}),
+        db.from('staff_work_hours_history').select('id,staff_id,effective_from,agreed_daily_hours,note,created_at').order('effective_from',{ascending:false}).order('created_at',{ascending:false}),
+        staffQuery
       ];
-      if(alCanManage()) tasks.push(db.from('staff_users').select('id,display_name,role,hire_date,is_active').eq('is_active',true).order('display_name',{ascending:true}));
       const results=await Promise.all(tasks);
       for(const r of results) if(r.error) throw r.error;
       state.annualLeaveRows=results[0].data||[];
       state.annualLeaveCredits=results[1].data||[];
       state.annualLeaveAllocations=results[2].data||[];
       state.annualLeaveCancellationRows=results[3].data||[];
-      state.annualLeaveStaff=alCanManage()?(results[4]?.data||[]):[];
+      state.annualLeaveWorkHours=results[4].data||[];
+      state.annualLeaveStaff=results[5].data||[];
       state.annualLeaveLoaded=true;
     }catch(err){
       console.error('讀取特休資料失敗',err);
@@ -294,11 +325,11 @@
 
   function alRequestTable(rows,{review=false}={}){
     if(!rows.length) return '<div class="al-empty"><div class="icon">🌿</div><h3>目前沒有特休申請紀錄</h3></div>';
-    return `<div class="al-table-shell"><table class="al-table"><thead><tr>${review?'<th>申請人</th>':''}<th>日期</th><th>時間</th><th>時數</th><th>狀態</th><th>備註</th><th>操作</th></tr></thead><tbody>${rows.map(r=>{const ds=alDisplayStatus(r);return `<tr>
+    return `<div class="al-table-shell"><table class="al-table"><thead><tr>${review?'<th>申請人</th>':''}<th>日期</th><th>時間</th><th>特休扣抵</th><th>狀態</th><th>備註</th><th>操作</th></tr></thead><tbody>${rows.map(r=>{const ds=alDisplayStatus(r);return `<tr>
       ${review?`<td><strong>${escapeHTML(r.applicant_name||'—')}</strong><div class="al-detail">${escapeHTML(alRoleLabel(r.applicant_role))}</div></td>`:''}
       <td>${escapeHTML(alDate(r.leave_date))}</td>
       <td>${escapeHTML(alTime(r.start_time))}–${escapeHTML(alTime(r.end_time))}</td>
-      <td><span class="al-amount">${escapeHTML(alDuration(r.minutes))}</span></td>
+      <td><span class="al-amount">${escapeHTML(alDays(r.leave_days))}</span><div class="al-detail">${escapeHTML(alDuration(r.minutes))}${r.work_hours_snapshot?`｜每日 ${escapeHTML(String(Number(r.work_hours_snapshot)))} 小時`:''}</div></td>
       <td><span class="al-status ${escapeHTML(ds.cls)}">${escapeHTML(ds.text)}</span>${r.review_note?`<div class="al-detail">${escapeHTML(r.review_note)}</div>`:''}${alCancellationNote(r)}</td>
       <td>${escapeHTML(r.reason||r.notes||'—')}</td>
       <td><div class="al-actions">
@@ -318,9 +349,9 @@
       ${alCanManage()?`<td><strong>${escapeHTML(names.get(String(c.staff_id))||'—')}</strong></td>`:''}
       <td>${escapeHTML(alDate(c.period_start))}～${escapeHTML(alDate(c.period_end))}</td>
       <td>${escapeHTML(c.label||'特休額度')}</td>
-      <td>${escapeHTML(alDuration(c.granted_minutes))}</td>
-      <td><strong>${escapeHTML(alDuration(alCreditUsedMinutes(c)))}</strong></td>
-      <td><strong>${escapeHTML(alDuration(c.remaining_minutes))}</strong></td>
+      <td><strong>${escapeHTML(alDays(c.granted_days))}</strong><div class="al-detail">生效時每日 ${escapeHTML(String(Number(c.daily_hours_snapshot)||'—'))} 小時</div></td>
+      <td><strong>${escapeHTML(alDays(alCreditUsedDays(c)))}</strong></td>
+      <td><strong>${escapeHTML(alDays(c.remaining_days))}</strong></td>
       <td>${escapeHTML(c.note||'—')}</td>
       <td><button type="button" class="btn sm" data-al-usage-credit="${escapeHTML(c.id)}">查看明細</button></td>
     </tr>`).join('')}</tbody></table></div>`;
