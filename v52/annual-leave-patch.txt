@@ -387,6 +387,7 @@
       renderAnnualLeavePage();
     });
     wireAnnualLeaveActions();
+    window.AttendanceV2Lifecycle?.runSoon('annual:render',{view:state.annualLeaveView});
   }
 
   function alPageFormSetDirty(dirty){
@@ -473,6 +474,7 @@
     $('alPageDraft')?.addEventListener('click',()=>saveAnnualLeave(existing,'draft'));
     $('alPageSubmit')?.addEventListener('click',()=>saveAnnualLeave(existing,'pending'));
     update();
+    window.AttendanceV2Lifecycle?.runSoon('annual:form',{kind:'annual_leave',existingId:existing?.id||null});
   }
 
   async function saveAnnualLeave(existing,status){
