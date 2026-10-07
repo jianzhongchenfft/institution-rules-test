@@ -1141,7 +1141,7 @@ async function htmlViewOriginal(path,fileName){
       db.from('care_plans').select('*').eq('case_id',caseId).order('plan_date',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}),
       db.from('service_budgets').select('*').eq('case_id',caseId).order('is_current',{ascending:false}).order('category'),
       db.from('case_imports').select('*').eq('case_id',caseId).order('imported_at',{ascending:false}),
-      db.from('tracking_events').select('id,event_date,category,subject,responsible_staff_id,status,next_followup_date,is_sensitive').eq('case_id',caseId).order('event_date',{ascending:false}).order('created_at',{ascending:false})
+      db.from('tracking_events').select('id,event_date,category,subject,responsible_staff_id,status,next_followup_date,is_sensitive,created_at').eq('case_id',caseId).order('event_date',{ascending:false}).order('created_at',{ascending:false})
     ]);
     var err=results.find(function(x){return x.error;});
     if(err&&err.error)throw err.error;
