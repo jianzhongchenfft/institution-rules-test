@@ -121,7 +121,7 @@
     e.preventDefault();e.stopImmediatePropagation();openSnapshotDetail(btn.dataset.payrollDetail);
   },true);
 
-  function update(){updateMineCard();applySnapshotMoney();}
+  function update(){applySnapshotMoney();}
   window.AttendanceV2Lifecycle?.register('overtime:render','overtime-payroll-summary',update);
   update();
 })();
