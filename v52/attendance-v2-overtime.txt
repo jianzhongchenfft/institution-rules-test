@@ -609,17 +609,9 @@
         reason:r.reason||''
       }));
 
-      const earnedToEnd=approvedOvertime
-        .filter(r=>r.applicant_staff_id===staffId && r.compensation_method==='comp_leave')
-        .reduce((sum,r)=>sum+(r.request_type==='holiday_visit_comp'?(Number(r.comp_minutes)||0):(Number(r.overtime_minutes)||0)),0);
-      const usedToEnd=approvedLeave
-        .filter(r=>r.applicant_staff_id===staffId)
-        .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
-
       const overtimePayMinutes=overtimePayItems.reduce((sum,r)=>sum+r.minutes,0);
       const compLeaveEarnedMinutes=compLeaveEarnedItems.reduce((sum,r)=>sum+r.minutes,0);
       const compLeaveUsedMinutes=compLeaveUsedItems.reduce((sum,r)=>sum+r.minutes,0);
-      const compLeaveBalanceMinutes=Math.max(0,earnedToEnd-usedToEnd);
 
       if(overtimePayMinutes===0 && compLeaveEarnedMinutes===0 && compLeaveUsedMinutes===0) return;
 
@@ -633,7 +625,6 @@
         overtimePayMinutes,
         compLeaveEarnedMinutes,
         compLeaveUsedMinutes,
-        compLeaveBalanceMinutes,
         overtimePayItems,
         compLeaveEarnedItems,
         compLeaveUsedItems
