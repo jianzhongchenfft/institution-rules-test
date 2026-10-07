@@ -24,29 +24,7 @@
     }
   }
 
-  let timer=null;
-  const observer=new MutationObserver(()=>{
-    if(!isBusinessManager())return;
-    clearTimeout(timer);
-    timer=setTimeout(adjust,20);
-  });
-  observer.observe(document.getElementById('content'),{childList:true,subtree:true});
-
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('[data-al-view="credits"],#alReload')) setTimeout(adjust,30);
-  });
-
+  window.AttendanceV2Lifecycle?.register('annual:render','annual-business-manager-access',adjust);
   adjust();
 })();
 
-// V5.2 測試版：載入特休到期未休之結清／遞延流程。
-(async()=>{
-  try{
-    const expiryRes=await fetch('v52/annual-leave-expiry-patch.txt?v=attendance-runtime-v4-20261005',{cache:'no-store'});
-    if(!expiryRes.ok) throw new Error(`v52/annual-leave-expiry-patch.txt 載入失敗（${expiryRes.status}）`);
-    eval(await expiryRes.text());
-  }catch(err){
-    console.error('特休到期處理模組載入失敗',err);
-    if(state.profile&&['organization_manager','admin'].includes(state.profile.role)) toast('特休到期處理模組載入失敗，請重新整理頁面。','error');
-  }
-})();
