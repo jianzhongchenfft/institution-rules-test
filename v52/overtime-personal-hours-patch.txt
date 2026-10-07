@@ -275,6 +275,12 @@
     enhanceRateModal();enhanceOvertimeModal();enhancePayroll();enhanceRules();
   }
 
-  let queued=false;const observer=new MutationObserver(ms=>{if(queued||!ms.some(m=>m.addedNodes?.length))return;queued=true;setTimeout(()=>{queued=false;if(state.page==='overtime'){if(!state.personalHoursLoaded)load();else enhance();}},40);});observer.observe(document.body,{childList:true,subtree:true});
-  if(state.profile)setTimeout(()=>load(true),320);
+  const phLifecycle=()=>{
+    if(state.page!=='overtime')return;
+    if(!state.personalHoursLoaded)load();
+    else enhance();
+  };
+  window.AttendanceV2Lifecycle?.register('overtime:render','overtime-personal-hours',phLifecycle);
+  window.AttendanceV2Lifecycle?.register('overtime:form','overtime-personal-hours-form',phLifecycle);
+  if(state.profile)load(true);
 })();
