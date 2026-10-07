@@ -621,7 +621,7 @@
       const compLeaveUsedMinutes=compLeaveUsedItems.reduce((sum,r)=>sum+r.minutes,0);
       const compLeaveBalanceMinutes=Math.max(0,earnedToEnd-usedToEnd);
 
-      if(overtimePayMinutes===0 && compLeaveEarnedMinutes===0 && compLeaveUsedMinutes===0 && compLeaveBalanceMinutes===0) return;
+      if(overtimePayMinutes===0 && compLeaveEarnedMinutes===0 && compLeaveUsedMinutes===0) return;
 
       const meta=state.overtimeRows.find(r=>r.applicant_staff_id===staffId)
         || state.compLeaveRows.find(r=>r.applicant_staff_id===staffId)
@@ -679,10 +679,9 @@
     openModal({
       title:`薪資結算明細｜${row.name}`,
       html:`
-        <section class="ot-rule-card"><h3>待計薪加班</h3>${payrollDetailTable(row.overtimePayItems,'pay')}</section>
-        <section class="ot-rule-card"><h3>本月新增換休</h3>${payrollDetailTable(row.compLeaveEarnedItems,'earned')}</section>
-        <section class="ot-rule-card"><h3>本月使用換休</h3>${payrollDetailTable(row.compLeaveUsedItems,'used')}</section>
-        <div class="ot-rule-highlight">月底換休餘額：<strong>${overtimeDurationLabel(row.compLeaveBalanceMinutes)}</strong></div>
+        <section class="ot-rule-card"><h3>應付加班明細</h3>${payrollDetailTable(row.overtimePayItems,'pay')}</section>
+        <section class="ot-rule-card"><h3>本月換休增加</h3>${payrollDetailTable(row.compLeaveEarnedItems,'earned')}</section>
+        <section class="ot-rule-card"><h3>本月換休使用</h3>${payrollDetailTable(row.compLeaveUsedItems,'used')}</section>
       `,
       large:true,
       showConfirm:false
@@ -696,25 +695,48 @@
     const settledInfo=settlement
       ? `已結算｜${escapeHTML(settlement.settled_by_name||'—')}・${rocDate(settlement.settled_at)}`
       : '尚未結算';
+
+    const compChange=(r)=>{
+      const earned=Number(r.compLeaveEarnedMinutes)||0;
+      const used=Number(r.compLeaveUsedMinutes)||0;
+      if(!earned&&!used)return '無';
+      return `${earned?`＋${overtimeDurationLabel(earned)}`:''}${earned&&used?'／':''}${used?`－${overtimeDurationLabel(used)}`:''}`;
+    };
+
     return `
-      <section class="ot-summary">
-        <article class="stat-card"><div class="stat-head"><span>本月待計薪加班</span><span class="stat-icon">💰</span></div><div class="stat-value">${overtimeDurationLabel(totals.overtimePayMinutes)}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>本月新增換休</span><span class="stat-icon">➕</span></div><div class="stat-value">${overtimeDurationLabel(totals.compLeaveEarnedMinutes)}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>本月使用換休</span><span class="stat-icon">➖</span></div><div class="stat-value">${overtimeDurationLabel(totals.compLeaveUsedMinutes)}</div></article>
-        <article class="stat-card"><div class="stat-head"><span>結算狀態</span><span class="stat-icon">${settlement?'🔒':'📂'}</span></div><div class="stat-value" style="font-size:18px">${settlement?'已結算':'未結算'}</div>${settlement?`<div class="stat-foot">${escapeHTML(settledInfo)}</div>`:''}</article>
-      </section>
-      <section class="ot-rule-card">
+      <section id="payrollStatusCard" class="ot-rule-card">
         <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
           <div>
-            <h3 style="margin-bottom:5px">${payrollMonthLabel(state.overtimeMonth)}薪資結算報表</h3>
-
+            <h3 style="margin-bottom:5px">${payrollMonthLabel(state.overtimeMonth)}薪資結算</h3>
+            <div class="ot-detail" data-payroll-status-note>${escapeHTML(settledInfo)}</div>
           </div>
-          ${!settlement?'<button id="payrollCloseBtn" class="btn primary">✓ 確認本月已結算</button>':'<span class="ot-status approved">🔒 已結算鎖定</span>'}
+          ${!settlement?'<button id="payrollCloseBtn" class="btn primary">✓ 確認本月已結算</button>':'<span class="ot-status approved">🔒 已結算</span>'}
         </div>
       </section>
+
+      <section class="ot-summary" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        <article class="stat-card">
+          <div class="stat-head"><span>應付加班時數</span><span class="stat-icon">⏱</span></div>
+          <div class="stat-value" data-payroll-overtime-total>${overtimeDurationLabel(totals.overtimePayMinutes)}</div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-head"><span>應付加班費</span><span class="stat-icon">💰</span></div>
+          <div class="stat-value" data-payroll-money-total style="font-size:22px">—</div>
+        </article>
+      </section>
+
       <section class="ot-rule-card">
         <h3>員工月結摘要</h3>
-        ${rows.length?`<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>員工</th><th>待計薪加班</th><th>新增換休</th><th>使用換休</th><th>月底換休餘額</th><th>操作</th></tr></thead><tbody>${rows.map(r=>`<tr><td><div class="ot-review-name">${escapeHTML(r.name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.role))}</div></td><td><span class="ot-amount">${overtimeDurationLabel(r.overtimePayMinutes)}</span></td><td>${overtimeDurationLabel(r.compLeaveEarnedMinutes)}</td><td>${overtimeDurationLabel(r.compLeaveUsedMinutes)}</td><td><strong>${overtimeDurationLabel(r.compLeaveBalanceMinutes)}</strong></td><td><button class="btn sm" data-payroll-detail="${escapeHTML(String(r.staffId))}">查看明細</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="ot-empty"><div class="icon">💰</div><h3>本月尚無可結算資料</h3></div>'}
+        ${rows.length?`<div class="ot-table-shell"><table class="ot-table">
+          <thead><tr><th>員工</th><th>應付加班時數</th><th>應付加班費</th><th>本月換休異動</th><th>操作</th></tr></thead>
+          <tbody>${rows.map(r=>`<tr data-payroll-staff-id="${escapeHTML(String(r.staffId))}">
+            <td><div class="ot-review-name">${escapeHTML(r.name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.role))}</div></td>
+            <td data-payroll-overtime-minutes><span class="ot-amount">${overtimeDurationLabel(r.overtimePayMinutes)}</span></td>
+            <td data-payroll-money-cell><span class="pr-money missing">—</span></td>
+            <td data-payroll-comp-change>${escapeHTML(compChange(r))}</td>
+            <td><button class="btn sm" data-payroll-detail="${escapeHTML(String(r.staffId))}">查看明細</button></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`:'<div class="ot-empty"><div class="icon">💰</div><h3>本月尚無可結算資料</h3></div>'}
       </section>`;
   }
 
@@ -792,7 +814,7 @@
           ${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 申請加班</button><button id="clAddBtn" class="btn">＋ 使用換休</button>':''}
         </div>
       </div>
-      ${canSubmit?`
+      ${state.overtimeView==='payroll'?'':(canSubmit?`
       <section class="ot-summary ot-summary-main">
         <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月加班時數</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看加班申請紀錄</div></article>
         <article class="stat-card ot-summary-action ${state.overtimeView==='balance'?'active':''}" role="button" tabindex="0" data-ot-summary-view="balance"><div class="stat-head"><span>一般加班換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(mainCompSources.ordinary)}</div><div class="stat-foot">有到期日・點擊查看換休帳本</div></article>
@@ -801,7 +823,7 @@
       <section class="ot-summary">
         <article class="stat-card"><div class="stat-head"><span>待審核加班／換休</span><span class="stat-icon">⏱</span></div><div class="stat-value">${summary.pendingOvertime}</div></article>
         <article class="stat-card"><div class="stat-head"><span>待審核換休使用</span><span class="stat-icon">🕒</span></div><div class="stat-value">${summary.pendingLeave}</div></article>
-      </section>`}
+      </section>`)}
       <div class="ot-toolbar">
         <div class="ot-tabs">
           ${canSubmit?`<button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">加班申請紀錄</button>
