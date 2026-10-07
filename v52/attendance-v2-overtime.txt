@@ -1842,14 +1842,8 @@
 })();
 
 
-// V5.2 換休到期管理：只處理週年到期提醒與薪資結清；換休帳本由主模組直接渲染。
+// V5.2 換休週年到期提醒；換休帳本與薪資結算由各自主模組處理。
 (() => {
-  const style=document.createElement('style');
-  style.id='v52-comp-leave-expiry-style';
-  style.textContent=``;
-
-  document.head.appendChild(style);
-
   Object.assign(state,{
     compLeaveExpiryStaff:state.compLeaveExpiryStaff||[],
     compLeaveExpiryLoaded:false,
@@ -1862,30 +1856,14 @@
 
   function ceToday(){return isoDate(new Date());}
 
-  function ceDuration(minutes){
-    const n=Math.max(0,Number(minutes)||0);
-    const h=Math.floor(n/60),m=n%60;
-    if(h&&m)return `${h}小時${m}分`;
-    if(h)return `${h}小時`;
-    return `${m}分鐘`;
-  }
-
   function ceDate(value){
     return value?rocDate(String(value).slice(0,10)+'T00:00:00'):'待設定';
   }
-
-  function ceRole(role){return roleLabels?.[role]||role||'—';}
 
   function ceStaff(staffId){
     return (state.compLeaveExpiryStaff||[]).find(s=>String(s.id)===String(staffId))||null;
   }
 
-
-  function ceIsPermanentHoliday(c){
-    if(!c||c.source_type!=='overtime_request')return false;
-    const source=(state.overtimeRows||[]).find(r=>String(r.id)===String(c.source_id));
-    return source?.request_type==='holiday_visit_comp'||c.source_label==='假日家訪換休';
-  }
 
   function ceDaysUntil(date){
     if(!date)return null;

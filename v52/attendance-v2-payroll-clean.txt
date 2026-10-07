@@ -687,15 +687,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
 
   const timedTypes=new Set(['overtime','rest_day_overtime','national_holiday_overtime']);
   function prCanReview(){return !!state.profile&&['organization_manager','admin'].includes(state.profile.role);}
-  function prCanSubmit(){return !!state.profile&&['supervisor','business_manager','organization_manager','admin'].includes(state.profile.role);}
-  function prTypeLabel(type){
-    return ({
-      overtime:'平日加班',
-      rest_day_overtime:'休息日加班',
-      national_holiday_overtime:'國定假日出勤',
-            holiday_visit_comp:'假日家訪換休'
-    })[type]||type||'—';
-  }
   function prRole(role){return roleLabels?.[role]||role||'—';}
   function prMoney(n){
     const v=Number(n);
@@ -911,17 +902,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
   }
 
 
-  function prReportItems(staffId){
-    const start=prMonthRange().start,end=prMonthRange().end;
-    const settlement=(state.payrollSettlements||[]).find(r=>r.settlement_month===start);
-    if(settlement){
-      const row=Array.isArray(settlement.summary?.staff)?settlement.summary.staff.find(r=>String(r.staffId)===String(staffId)):null;
-      return (row?.overtimePayItems||[]).map(x=>({...x,staffId}));
-    }
-    return (state.overtimeRows||[])
-      .filter(r=>String(r.applicant_staff_id)===String(staffId)&&r.status==='approved'&&r.compensation_method==='overtime_pay'&&r.work_date>=start&&r.work_date<=end)
-      .map(r=>({id:r.id,date:r.work_date,type:r.request_type,startTime:String(r.start_time||'').slice(0,5),endTime:String(r.end_time||'').slice(0,5),minutes:Number(r.overtime_minutes)||0,reason:r.reason||'',staffId}));
-  }
   function prStaffCalc(staffId,rateResolver=prRateFor){
     const {start,end}=prMonthRange();
     const rows=(state.overtimeRows||[])
@@ -958,13 +938,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
     const start=prMonthRange().start;
     return (state.payrollSettlements||[]).find(r=>r.settlement_month===start)||null;
   }
-  function prCorrectionAmount(staffId){
-    const settlement=prSettlement();if(!settlement)return 0;
-    return (state.payrollAmountCorrections||[])
-      .filter(c=>c.settlement_id===settlement.id&&String(c.staff_id)===String(staffId)&&c.adjustment_type==='overtime_pay')
-      .reduce((s,c)=>s+(Number(c.calculated_amount)||0),0);
-  }
-
   function prEnhancePayroll(){
     if(state.page!=='overtime'||state.overtimeView!=='payroll'||!prCanReview()||!state.payrollRatesLoaded)return;
     if(prSettlement())return;
@@ -1001,37 +974,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
       : '薪資資料尚未完整，請先完成設定。';
   }
   function prEnhanceCorrectionModal(){ return; }
-
-  async function prSubmitCorrectionAmount(){
-    const settlement=prSettlement();if(!settlement){toast('找不到本月份月結資料','error');return false;}
-    const staffId=document.getElementById('pcStaff')?.value;
-    const staff=(state.overtimeStaffDirectory||state.payrollRateStaff||[]).find(s=>String(s.id)===String(staffId));
-    const direction=Number(document.getElementById('pcDirection')?.value||1);
-    const hours=Math.max(0,Number(document.getElementById('pcHours')?.value)||0);
-    const mins=Math.max(0,Number(document.getElementById('pcMinutes')?.value)||0);
-    const total=(hours*60+mins)*direction;
-    const reason=String(document.getElementById('pcReason')?.value||'').trim();
-    const date=document.getElementById('prCorrDate')?.value;
-    const dayType=document.getElementById('prCorrDayType')?.value;
-    if(!staff||!date||!dayType||!total||!reason){toast('請完整填寫員工、加班日期、出勤類型、更正時數與原因','warn');return false;}
-    const {start,end}=prMonthRange();if(date<start||date>end){toast('加班計薪更正日期必須屬於目前月結月份','warn');return false;}
-    const rate=prRateFor(staffId,date),calc=prCalc(dayType,Math.abs(total),rate);
-    if(!calc.ok){toast('無法建立加班計薪更正：'+calc.text,'warn');return false;}
-    if(!confirm(`確定建立月結更正嗎？\n\n${staff.display_name}｜${prTypeLabel(dayType)}｜${direction>0?'+':'−'}${Math.abs(total)}分鐘｜${direction>0?'+':'−'}${prMoney(calc.amount)}`))return false;
-    showLoading(true);
-    try{
-      const {error}=await db.from('payroll_settlement_corrections').insert({
-        settlement_id:settlement.id,staff_id:staff.id,staff_name:staff.display_name,staff_role:staff.role,
-        adjustment_type:'overtime_pay',adjustment_minutes:total,reason,
-        work_date:date,workday_type:dayType,
-        created_by:state.user.id,created_by_name:state.profile.display_name
-      });
-      if(error)throw error;
-      closeModal();state.payrollRatesLoaded=false;state.payrollCorrectionsLoaded=false;await prLoad(true);navigate('overtime');state.overtimeView='payroll';toast('月結加班計薪更正已建立，金額由資料庫依薪資基數計算','success');return true;
-    }catch(err){console.error(err);toast('建立加班計薪更正失敗：'+(err?.message||err),'error');return false;}
-    finally{showLoading(false);}
-  }
-
 
   function prEnhance(){
     if(state.page!=='overtime')return;
