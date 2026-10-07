@@ -65,6 +65,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!staffManagementRes.ok) throw new Error(`v52/staff-management.txt 載入失敗（${staffManagementRes.status}）`);
       eval(await staffManagementRes.text());
 
+      const staffScheduleRes = await fetch('v52/staff-work-schedule-ui.txt?v=work-schedule-v1-20261008',{cache:'no-store'});
+      if(!staffScheduleRes.ok) throw new Error(`v52/staff-work-schedule-ui.txt 載入失敗（${staffScheduleRes.status}）`);
+      eval(await staffScheduleRes.text());
+
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
       eval(await scheduleRes.text());
