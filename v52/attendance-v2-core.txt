@@ -33,4 +33,11 @@
   }
 
   window.AttendanceV2Lifecycle={register,unregister,run,runSoon};
+
+  if(!document.getElementById('attendance-v2-shared-style')){
+    const style=document.createElement('style');
+    style.id='attendance-v2-shared-style';
+    style.textContent='.attendance-expiry-reminder{margin:-2px 0 12px;border:1px solid #eaded9;background:#fffaf8;color:#667085;border-radius:10px;padding:9px 12px;font-size:11.5px;line-height:1.55}.attendance-expiry-reminder strong{color:#344054}.attendance-expiry-reminder .muted{color:#98a2b3}';
+    document.head.appendChild(style);
+  }
 })();
