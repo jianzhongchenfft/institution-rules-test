@@ -108,7 +108,7 @@
       .sort((a,b)=>String(b.effective_from).localeCompare(String(a.effective_from))||String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]||null;
   }
   function alTimeToMinutes(value){
-    if(!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(value||'')))return null;
+    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value||'')))return null;
     const [h,m]=String(value).split(':').map(Number);
     return h*60+m;
   }
