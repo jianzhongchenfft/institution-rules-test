@@ -251,28 +251,11 @@
     cePayrollPanel();
   }
 
-  let scheduled=false;
-  function scheduleEnhance(){
-    if(scheduled)return;
-    scheduled=true;
-    queueMicrotask(()=>{
-      scheduled=false;
-      if(state.page!=='overtime')return;
-      if(!state.compLeaveExpiryLoaded)ceLoad();
-      else ceEnhance();
-    });
+  function ceLifecycle(){
+    if(state.page!=='overtime')return;
+    if(!state.compLeaveExpiryLoaded)ceLoad();
+    else ceEnhance();
   }
-
-  const observer=new MutationObserver(mutations=>{
-    const relevant=mutations.some(m=>Array.from(m.addedNodes||[]).some(n=>
-      n.nodeType===1&&(
-        n.id==='otMain'||
-        n.id==='otReload'||
-        n.matches?.('.modal')||
-        n.querySelector?.('#otMain,#otReload')
-      )
-    ));
-    if(relevant)scheduleEnhance();
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
+  window.AttendanceV2Lifecycle?.register('overtime:render','comp-leave-expiry',ceLifecycle);
+  window.AttendanceV2Lifecycle?.register('overtime:form','comp-leave-expiry-form',ceLifecycle);
 })();
