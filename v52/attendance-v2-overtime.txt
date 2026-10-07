@@ -89,7 +89,7 @@
   });
 
   function overtimeCanSubmit(){
-    return !!state.profile && ['supervisor','business_manager','admin'].includes(state.profile.role);
+    return !!state.profile && ['supervisor','business_manager','organization_manager','admin'].includes(state.profile.role);
   }
 
   function overtimeCanReview(){

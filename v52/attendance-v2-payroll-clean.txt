@@ -689,7 +689,7 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
   const newTimedTypes=new Set(['rest_day_overtime','national_holiday_overtime']);
 
   function prCanReview(){return !!state.profile&&['organization_manager','admin'].includes(state.profile.role);}
-  function prCanSubmit(){return !!state.profile&&['supervisor','business_manager','admin'].includes(state.profile.role);}
+  function prCanSubmit(){return !!state.profile&&['supervisor','business_manager','organization_manager','admin'].includes(state.profile.role);}
   function prTypeLabel(type){
     return ({
       overtime:'平日加班',
