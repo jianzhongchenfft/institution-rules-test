@@ -462,11 +462,12 @@
     prEnsureSettingsButton();prEnhanceTypeSelect();prEnhancePayroll();prEnhanceCorrectionModal();prNormalizeLabels();
   }
 
-  let queued=false;
-  const obs=new MutationObserver(ms=>{
-    const relevant=ms.some(m=>Array.from(m.addedNodes||[]).some(n=>n.nodeType===1&&(n.id==='otMain'||n.id==='otType'||n.id==='pcType'||n.matches?.('.modal,.ot-table,.ot-summary')||n.querySelector?.('#otMain,#otType,#pcType,.modal,.ot-table,.ot-summary'))));
-    if(!relevant||queued)return;queued=true;setTimeout(()=>{queued=false;if(state.page==='overtime'){if(!state.payrollRatesLoaded)prLoad();else prEnhance();}},30);
-  });
-  obs.observe(document.body,{childList:true,subtree:true});
-  if(state.profile&&state.page==='overtime')setTimeout(()=>prLoad(true),170);
+  const prLifecycle=()=>{
+    if(state.page!=='overtime')return;
+    if(!state.payrollRatesLoaded)prLoad();
+    else prEnhance();
+  };
+  window.AttendanceV2Lifecycle?.register('overtime:render','overtime-payroll-calc',prLifecycle);
+  window.AttendanceV2Lifecycle?.register('overtime:form','overtime-payroll-calc-form',prLifecycle);
+  if(state.profile&&state.page==='overtime')prLoad(true);
 })();
