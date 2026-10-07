@@ -65,32 +65,36 @@
     }finally{state.annualAutoLoading=false;}
   }
 
-  function ownExpiring(){
+  function ownCurrentCredits(){
     const staffId=String(state.profile?.id||'');
-    return (state.annualAutoCredits||[]).filter(c=>{
-      if(String(c.staff_id)!==staffId||c.settlement_status!=='active'||(Number(c.remaining_minutes)||0)<=0)return false;
-      const d=daysUntil(c.period_end);
-      return d!==null&&d>=0&&d<=30;
-    });
+    const t=today();
+    return (state.annualAutoCredits||[]).filter(c=>
+      String(c.staff_id)===staffId&&
+      c.settlement_status==='active'&&
+      String(c.period_start||'')<=t&&
+      String(c.period_end||'')>=t
+    );
   }
 
   function renderOwnReminder(){
     if(state.page!=='overtime'||state.attendanceSection!=='annual')return;
     const summary=document.querySelector('#content .al-summary');
     if(!summary)return;
-    const expiring=ownExpiring();
+    const current=ownCurrentCredits();
     const existing=document.getElementById('alaOwnReminder');
-    if(!expiring.length){existing?.remove();return;}
-    const total=expiring.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
-    const nearest=expiring.slice().sort((a,b)=>String(a.period_end).localeCompare(String(b.period_end)))[0];
-    const html=`你目前有 <strong>${escapeHTML(duration(total))}</strong> 特休將於 <strong>${escapeHTML(dateText(nearest.period_end))}</strong> 前到期；到期未休將轉為待結清，不會直接消失。`;
+    if(!current.length){existing?.remove();return;}
+    const nearest=current.slice().sort((a,b)=>String(a.period_end).localeCompare(String(b.period_end)))[0];
+    const d=daysUntil(nearest.period_end);
+    const countdown=d===0?'今天到期':d>0?`剩 ${d} 天`:'已到期';
+    const html=`📅 本期特休到期日：<strong>${escapeHTML(dateText(nearest.period_end))}</strong>（${escapeHTML(countdown)}）。下一期特休將依週年制與年資自動產生；到期未休依既有結清／遞延規則處理。<span class="muted">若有遞延特休，仍以各批次有效期間為準。</span>`;
     if(existing){
+      existing.className='attendance-expiry-reminder';
       if(existing.innerHTML!==html)existing.innerHTML=html;
       return;
     }
     const box=document.createElement('div');
     box.id='alaOwnReminder';
-    box.className='ala-reminder';
+    box.className='attendance-expiry-reminder';
     box.innerHTML=html;
     summary.insertAdjacentElement('afterend',box);
   }
