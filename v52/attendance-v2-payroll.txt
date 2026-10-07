@@ -172,7 +172,6 @@
       originalPay:Number(r.overtimePayMinutes)||0,
       originalEarned:Number(r.compLeaveEarnedMinutes)||0,
       originalUsed:Number(r.compLeaveUsedMinutes)||0,
-      originalBalance:Number(r.compLeaveBalanceMinutes)||0,
       corrPay:0,corrEarned:0,corrUsed:0
     }));
 
@@ -181,7 +180,7 @@
       if(!map.has(key)){
         map.set(key,{
           staffId:key,name:c.staff_name||'未命名',role:c.staff_role||'',
-          originalPay:0,originalEarned:0,originalUsed:0,originalBalance:0,
+          originalPay:0,originalEarned:0,originalUsed:0,
           corrPay:0,corrEarned:0,corrUsed:0
         });
       }
@@ -194,8 +193,7 @@
     return [...map.values()].map(r=>({...r,
       finalPay:Math.max(0,r.originalPay+r.corrPay),
       finalEarned:Math.max(0,r.originalEarned+r.corrEarned),
-      finalUsed:Math.max(0,r.originalUsed+r.corrUsed),
-      finalBalance:Math.max(0,r.originalBalance+r.corrEarned-r.corrUsed)
+      finalUsed:Math.max(0,r.originalUsed+r.corrUsed)
     })).sort((a,b)=>String(a.name).localeCompare(String(b.name),'zh-Hant'));
   }
 
