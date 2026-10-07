@@ -678,7 +678,8 @@
   function renderOvertimePage(){
     if(state.page!=='overtime') return;
     const summary=overtimeSummary();
-    const own=overtimeOwnRows();
+    const {start:monthStart,end:monthEnd}=overtimeMonthRange(state.overtimeMonth);
+    const own=overtimeOwnRows().filter(r=>r.work_date>=monthStart&&r.work_date<=monthEnd);
     const ownLeave=compLeaveOwnRows();
     const canSubmit=overtimeCanSubmit();
     const canReview=overtimeCanReview();
