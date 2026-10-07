@@ -64,14 +64,7 @@
     toast('此月份尚未完整結束，請於次月1日起再進行薪資結算。','warn');
   },true);
 
-  // 只在畫面新增「薪資結算按鈕」時套用防呆，避免監聽器因自己修改 DOM 而形成無限循環。
-  const observer=new MutationObserver(mutations=>{
-    const shouldApply=mutations.some(m=>Array.from(m.addedNodes||[]).some(node=>{
-      if(node.nodeType!==1) return false;
-      return node.id==='payrollCloseBtn' || !!node.querySelector?.('#payrollCloseBtn');
-    }));
-    if(shouldApply) applyPayrollPeriodGuard();
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-  setTimeout(applyPayrollPeriodGuard,0);
+  window.AttendanceV2Lifecycle?.register('overtime:render','payroll-period-guard',applyPayrollPeriodGuard);
+  window.AttendanceV2Lifecycle?.register('overtime:form','payroll-period-guard-form',applyPayrollPeriodGuard);
+  applyPayrollPeriodGuard();
 })();
