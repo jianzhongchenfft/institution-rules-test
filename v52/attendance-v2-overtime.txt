@@ -8,7 +8,7 @@
   overtimeStyle.id = 'v52-overtime-style';
   overtimeStyle.textContent = `
     .ot-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-    .ot-summary-main{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .ot-summary-main{grid-template-columns:repeat(3,minmax(0,1fr))}
     .ot-summary-action{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;user-select:none}.ot-summary-action:hover{border-color:#dc9479;box-shadow:0 3px 10px rgba(16,24,40,.08)}.ot-summary-action:focus{outline:2px solid rgba(220,148,121,.35);outline-offset:2px}.ot-summary-action.active{border-color:#dc9479;box-shadow:0 0 0 2px rgba(220,148,121,.14);background:#fff8f5}
     .ot-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
     .ot-toolbar .spacer{flex:1}
@@ -254,6 +254,32 @@
     const ordinary=credits.filter(x=>!isHoliday(x)).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
     const holidayVisit=credits.filter(isHoliday).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
     return {ordinary,holidayVisit,total:ordinary+holidayVisit};
+  }
+  function compLeaveSourceAvailability(staffId,asOfDate=null,excludeUsageId=null){
+    const base=compLeaveSourceBreakdown(staffId,asOfDate);
+    const pending=(state.compLeaveRows||[])
+      .filter(r=>String(r.applicant_staff_id)===String(staffId)&&r.status==='pending')
+      .filter(r=>!excludeUsageId||String(r.id)!==String(excludeUsageId))
+      .reduce((sum,r)=>sum+(Number(r.minutes)||0),0);
+    let ordinary=base.ordinary;
+    let holidayVisit=base.holidayVisit;
+    let reserve=pending;
+    const fromOrdinary=Math.min(ordinary,reserve);
+    ordinary-=fromOrdinary;
+    reserve-=fromOrdinary;
+    const fromHoliday=Math.min(holidayVisit,reserve);
+    holidayVisit-=fromHoliday;
+    return {ordinary:Math.max(0,ordinary),holidayVisit:Math.max(0,holidayVisit),total:Math.max(0,ordinary+holidayVisit),pending};
+  }
+
+  function compLeavePlannedAllocation(staffId,asOfDate,minutes,excludeUsageId=null){
+    const available=compLeaveSourceAvailability(staffId,asOfDate,excludeUsageId);
+    let need=Math.max(0,Number(minutes)||0);
+    const ordinary=Math.min(need,available.ordinary);
+    need-=ordinary;
+    const holidayVisit=Math.min(need,available.holidayVisit);
+    need-=holidayVisit;
+    return {ordinary,holidayVisit,shortage:Math.max(0,need),total:Math.max(0,Number(minutes)||0),available};
   }
 
   function compLeaveDurationParts(minutes){
@@ -701,6 +727,7 @@
     const ownLeave=compLeaveOwnRows();
     const canSubmit=overtimeCanSubmit();
     const canReview=overtimeCanReview();
+    const mainCompSources=compLeaveSourceAvailability(state.profile?.id,isoDate(new Date()));
     const reviewCount=summary.pending+(state.leaveCancellationRows||[]).filter(x=>x.source_type==='comp_leave'&&x.status==='pending').length;
     const validViews=canSubmit
       ? (canReview?['mine','balance','usage','review','payroll']:['mine','balance','usage'])
@@ -717,7 +744,8 @@
       ${canSubmit?`
       <section class="ot-summary ot-summary-main">
         <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月加班時數</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看加班申請紀錄</div></article>
-        <article class="stat-card ot-summary-action ${state.overtimeView==='usage'?'active':''}" role="button" tabindex="0" data-ot-summary-view="usage"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div><div class="stat-foot">累計已使用 ${overtimeDurationLabel(summary.balance.used)}・點擊查看紀錄</div></article>
+        <article class="stat-card ot-summary-action ${state.overtimeView==='balance'?'active':''}" role="button" tabindex="0" data-ot-summary-view="balance"><div class="stat-head"><span>一般加班換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(mainCompSources.ordinary)}</div><div class="stat-foot">有到期日・點擊查看換休帳本</div></article>
+        <article class="stat-card ot-summary-action ${state.overtimeView==='balance'?'active':''}" role="button" tabindex="0" data-ot-summary-view="balance"><div class="stat-head"><span>假日家訪換休</span><span class="stat-icon">🏠</span></div><div class="stat-value">${overtimeDurationLabel(mainCompSources.holidayVisit)}</div><div class="stat-foot">無到期限制・點擊查看換休帳本</div></article>
       </section>`:`
       <section class="ot-summary">
         <article class="stat-card"><div class="stat-head"><span>待審核加班／換休</span><span class="stat-icon">⏱</span></div><div class="stat-value">${summary.pendingOvertime}</div></article>
