@@ -703,7 +703,7 @@
       </div>
       ${canSubmit?`
       <section class="ot-summary ot-summary-main">
-        <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看加班申請紀錄</div></article>
+        <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月加班時數</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看加班申請紀錄</div></article>
         <article class="stat-card ot-summary-action ${state.overtimeView==='usage'?'active':''}" role="button" tabindex="0" data-ot-summary-view="usage"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div><div class="stat-foot">累計已使用 ${overtimeDurationLabel(summary.balance.used)}・點擊查看紀錄</div></article>
       </section>`:`
       <section class="ot-summary">
@@ -1847,6 +1847,63 @@
     return {cls:'ok',text:'有效'};
   }
 
+  function ceAddYearsClamped(date,years){
+    const [y,m,d]=String(date||'').slice(0,10).split('-').map(Number);
+    if(!y||!m||!d)return null;
+    const targetY=y+Number(years||0);
+    const lastDay=new Date(Date.UTC(targetY,m,0)).getUTCDate();
+    return `${targetY}-${String(m).padStart(2,'0')}-${String(Math.min(d,lastDay)).padStart(2,'0')}`;
+  }
+
+  function ceAddDays(date,days){
+    if(!date)return null;
+    const d=new Date(String(date).slice(0,10)+'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate()+Number(days||0));
+    return d.toISOString().slice(0,10);
+  }
+
+  function ceAnniversaryEnd(staffId){
+    const hire=ceStaff(staffId)?.hire_date;
+    if(!hire)return null;
+    const t=ceToday();
+    const hireYear=Number(String(hire).slice(0,4));
+    const todayYear=Number(String(t).slice(0,4));
+    let years=Math.max(0,todayYear-hireYear);
+    let start=ceAddYearsClamped(hire,years);
+    if(start&&start>t){
+      years=Math.max(0,years-1);
+      start=ceAddYearsClamped(hire,years);
+    }
+    return ceAddDays(ceAddYearsClamped(hire,years+1),-1);
+  }
+
+  function ceExpiryCountdownText(date){
+    const d=ceDaysUntil(date);
+    if(d===null)return '';
+    if(d<0)return '已到期';
+    if(d===0)return '今天到期';
+    return `剩 ${d} 天`;
+  }
+
+  function ceAnniversaryReminder(){
+    const summary=document.querySelector('#content .ot-summary-main');
+    const existing=document.getElementById('ceAnniversaryReminder');
+    if(!summary){existing?.remove();return;}
+    const expiry=ceAnniversaryEnd(state.profile?.id);
+    const html=expiry
+      ? `📅 本期一般加班換休到期日：<strong>${escapeHTML(ceDate(expiry))}</strong>（${escapeHTML(ceExpiryCountdownText(expiry))}）。到期未休依既有規則辦理結清；<span class="muted">假日家訪換休無到期限制。</span>`
+      : '📅 本期一般加班換休到期日：<strong>尚未設定到職日</strong>，目前無法計算週年到期日。';
+    if(existing){
+      if(existing.innerHTML!==html)existing.innerHTML=html;
+      return;
+    }
+    const box=document.createElement('div');
+    box.id='ceAnniversaryReminder';
+    box.className='attendance-expiry-reminder';
+    box.innerHTML=html;
+    summary.insertAdjacentElement('afterend',box);
+  }
+
   function ceBalancePanel(){
     if(state.page!=='overtime'||state.overtimeView!=='balance'||!state.compLeaveExpiryLoaded)return;
     const main=document.getElementById('otMain');
@@ -1969,6 +2026,7 @@
   function ceEnhance(){
     if(state.page!=='overtime'||!state.compLeaveExpiryLoaded)return;
     ceEnsureSettingsButton();
+    ceAnniversaryReminder();
     ceBalancePanel();
     cePayrollPanel();
   }
