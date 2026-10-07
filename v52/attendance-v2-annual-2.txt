@@ -108,7 +108,7 @@
       <div class="field"><label>目前可再申請</label><input id="alBalanceValue" class="al-readonly" value="${escapeHTML(alDays(b.available))}" disabled></div>
       <div class="field"><label>開始時間 *</label><div class="al-time-pair"><select id="alStartHour">${alTimeOptions(sp.hour)}</select><select id="alStartMinute"><option value="00" ${sp.minute==='00'?'selected':''}>00</option><option value="30" ${sp.minute==='30'?'selected':''}>30</option></select></div></div>
       <div class="field"><label>結束時間 *</label><div class="al-time-pair"><select id="alEndHour">${alTimeOptions(ep.hour)}</select><select id="alEndMinute"><option value="00" ${ep.minute==='00'?'selected':''}>00</option><option value="30" ${ep.minute==='30'?'selected':''}>30</option></select></div></div>
-      <div class="field full"><label>特休扣抵</label><div id="alDurationHelp" class="al-calc">系統將依開始與結束時間，以及特休日期當天有效的約定每日工時換算</div><div class="al-detail" id="alWorkHoursHelp">當日約定每日工時：${workHours?escapeHTML(String(workHours))+' 小時':'尚未設定'}</div></div>
+      <div class="field full"><label>特休扣抵</label><div id="alDurationHelp" class="al-calc">系統將依特休日期當天有效的正常工作時段換算；午休等休息時間不列入扣抵</div><div class="al-detail" id="alWorkHoursHelp">當日約定每日工時：${workHours?escapeHTML(String(workHours))+' 小時':'尚未設定'}</div></div>
       <div class="field full"><label>備註／事由</label><textarea id="alReason" placeholder="選填">${escapeHTML(existing?.reason||'')}</textarea></div>
       <div class="field full"><label>其他備註</label><textarea id="alNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
     </div>`;
@@ -127,13 +127,26 @@
       const date=$('alDate')?.value||isoDate(new Date());
       const start=alSelectedTime('alStart'), end=alSelectedTime('alEnd'), mins=alMinutesBetween(start,end);
       const hours=alWorkHoursOn(state.profile?.id,date);
-      const days=alLeaveDaysFor(mins,date,state.profile?.id);
+      const schedule=alWorkScheduleOn(state.profile?.id,date);
+      const charge=start&&end?alChargeMinutesFor(start,end,date,state.profile?.id):null;
+      const days=alLeaveDaysFor(mins,date,state.profile?.id,start,end);
       const help=$('alDurationHelp');
       const hoursHelp=$('alWorkHoursHelp');
-      if(hoursHelp)hoursHelp.textContent=`當日約定每日工時：${hours?hours+' 小時':'尚未設定'}`;
-      if(help)help.textContent=start&&end&&mins>0&&hours
-        ? `${alDuration(mins)} → 扣抵 ${alDays(days)}${mins>hours*60?'（單日最高扣抵1天）':''}`
-        :'請選擇完整且正確的起訖時間，並確認當日已有有效工時設定';
+      if(hoursHelp){
+        const scheduleText=schedule
+          ? alTime(schedule.work_start_time)+'～'+alTime(schedule.work_end_time)+(schedule.break_start_time?'；休息 '+alTime(schedule.break_start_time)+'～'+alTime(schedule.break_end_time):'')
+          : '尚未設定正常工作時段';
+        hoursHelp.textContent=`當日約定每日工時：${hours?hours+' 小時':'尚未設定'}｜${scheduleText}`;
+      }
+      if(help){
+        if(start&&end&&mins>0&&hours&&charge!==null&&charge>0){
+          help.textContent=`申請時段 ${alDuration(mins)}｜實際工作時段扣抵 ${alDuration(charge)} → ${alDays(days)}`;
+        }else if(start&&end&&charge===0){
+          help.textContent='所選時段未落在正常工作時間內，不會產生特休扣抵';
+        }else{
+          help.textContent='請選擇完整且正確的起訖時間，並確認當日已有正常工作時段設定';
+        }
+      }
     };
     const updateBalance=()=>{
       const date=$('alDate').value||isoDate(new Date());
@@ -159,8 +172,10 @@
     if(!['00','30'].includes(start.slice(3,5))||!['00','30'].includes(end.slice(3,5))){toast('特休時間請以30分鐘為間隔','warn');return false;}
     if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
     const workHours=alWorkHoursOn(state.profile.id,leaveDate);
-    if(status==='pending'&&!workHours){toast('此日期尚未設定有效的約定每日工時，請先至人員管理補齊工時時間軸','warn');return false;}
-    const requestedDays=alLeaveDaysFor(minutes,leaveDate,state.profile.id);
+    const chargeMinutes=alChargeMinutesFor(start,end,leaveDate,state.profile.id);
+    if(status==='pending'&&(!workHours||chargeMinutes===null)){toast('此日期尚未設定可用的正常工作時段，請先至人員管理補齊工時／班型時間軸','warn');return false;}
+    if(status==='pending'&&chargeMinutes<=0){toast('所選時段未落在正常工作時間內，無需申請特休','warn');return false;}
+    const requestedDays=alLeaveDaysFor(minutes,leaveDate,state.profile.id,start,end);
     const balance=alBalance(state.profile.id,leaveDate);
     if(status==='pending' && requestedDays>balance.available+0.0000005){toast(`所選日期目前可用特休僅 ${alDays(balance.available)}`,'warn');return false;}
     const payload={
@@ -203,7 +218,7 @@
     if(!alCanReview()){toast('目前帳號沒有特休審核權限','warn');return;}
     const row=(state.annualLeaveRows||[]).find(r=>String(r.id)===String(id));
     if(!row||row.status!=='pending'){toast('此特休申請目前不是待審核狀態','warn');return;}
-    if(status==='approved'&&!confirm(`確定核准「${row.applicant_name}」${alDate(row.leave_date)} ${alDays(row.leave_days)} 特休嗎？\n\n實際時段：${alDuration(row.minutes)}；當日每日工時 ${Number(row.work_hours_snapshot)||'—'} 小時。`)) return;
+    if(status==='approved'&&!confirm(`確定核准「${row.applicant_name}」${alDate(row.leave_date)} ${alDays(row.leave_days)} 特休嗎？\n\n申請時段：${alTime(row.start_time)}–${alTime(row.end_time)}；實際扣抵 ${alDuration(row.charge_minutes??row.minutes)}；當日每日工時 ${Number(row.work_hours_snapshot)||'—'} 小時。`)) return;
     showLoading(true);
     try{
       const {error}=await db.from('annual_leave_requests').update({
