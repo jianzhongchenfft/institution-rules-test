@@ -721,13 +721,10 @@
     return overtimeNavigateForAnnual(id);
   };
 
-  const observer=new MutationObserver(()=>{
-    if(state.page==='overtime'&&state.attendanceSection==='overtime') decorateOvertimePage();
-  });
-  observer.observe($('content'),{childList:true,subtree:true});
+  window.AttendanceV2Lifecycle?.register('overtime:render','annual-tabs-on-overtime',decorateOvertimePage);
 
   if(state.profile){
     renderNav();
-    if(state.page==='overtime'&&state.attendanceSection==='overtime') setTimeout(decorateOvertimePage,0);
+    if(state.page==='overtime'&&state.attendanceSection==='overtime') decorateOvertimePage();
   }
 })();
