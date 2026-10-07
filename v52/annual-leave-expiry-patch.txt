@@ -113,9 +113,11 @@
   }
 
   function wire(){document.querySelectorAll('[data-ale-cash]').forEach(btn=>btn.addEventListener('click',()=>openCash(btn.dataset.aleCash)));document.querySelectorAll('[data-ale-carry]').forEach(btn=>btn.addEventListener('click',()=>openCarry(btn.dataset.aleCarry)));}
-  let timer=null;
-  const observer=new MutationObserver(()=>{if(state.page!=='overtime'||state.attendanceSection!=='annual'||state.annualLeaveView!=='credits')return;clearTimeout(timer);timer=setTimeout(()=>{if(!document.getElementById('aleExpiryPanel'))load(false);},40);});
-  observer.observe(document.getElementById('content'),{childList:true,subtree:true});
-  document.addEventListener('click',e=>{if(e.target.closest?.('[data-al-view="credits"]'))setTimeout(()=>load(true),80);if(e.target.closest?.('#alReload'))setTimeout(()=>load(true),150);});
+  const aleLifecycle=()=>{
+    if(state.page!=='overtime'||state.attendanceSection!=='annual'||state.annualLeaveView!=='credits')return;
+    if(!state.annualExpiryLoaded)load(false);
+    else render();
+  };
+  window.AttendanceV2Lifecycle?.register('annual:render','annual-expiry',aleLifecycle);
   if(state.page==='overtime'&&state.attendanceSection==='annual'&&state.annualLeaveView==='credits')load(true);
 })();
