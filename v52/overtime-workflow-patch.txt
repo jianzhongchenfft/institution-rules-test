@@ -177,18 +177,6 @@
     }
   },true);
 
-  let queued=false;
-  const observer=new MutationObserver(mutations=>{
-    if(queued||!mutations.some(m=>m.addedNodes?.length))return;
-    queued=true;
-    queueMicrotask(()=>{
-      queued=false;
-      addWithdrawButtons();
-    });
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('[data-ot-view],#otReload'))queueMicrotask(addWithdrawButtons);
-  });
+  window.AttendanceV2Lifecycle?.register('overtime:render','overtime-workflow-withdraw',addWithdrawButtons);
+  addWithdrawButtons();
 })();
