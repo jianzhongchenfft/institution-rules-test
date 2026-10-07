@@ -703,7 +703,7 @@
       </div>
       ${canSubmit?`
       <section class="ot-summary ot-summary-main">
-        <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看我的申請</div></article>
+        <article class="stat-card ot-summary-action ${state.overtimeView==='mine'?'active':''}" role="button" tabindex="0" data-ot-summary-view="mine"><div class="stat-head"><span>本月我的加班</span><span class="stat-icon">⏱</span></div><div class="stat-value">${overtimeDurationLabel(summary.overtimeMinutes)}</div><div class="stat-foot">點擊查看加班申請紀錄</div></article>
         <article class="stat-card ot-summary-action ${state.overtimeView==='usage'?'active':''}" role="button" tabindex="0" data-ot-summary-view="usage"><div class="stat-head"><span>目前剩餘換休</span><span class="stat-icon">🕒</span></div><div class="stat-value">${overtimeDurationLabel(summary.balance.requestable)}</div><div class="stat-foot">累計已使用 ${overtimeDurationLabel(summary.balance.used)}・點擊查看紀錄</div></article>
       </section>`:`
       <section class="ot-summary">
@@ -712,7 +712,7 @@
       </section>`}
       <div class="ot-toolbar">
         <div class="ot-tabs">
-          ${canSubmit?`<button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">我的申請</button>
+          ${canSubmit?`<button class="ot-tab ${state.overtimeView==='mine'?'active':''}" data-ot-view="mine">加班申請紀錄</button>
           <button class="ot-tab ${state.overtimeView==='balance'?'active':''}" data-ot-view="balance">換休帳本</button>
           <button class="ot-tab ${state.overtimeView==='usage'?'active':''}" data-ot-view="usage">換休使用紀錄</button>`:''}
           ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${reviewCount}</button><button class="ot-tab ${state.overtimeView==='payroll'?'active':''}" data-ot-view="payroll">薪資結算</button>`:''}
@@ -1579,15 +1579,15 @@
   }
 
   function renderCorrectionRows(items,settled){
-    if(!items.length) return '<div class="ot-empty"><div class="icon">✓</div><h3>本月沒有可更正的已核准紀錄</h3></div>';
+    if(!items.length) return '<div class="ot-empty"><div class="icon">✓</div><h3>本月沒有可調整的已核准紀錄</h3></div>';
     return `<div class="ot-table-shell"><table class="ot-correction-table"><thead><tr><th>日期</th><th>申請人</th><th>類型</th><th>認列</th><th>事由</th><th>操作</th></tr></thead><tbody>${items.map(item=>{
       const r=item.row;
-      return `<tr><td>${dateText(item.date)}</td><td><strong>${escapeHTML(item.name)}</strong></td><td>${escapeHTML(typeText(r,item.kind))}</td><td>${escapeHTML(amountText(r,item.kind))}</td><td>${escapeHTML(r.reason||'—')}</td><td>${settled?'<span class="ot-status approved">已月結鎖定</span>':`<button class="btn sm" data-integrity-void="${item.kind}:${item.id}">作廢／更正</button>`}</td></tr>`;
+      return `<tr><td>${dateText(item.date)}</td><td><strong>${escapeHTML(item.name)}</strong></td><td>${escapeHTML(typeText(r,item.kind))}</td><td>${escapeHTML(amountText(r,item.kind))}</td><td>${escapeHTML(r.reason||'—')}</td><td>${settled?'<span class="ot-status approved">已月結鎖定</span>':`<button class="btn sm" data-integrity-void="${item.kind}:${item.id}">作廢</button>`}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 
   function openCorrectionCenter(){
-    if(!canReviewIntegrity()){toast('目前帳號沒有更正核准紀錄的權限','warn');return;}
+    if(!canReviewIntegrity()){toast('目前帳號沒有調整核准紀錄的權限','warn');return;}
     const settled=selectedMonthSettledFromState();
     const items=currentApprovedRows();
     openModal({
