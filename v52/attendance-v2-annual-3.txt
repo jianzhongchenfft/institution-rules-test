@@ -121,7 +121,7 @@
   `;
   document.head.appendChild(style);
 
-  Object.assign(state,{annualExpiryCredits:state.annualExpiryCredits||[],annualExpiryEvents:state.annualExpiryEvents||[],annualExpiryStaff:state.annualExpiryStaff||[],annualExpiryLoading:false,annualExpiryLoaded:false});
+  Object.assign(state,{annualExpiryCredits:state.annualExpiryCredits||[],annualExpiryEvents:state.annualExpiryEvents||[],annualExpiryStaff:state.annualExpiryStaff||[],annualExpiryQuotes:state.annualExpiryQuotes||{},annualExpiryLoading:false,annualExpiryLoaded:false});
 
   const today=()=>isoDate(new Date());
   const dur=n=>{n=Math.max(0,Number(n)||0);const h=Math.floor(n/60),m=n%60;return h&&m?`${h}小時${m}分`:h?`${h}小時`:`${m}分鐘`;};
@@ -129,8 +129,10 @@
   const dateText=v=>v?rocDate(String(v).slice(0,10)+'T00:00:00'):'—';
   const dtText=v=>v?rocDate(v):'—';
   const pad=n=>String(n).padStart(2,'0');
+  const money=n=>Number.isFinite(Number(n))?`NT$ ${Math.round(Number(n)).toLocaleString('zh-TW')}`:'—';
   const nameMap=()=>new Map((state.annualExpiryStaff||[]).map(s=>[String(s.id),s.display_name||'—']));
   const creditMap=()=>new Map((state.annualExpiryCredits||[]).map(c=>[String(c.id),c]));
+  const quoteFor=id=>state.annualExpiryQuotes?.[String(id)]||null;
 
   function addDays(value,days){
     const [y,m,d]=String(value).slice(0,10).split('-').map(Number);
@@ -151,11 +153,20 @@
     try{
       const [creditsRes,eventsRes,staffRes]=await Promise.all([
         db.from('annual_leave_credits').select('id,staff_id,period_start,period_end,granted_days,remaining_days,granted_minutes,remaining_minutes,label,note,generation_source,settlement_status,daily_hours_snapshot,source_credit_id,created_at,updated_at').order('period_end',{ascending:false}).order('created_at',{ascending:false}),
-        db.from('annual_leave_settlement_events').select('id,credit_id,staff_id,action,days,minutes,agreement_date,note,processed_by_name,carryover_credit_id,created_at').order('created_at',{ascending:false}),
+        db.from('annual_leave_settlement_events').select('id,credit_id,staff_id,action,days,minutes,agreement_date,note,processed_by_name,carryover_credit_id,wage_basis_credit_id,wage_basis_date,payroll_rate_id,payroll_rate_effective_from,monthly_wage_base,daily_wage,calculated_amount,calculation_formula,calculation_version,created_at').order('created_at',{ascending:false}),
         db.from('staff_users').select('id,display_name,role,is_active').order('display_name',{ascending:true})
       ]);
       if(creditsRes.error)throw creditsRes.error;if(eventsRes.error)throw eventsRes.error;if(staffRes.error)throw staffRes.error;
-      state.annualExpiryCredits=creditsRes.data||[];state.annualExpiryEvents=eventsRes.data||[];state.annualExpiryStaff=staffRes.data||[];state.annualExpiryLoaded=true;
+      state.annualExpiryCredits=creditsRes.data||[];
+      state.annualExpiryEvents=eventsRes.data||[];
+      state.annualExpiryStaff=staffRes.data||[];
+      const quoteRows=state.annualExpiryCredits.filter(c=>c.settlement_status==='pending_settlement'&&(Number(c.remaining_days)||0)>0);
+      const quoteEntries=await Promise.all(quoteRows.map(async c=>{
+        const {data,error}=await db.rpc('annual_leave_cash_settlement_quote',{p_credit_id:c.id});
+        return [String(c.id),error?{error:error.message}:data];
+      }));
+      state.annualExpiryQuotes=Object.fromEntries(quoteEntries);
+      state.annualExpiryLoaded=true;
       render();
     }catch(err){console.error('讀取特休到期處理資料失敗',err);toast('讀取特休到期處理資料失敗：'+(err?.message||err),'error');}
     finally{state.annualExpiryLoading=false;}
@@ -165,18 +176,22 @@
   function pendingHTML(){
     const rows=pendingRows(),names=nameMap();
     if(!rows.length)return '<div class="ale-empty">目前沒有到期未休、待處理的特休。</div>';
-    return `<div class="ale-table-shell"><table class="ale-table"><thead><tr><th>員工</th><th>來源批次</th><th>到期日</th><th>待處理特休</th><th>狀態</th><th>操作</th></tr></thead><tbody>${rows.map(c=>{
-      const carryAllowed=canCarry(c),status=c.generation_source==='carryover'?'遞延特休到期':'一般特休到期';
-      return `<tr><td><strong>${escapeHTML(names.get(String(c.staff_id))||'—')}</strong></td><td>${escapeHTML(c.label||'特休額度')}<div class="al-detail">${escapeHTML(dateText(c.period_start))}～${escapeHTML(dateText(c.period_end))}</div></td><td>${escapeHTML(dateText(c.period_end))}</td><td><strong>${escapeHTML(daysText(c.remaining_days))}</strong><div class="al-detail">原批次等值 ${escapeHTML(dur(c.remaining_minutes))}</div></td><td><span class="ale-chip pending">${escapeHTML(status)}</span>${!carryAllowed&&c.generation_source!=='carryover'?'<div class="al-detail">已超過下一年度遞延期間，只能結清</div>':''}</td><td><div class="ale-actions"><button class="btn sm primary" data-ale-cash="${c.id}">確認工資結清</button>${carryAllowed?`<button class="btn sm" data-ale-carry="${c.id}">協議遞延</button>`:''}</div></td></tr>`;
+    return `<div class="ale-table-shell"><table class="ale-table"><thead><tr><th>員工</th><th>來源批次</th><th>到期日</th><th>待處理特休</th><th>預估結清工資</th><th>狀態</th><th>操作</th></tr></thead><tbody>${rows.map(c=>{
+      const carryAllowed=canCarry(c),status=c.generation_source==='carryover'?'遞延特休到期':'一般特休到期',quote=quoteFor(c.id);
+      const wage=quote?.error
+        ? `<span class="ale-chip pending">待設定</span><div class="al-detail">${escapeHTML(quote.error)}</div>`
+        : quote
+          ? `<strong>${escapeHTML(money(quote.calculated_amount))}</strong><div class="al-detail">基準日 ${escapeHTML(dateText(quote.wage_basis_date))}｜月薪 ${escapeHTML(money(quote.monthly_wage_base))}</div>`
+          : '<span class="muted">—</span>';
+      return `<tr><td><strong>${escapeHTML(names.get(String(c.staff_id))||'—')}</strong></td><td>${escapeHTML(c.label||'特休額度')}<div class="al-detail">${escapeHTML(dateText(c.period_start))}～${escapeHTML(dateText(c.period_end))}</div></td><td>${escapeHTML(dateText(c.period_end))}</td><td><strong>${escapeHTML(daysText(c.remaining_days))}</strong><div class="al-detail">原批次等值 ${escapeHTML(dur(c.remaining_minutes))}</div></td><td>${wage}</td><td><span class="ale-chip pending">${escapeHTML(status)}</span>${!carryAllowed&&c.generation_source!=='carryover'?'<div class="al-detail">已超過下一年度遞延期間，只能結清</div>':''}</td><td><div class="ale-actions"><button class="btn sm primary" data-ale-cash="${c.id}">確認工資結清</button>${carryAllowed?`<button class="btn sm" data-ale-carry="${c.id}">協議遞延</button>`:''}</div></td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
-
   function historyHTML(){
     const rows=(state.annualExpiryEvents||[]).slice(0,30),names=nameMap(),credits=creditMap();
     if(!rows.length)return '<div class="ale-empty">目前尚無到期處理紀錄。</div>';
     return `<div class="ale-table-shell"><table class="ale-table"><thead><tr><th>員工</th><th>原批次</th><th>處理方式</th><th>特休天數</th><th>處理資訊</th><th>經手人</th></tr></thead><tbody>${rows.map(e=>{
       const c=credits.get(String(e.credit_id)),child=e.carryover_credit_id?credits.get(String(e.carryover_credit_id)):null,isCarry=e.action==='carryover';
-      const info=isCarry?`同意日：${dateText(e.agreement_date)}${child?`<div class="al-detail">遞延有效：${dateText(child.period_start)}～${dateText(child.period_end)}</div>`:''}`:'已確認工資結清';
+      const info=isCarry?`同意日：${dateText(e.agreement_date)}${child?`<div class="al-detail">遞延有效：${dateText(child.period_start)}～${dateText(child.period_end)}</div>`:''}`:(e.calculated_amount!==null&&e.calculated_amount!==undefined?`結清金額：<strong>${money(e.calculated_amount)}</strong><div class="al-detail">工資基準日：${dateText(e.wage_basis_date)}${e.calculation_formula?`｜${escapeHTML(e.calculation_formula)}`:''}</div>`:'已確認工資結清');
       return `<tr><td><strong>${escapeHTML(names.get(String(e.staff_id))||'—')}</strong></td><td>${escapeHTML(c?.label||'特休')}<div class="al-detail">${c?`${escapeHTML(dateText(c.period_start))}～${escapeHTML(dateText(c.period_end))}`:'—'}</div></td><td><span class="ale-chip ${isCarry?'carry':'cash'}">${isCarry?'協議遞延':'工資結清'}</span></td><td><strong>${escapeHTML(daysText(e.days))}</strong><div class="al-detail">${escapeHTML(dur(e.minutes))}</div></td><td>${info}${e.note?`<div class="al-detail">備註：${escapeHTML(e.note)}</div>`:''}</td><td>${escapeHTML(e.processed_by_name||'—')}<div class="al-detail">${escapeHTML(dtText(e.created_at))}</div></td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
@@ -187,14 +202,20 @@
     const main=document.getElementById('alMain');if(!main)return;
     const rows=pendingRows(),total=rows.reduce((s,c)=>s+(Number(c.remaining_days)||0),0),panel=document.createElement('section');
     panel.id='aleExpiryPanel';panel.className='ale-panel';
-    panel.innerHTML=`<h3>到期未休特休處理</h3><div class="ale-note">特休到期仍有餘額時，由機構負責人或系統管理員在此記錄處理方式。工資結清目前記錄「已完成結清」的特休天數、等值時數與稽核紀錄，尚未自動計算薪資金額；協議遞延會保留原批次，另建立下一年度的遞延特休批次。</div>${rows.length?`<div class="ale-alert">目前共有 <strong>${rows.length}</strong> 筆到期未休待處理，合計 <strong>${escapeHTML(daysText(total))}</strong>。</div>`:''}${pendingHTML()}<div class="ale-divider"></div><h3>最近處理紀錄</h3><div class="ale-note">保留原批次、處理天數、等值時數、處理方式、同意日期與經手人，供後續查核。</div>${historyHTML()}`;
+    panel.innerHTML=`<h3>到期未休特休處理</h3><div class="ale-note">特休到期仍有餘額時，由機構負責人或系統管理員在此處理。工資結清會依未休日數與薪資基數自動計算；月薪制以特休年度終結時適用的月薪正常工資 ÷ 30 作為一日工資。遞延特休屆期未休時，仍沿用原特休年度終結時的工資基準。</div>${rows.length?`<div class="ale-alert">目前共有 <strong>${rows.length}</strong> 筆到期未休待處理，合計 <strong>${escapeHTML(daysText(total))}</strong>。</div>`:''}${pendingHTML()}<div class="ale-divider"></div><h3>最近處理紀錄</h3><div class="ale-note">保留原批次、處理天數、等值時數、處理方式、同意日期與經手人，供後續查核。</div>${historyHTML()}`;
     (document.getElementById('alaManagerPanel')||main).insertAdjacentElement('afterend',panel);wire();
   }
 
   function getCredit(id){return (state.annualExpiryCredits||[]).find(c=>String(c.id)===String(id))||null;}
-  function openCash(id){
+  async function openCash(id){
     const c=getCredit(id);if(!c)return toast('找不到這筆特休額度','warn');const names=nameMap();
-    openModal({title:'確認未休特休工資結清',html:`<div class="al-calc">${escapeHTML(names.get(String(c.staff_id))||'—')}｜${escapeHTML(c.label||'特休')}｜待結清 ${escapeHTML(daysText(c.remaining_days))}<br>原批次等值：${escapeHTML(dur(c.remaining_minutes))}</div><div class="field" style="margin-top:12px"><label>備註（選填）</label><textarea id="aleCashNote" rows="3" placeholder="例如：併入115年9月薪資結清"></textarea></div><label class="ale-confirm"><input id="aleCashConfirm" type="checkbox"><span>我確認此筆未休特休已完成工資結清。完成後原批次剩餘特休天數將歸零並保留處理紀錄。</span></label><div class="ale-form-help">本階段尚未自動試算結清金額，請確認薪資作業已實際完成後再勾選。</div>`,confirmText:'確認已結清',onConfirm:()=>submitResolution(c.id,'cash_settlement',null,$('aleCashNote')?.value||'',!!$('aleCashConfirm')?.checked)});
+    let quote=quoteFor(id);
+    if(!quote||quote.error){
+      const {data,error}=await db.rpc('annual_leave_cash_settlement_quote',{p_credit_id:id});
+      if(error){toast('無法計算未休特休工資：'+(error.message||error),'error');return;}
+      quote=data;state.annualExpiryQuotes[String(id)]=quote;
+    }
+    openModal({title:'確認未休特休工資結清',html:`<div class="al-calc">${escapeHTML(names.get(String(c.staff_id))||'—')}｜${escapeHTML(c.label||'特休')}｜待結清 ${escapeHTML(daysText(c.remaining_days))}<br><strong>結清工資：${escapeHTML(money(quote.calculated_amount))}</strong><br><span class="muted">${escapeHTML(quote.calculation_formula||'')}</span><br><span class="muted">工資基準日：${escapeHTML(dateText(quote.wage_basis_date))}｜月薪工資基數：${escapeHTML(money(quote.monthly_wage_base))}</span></div><div class="field" style="margin-top:12px"><label>備註（選填）</label><textarea id="aleCashNote" rows="3" placeholder="例如：併入115年9月薪資結清"></textarea></div><label class="ale-confirm"><input id="aleCashConfirm" type="checkbox"><span>我確認以上金額，且此筆未休特休工資已完成結清。完成後原批次剩餘特休天數將歸零並保留計算與處理紀錄。</span></label><div class="ale-form-help">系統會保存薪資基準日、月薪工資基數、計算公式與結清金額，供後續查核。</div>`,confirmText:'確認已結清',onConfirm:()=>submitResolution(c.id,'cash_settlement',null,$('aleCashNote')?.value||'',!!$('aleCashConfirm')?.checked)});
   }
   function openCarry(id){
     const c=getCredit(id);if(!c)return toast('找不到這筆特休額度','warn');if(!canCarry(c))return toast('此筆特休目前只能辦理工資結清','warn');
@@ -207,10 +228,10 @@
     if(action==='carryover'&&!agreementDate){toast('請填寫勞雇雙方同意日期','warn');return false;}
     showLoading(true);
     try{
-      const {error}=await db.rpc('resolve_annual_leave_expiry',{p_credit_id:id,p_action:action,p_agreement_date:agreementDate,p_note:String(note||'').trim()||null});if(error)throw error;
+      const {data,error}=await db.rpc('resolve_annual_leave_expiry',{p_credit_id:id,p_action:action,p_agreement_date:agreementDate,p_note:String(note||'').trim()||null});if(error)throw error;
       closeModal();state.annualExpiryLoaded=false;await load(true);state.annualLeaveCredits=(state.annualExpiryCredits||[]).slice();
       document.querySelector('[data-al-view="credits"]')?.click();
-      toast(action==='carryover'?'已建立遞延特休並保留原批次紀錄':'已記錄未休特休工資結清','success');return true;
+      toast(action==='carryover'?'已建立遞延特休並保留原批次紀錄':`已記錄未休特休工資結清${data?.calculated_amount!==undefined?' '+money(data.calculated_amount):''}`,'success');return true;
     }catch(err){console.error('特休到期處理失敗',err);toast('處理失敗：'+(err?.message||err),'error');return false;}
     finally{showLoading(false);}
   }
