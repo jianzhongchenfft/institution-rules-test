@@ -1,0 +1,419 @@
+    $('crumb').textContent='加班、換休與特休管理';
+    $('content').innerHTML=`
+      <div class="page-head">
+        <div><h1>🗓 加班休假</h1></div>
+        <div class="actions">
+          ${alCanSubmit()?'<button id="alAddBtn" class="btn primary">＋ 申請特休</button>':''}
+        </div>
+      </div>
+      ${attendanceTabs('annual')}
+      <section class="al-summary">
+        <article class="stat-card"><div class="stat-head"><span>本期特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${escapeHTML(alDuration(balance.granted))}</div></article>
+        <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-open-usage aria-pressed="${state.annualLeaveView==='usage'}"><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${escapeHTML(alDuration(balance.remaining))}</div><div class="stat-foot">已使用 ${escapeHTML(alDuration(balance.used))}・點擊查看明細</div></article>
+      </section>
+      <div class="al-toolbar">
+        <div class="al-tabs">
+          <button class="al-tab ${state.annualLeaveView==='mine'?'active':''}" data-al-view="mine">我的申請</button>
+          <button class="al-tab ${state.annualLeaveView==='usage'?'active':''}" data-al-view="usage">使用明細</button>
+          <button class="al-tab ${state.annualLeaveView==='credits'?'active':''}" data-al-view="credits">${alCanManage()?'特休管理':'我的特休帳本'}</button>
+          ${alCanReview()?`<button class="al-tab ${state.annualLeaveView==='review'?'active':''}" data-al-view="review">待審核 ${reviewRows.length+cancellationReviewCount}</button>`:''}
+        </div>
+        <span class="spacer"></span>
+        ${state.annualLeaveView==='mine'?'<label class="schedule-filter-label" for="alMonth">月份</label><input id="alMonth" type="month" value="'+escapeHTML(state.annualLeaveMonth)+'">':''}
+        <button id="alReload" class="btn">↻ 重新整理</button>
+      </div>
+      <div id="alMain">${state.annualLeaveView==='usage'?alUsageTable():state.annualLeaveView==='credits'?alCreditTable():state.annualLeaveView==='review'?(`<section class="ot-rule-card"><h3>特休申請</h3>${alRequestTable(reviewRows,{review:true})}</section><section class="ot-rule-card"><h3>特休銷假申請</h3>${alCancellationReviewHTML()}</section>`):alRequestTable(monthOwn)}</div>`;
+
+    wireAttendanceTabs();
+    $('alAddBtn')?.addEventListener('click',()=>openAnnualLeaveModal());
+    document.querySelectorAll('[data-al-view]').forEach(btn=>btn.addEventListener('click',()=>{
+      state.annualLeaveView=btn.dataset.alView;
+      if(state.annualLeaveView==='usage')state.annualLeaveUsageCreditId=null;
+      renderAnnualLeavePage();
+    }));
+    const usageCard=document.querySelector('[data-al-open-usage]');
+    const openMyUsage=()=>{state.annualLeaveView='usage';state.annualLeaveUsageCreditId=null;renderAnnualLeavePage();};
+    usageCard?.addEventListener('click',openMyUsage);
+    usageCard?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMyUsage();}});
+    $('alMonth')?.addEventListener('change',e=>{state.annualLeaveMonth=e.target.value||isoDate(new Date()).slice(0,7);renderAnnualLeavePage();});
+    $('alReload')?.addEventListener('click',async()=>{await loadAnnualLeaveData();renderAnnualLeavePage();toast('已重新整理特休資料','success');});
+    document.querySelectorAll('[data-al-usage-credit]').forEach(btn=>btn.addEventListener('click',()=>{
+      state.annualLeaveUsageCreditId=btn.dataset.alUsageCredit;
+      state.annualLeaveView='usage';
+      renderAnnualLeavePage();
+    }));
+    document.querySelector('[data-al-usage-clear]')?.addEventListener('click',()=>{
+      state.annualLeaveUsageCreditId=null;
+      state.annualLeaveView='usage';
+      renderAnnualLeavePage();
+    });
+    wireAnnualLeaveActions();
+    window.AttendanceV2Lifecycle?.runSoon('annual:render',{view:state.annualLeaveView});
+  }
+
+  function alPageFormSetDirty(dirty){
+    state.annualLeavePageFormDirty=!!dirty;
+    const status=document.getElementById('alPageFormStatus');
+    if(status){
+      status.classList.toggle('dirty',!!dirty);
+      status.textContent=dirty?'尚有未儲存變更':'';
+    }
+  }
+
+  function alPageFormLeave(view='mine'){
+    if(state.annualLeavePageFormDirty&&!window.confirm('目前有尚未儲存的內容，確定離開嗎？'))return;
+    state.annualLeavePageFormDirty=false;
+    state.annualLeaveView=view;
+    renderAnnualLeavePage();
+  }
+
+  function alRenderPageForm({title,subtitle,html,view='mine',actions=''}) {
+    $('content').innerHTML=`
+      <div class="al-page-form">
+        <div class="al-page-form-head">
+          <div>
+            <button type="button" id="alPageBack" class="btn" style="margin-bottom:10px">← 返回特休</button>
+            <div class="al-page-form-title">${escapeHTML(title)}</div>
+            <div class="al-page-form-sub">${escapeHTML(subtitle||'')}</div>
+            <div id="alPageFormStatus" class="al-page-form-status"></div>
+          </div>
+        </div>
+        <div id="alPageFormBody" class="al-page-form-card">${html}</div>
+        <div class="al-page-form-footer">
+          <button type="button" id="alPageCancel" class="btn">返回</button>
+          <span class="spacer"></span>
+          ${actions}
+        </div>
+      </div>`;
+    alPageFormSetDirty(false);
+    const root=$('alPageFormBody');
+    const mark=()=>alPageFormSetDirty(true);
+    root?.addEventListener('input',mark);
+    root?.addEventListener('change',mark);
+    $('alPageBack')?.addEventListener('click',()=>alPageFormLeave(view));
+    $('alPageCancel')?.addEventListener('click',()=>alPageFormLeave(view));
+    window.scrollTo({top:0,behavior:'auto'});
+  }
+
+  function annualLeaveFormHTML(existing){
+    const date=existing?.leave_date||isoDate(new Date());
+    const sp=alTimeParts(existing?.start_time), ep=alTimeParts(existing?.end_time);
+    if(!existing){ sp.minute='00'; ep.minute='00'; }
+    const b=alBalance(state.profile?.id,date);
+    return `<div class="form-grid">
+      <div class="field"><label>申請人</label><input class="al-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
+      <div class="field"><label>身分</label><input class="al-readonly" value="${escapeHTML(alRoleLabel(state.profile?.role))}" disabled></div>
+      <div class="field"><label>特休日期 *</label><input id="alDate" type="date" value="${escapeHTML(date)}"></div>
+      <div class="field"><label>目前可再申請</label><input id="alBalanceValue" class="al-readonly" value="${escapeHTML(alDuration(b.available))}" disabled></div>
+      <div class="field"><label>開始時間 *</label><div class="al-time-pair"><select id="alStartHour">${alTimeOptions(sp.hour)}</select><select id="alStartMinute"><option value="00" ${sp.minute==='00'?'selected':''}>00</option><option value="30" ${sp.minute==='30'?'selected':''}>30</option></select></div></div>
+      <div class="field"><label>結束時間 *</label><div class="al-time-pair"><select id="alEndHour">${alTimeOptions(ep.hour)}</select><select id="alEndMinute"><option value="00" ${ep.minute==='00'?'selected':''}>00</option><option value="30" ${ep.minute==='30'?'selected':''}>30</option></select></div></div>
+      <div class="field full"><label>特休時數</label><div id="alDurationHelp" class="al-calc">系統將依開始與結束時間自動計算</div></div>
+      <div class="field full"><label>備註／事由</label><textarea id="alReason" placeholder="選填">${escapeHTML(existing?.reason||'')}</textarea></div>
+      <div class="field full"><label>其他備註</label><textarea id="alNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
+    </div>`;
+  }
+
+  function openAnnualLeaveModal(existing=null){
+    if(!alCanSubmit()){toast('目前帳號沒有特休申請權限','warn');return;}
+    alRenderPageForm({
+      title:existing?'編輯特休申請':'申請特休',
+      subtitle:existing?'修改既有特休申請內容，送出後依原審核流程處理。':'填寫特休日期與起訖時間後送出審核。',
+      html:annualLeaveFormHTML(existing),
+      view:'mine',
+      actions:`${!existing?'<button type="button" id="alPageDraft" class="btn">儲存草稿</button>':''}<button type="button" id="alPageSubmit" class="btn primary">送出審核</button>`
+    });
+    const update=()=>{
+      const start=alSelectedTime('alStart'), end=alSelectedTime('alEnd'), mins=alMinutesBetween(start,end);
+      $('alDurationHelp').textContent=start&&end&&mins>0?alDuration(mins):'請選擇完整且正確的起訖時間';
+    };
+    const updateBalance=()=>{
+      const b=alBalance(state.profile?.id,$('alDate').value||isoDate(new Date()));
+      $('alBalanceValue').value=alDuration(b.available);
+    };
+    ['alStartHour','alStartMinute','alEndHour','alEndMinute'].forEach(id=>$(id)?.addEventListener('change',update));
+    $('alDate')?.addEventListener('change',updateBalance);
+    $('alPageDraft')?.addEventListener('click',()=>saveAnnualLeave(existing,'draft'));
+    $('alPageSubmit')?.addEventListener('click',()=>saveAnnualLeave(existing,'pending'));
+    update();
+    window.AttendanceV2Lifecycle?.runSoon('annual:form',{kind:'annual_leave',existingId:existing?.id||null});
+  }
+
+  async function saveAnnualLeave(existing,status){
+    const leaveDate=$('alDate').value;
+    const start=alSelectedTime('alStart'), end=alSelectedTime('alEnd');
+    const minutes=alMinutesBetween(start,end);
+    const reason=$('alReason').value.trim(), notes=$('alNotes').value.trim();
+    if(!leaveDate){toast('請選擇特休日期','warn');return false;}
+    if(!start||!end){toast('請選擇完整的開始與結束時間','warn');return false;}
+    if(!['00','30'].includes(start.slice(3,5))||!['00','30'].includes(end.slice(3,5))){toast('特休時間請以30分鐘為間隔','warn');return false;}
+    if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
+    const balance=alBalance(state.profile.id,leaveDate);
+    if(status==='pending' && minutes>balance.available){toast(`所選日期目前可用特休僅 ${alDuration(balance.available)}`,'warn');return false;}
+    const payload={
+      applicant_staff_id:state.profile.id,
+      applicant_name:state.profile.display_name,
+      applicant_role:state.profile.role,
+      leave_date:leaveDate,
+      start_time:start,
+      end_time:end,
+      minutes,
+      reason,
+      notes:notes||null,
+      status,
+      submitted_at:status==='pending'?new Date().toISOString():null,
+      review_note:null,
+      reviewed_at:null,
+      reviewed_by:null,
+      updated_at:new Date().toISOString()
+    };
+    showLoading(true);
+    try{
+      let error;
+      if(existing){ ({error}=await db.from('annual_leave_requests').update(payload).eq('id',existing.id)); }
+      else { payload.created_by=state.user.id; ({error}=await db.from('annual_leave_requests').insert(payload)); }
+      if(error) throw error;
+      state.annualLeavePageFormDirty=false;
+      await loadAnnualLeaveData();
+      state.annualLeaveView='mine';
+      renderAnnualLeavePage();
+      toast(status==='pending'?'特休申請已送出審核':'特休草稿已儲存','success');
+      return true;
+    }catch(err){
+      console.error('儲存特休失敗',err);
+      toast('儲存特休申請失敗：'+(err?.message||err),'error');
+      return false;
+    }finally{showLoading(false);}
+  }
+
+  async function reviewAnnualLeave(id,status,note=null){
+    if(!alCanReview()){toast('目前帳號沒有特休審核權限','warn');return;}
+    const row=(state.annualLeaveRows||[]).find(r=>String(r.id)===String(id));
+    if(!row||row.status!=='pending'){toast('此特休申請目前不是待審核狀態','warn');return;}
+    if(status==='approved'&&!confirm(`確定核准「${row.applicant_name}」${alDate(row.leave_date)} ${alDuration(row.minutes)} 特休嗎？`)) return;
+    showLoading(true);
+    try{
+      const {error}=await db.from('annual_leave_requests').update({
+        status,
+        review_note:note||null,
+        reviewed_by:state.user.id,
+        reviewed_at:new Date().toISOString(),
+        updated_at:new Date().toISOString()
+      }).eq('id',id).eq('status','pending');
+      if(error) throw error;
+      closeModal();
+      await loadAnnualLeaveData();
+      renderAnnualLeavePage();
+      toast(status==='approved'?'特休申請已核准':'特休申請已退回','success');
+    }catch(err){
+      console.error('審核特休失敗',err);
+      toast('審核特休失敗：'+(err?.message||err),'error');
+    }finally{showLoading(false);}
+  }
+
+  function openAnnualRejectModal(id){
+    openModal({
+      title:'退回特休申請',
+      html:'<div class="field"><label>退回原因 *</label><textarea id="alRejectReason" placeholder="請說明需要補充或修正的內容"></textarea></div>',
+      confirmText:'確認退回',
+      onConfirm:async()=>{
+        const note=$('alRejectReason').value.trim();
+        if(!note){toast('請填寫退回原因','warn');return false;}
+        await reviewAnnualLeave(id,'rejected',note);
+        return true;
+      }
+    });
+  }
+
+  function openAnnualCancellationModal(id){
+    const row=alOwnRows().find(r=>String(r.id)===String(id));
+    if(!row||!alCanRequestCancellation(row)){toast('此筆特休目前無法申請銷假','warn');return;}
+    openModal({
+      title:'申請銷假｜特休',
+      html:`<div class="al-calc">原核准特休：<strong>${escapeHTML(alDate(row.leave_date))}　${escapeHTML(alTime(row.start_time))}–${escapeHTML(alTime(row.end_time))}</strong><br>銷假需由管理者審核；核准後才會將特休時數還回。</div><div class="field" style="margin-top:12px"><label>銷假原因 *</label><textarea id="alCancelReason" placeholder="例如：原行程取消，當日正常上班"></textarea></div>`,
+      confirmText:'送出銷假申請',
+      onConfirm:()=>submitAnnualCancellation(id)
+    });
+  }
+
+  async function submitAnnualCancellation(id){
+    const reason=String(document.getElementById('alCancelReason')?.value||'').trim();
+    if(!reason){toast('請填寫銷假原因','warn');return false;}
+    showLoading(true);
+    try{
+      const {error}=await db.rpc('request_leave_cancellation',{p_source_type:'annual_leave',p_source_id:id,p_reason:reason});
+      if(error)throw error;
+      closeModal();await loadAnnualLeaveData();renderAnnualLeavePage();toast('銷假申請已送出審核','success');return true;
+    }catch(err){console.error('送出特休銷假失敗',err);toast('送出銷假失敗：'+(err?.message||err),'error');return false;}
+    finally{showLoading(false);}
+  }
+
+  async function reviewAnnualCancellation(id,action,note=null){
+    const req=(state.annualLeaveCancellationRows||[]).find(x=>String(x.id)===String(id));
+    if(!req||req.status!=='pending'){toast('此銷假申請目前不是待審核狀態','warn');return false;}
+    if(action==='approve'&&!confirm(`確定核准「${req.applicant_name}」${alDate(req.leave_date)} 的特休銷假嗎？\n\n核准後會將原扣除的特休時數還回。`))return false;
+    showLoading(true);
+    try{
+      const {error}=await db.rpc('review_leave_cancellation',{p_id:id,p_action:action,p_note:note||null});
+      if(error)throw error;
+      closeModal();await loadAnnualLeaveData();renderAnnualLeavePage();toast(action==='approve'?'銷假已核准，特休時數已還回':'銷假申請已退回','success');return true;
+    }catch(err){console.error('審核特休銷假失敗',err);toast('審核銷假失敗：'+(err?.message||err),'error');return false;}
+    finally{showLoading(false);}
+  }
+
+  function openAnnualCancellationRejectModal(id){
+    openModal({
+      title:'退回特休銷假申請',
+      html:'<div class="field"><label>退回原因 *</label><textarea id="alCancelRejectReason" placeholder="請說明退回原因"></textarea></div>',
+      confirmText:'確認退回',
+      onConfirm:()=>{
+        const note=String(document.getElementById('alCancelRejectReason')?.value||'').trim();
+        if(!note){toast('請填寫退回原因','warn');return false;}
+        return reviewAnnualCancellation(id,'reject',note);
+      }
+    });
+  }
+
+  async function withdrawAnnualLeave(id){
+    const row=alOwnRows().find(r=>String(r.id)===String(id));
+    if(!row||row.status!=='pending'){toast('只有待審核中的特休申請可以撤回','warn');return;}
+    if(!confirm(`確定撤回 ${alDate(row.leave_date)} 的特休申請嗎？`)) return;
+    showLoading(true);
+    try{
+      const {error}=await db.from('annual_leave_requests').update({
+        status:'withdrawn',
+        withdraw_reason:'申請人撤回',
+        withdrawn_by:state.user.id,
+        withdrawn_at:new Date().toISOString(),
+        updated_at:new Date().toISOString()
+      }).eq('id',id).eq('status','pending');
+      if(error) throw error;
+      await loadAnnualLeaveData();
+      renderAnnualLeavePage();
+      toast('特休申請已撤回','success');
+    }catch(err){
+      console.error('撤回特休失敗',err);
+      toast('撤回特休失敗：'+(err?.message||err),'error');
+    }finally{showLoading(false);}
+  }
+
+  function wireAnnualLeaveActions(){
+    document.querySelectorAll('[data-al-edit]').forEach(btn=>btn.addEventListener('click',()=>{
+      const row=alOwnRows().find(r=>String(r.id)===String(btn.dataset.alEdit));
+      if(row) openAnnualLeaveModal(row);
+    }));
+    document.querySelectorAll('[data-al-withdraw]').forEach(btn=>btn.addEventListener('click',()=>withdrawAnnualLeave(btn.dataset.alWithdraw)));
+    document.querySelectorAll('[data-al-approve]').forEach(btn=>btn.addEventListener('click',()=>reviewAnnualLeave(btn.dataset.alApprove,'approved')));
+    document.querySelectorAll('[data-al-reject]').forEach(btn=>btn.addEventListener('click',()=>openAnnualRejectModal(btn.dataset.alReject)));
+    document.querySelectorAll('[data-al-cancel-request]').forEach(btn=>btn.addEventListener('click',()=>openAnnualCancellationModal(btn.dataset.alCancelRequest)));
+    document.querySelectorAll('[data-al-cancel-approve]').forEach(btn=>btn.addEventListener('click',()=>reviewAnnualCancellation(btn.dataset.alCancelApprove,'approve')));
+    document.querySelectorAll('[data-al-cancel-reject]').forEach(btn=>btn.addEventListener('click',()=>openAnnualCancellationRejectModal(btn.dataset.alCancelReject)));
+  }
+
+  const overtimeNavigateForAnnual = navigate;
+  navigate = function(id){
+    if(id!=='overtime') return overtimeNavigateForAnnual(id);
+    if(state.attendanceSection==='annual'){
+      state.page='overtime';
+      renderNav();
+      $('sidebar').classList.remove('open');
+      window.scrollTo({top:0,behavior:'auto'});
+      $('content').innerHTML='<div class="empty compact"><div class="icon">🌿</div><h3>正在載入特休資料</h3><p>請稍候。</p></div>';
+      return loadAnnualLeaveData().then(renderAnnualLeavePage);
+    }
+    return overtimeNavigateForAnnual(id);
+  };
+
+  window.AttendanceV2Lifecycle?.register('overtime:render','annual-tabs-on-overtime',decorateOvertimePage);
+
+  if(state.profile){
+    renderNav();
+    if(state.page==='overtime'&&state.attendanceSection==='overtime') decorateOvertimePage();
+  }
+})();
+
+
+
+/* ===== v52/annual-leave-auto-patch.txt ===== */
+// V5.2 特休週年制自動產生：狀態提示、到期提醒
+(() => {
+  const style=document.createElement('style');
+  style.id='v52-annual-leave-auto-style';
+  style.textContent=`
+    .ala-panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px 17px;margin-top:12px}
+    .ala-panel h3{margin:0 0 10px;font-size:15px}
+    .ala-note{font-size:11.5px;color:#667085;line-height:1.6}
+    .ala-grid{display:grid;gap:8px;margin-top:10px}
+    .ala-row{display:grid;grid-template-columns:minmax(120px,1fr) 150px 135px minmax(180px,1.3fr);gap:10px;align-items:center;border-top:1px solid var(--line);padding:9px 0;font-size:12px}
+    .ala-row:first-child{border-top:0}
+    .ala-name{font-weight:900;color:#344054}
+    .ala-sub{font-size:10.5px;color:#667085;margin-top:2px}
+    .ala-chip{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:10.5px;font-weight:900;white-space:nowrap}
+    .ala-chip.ok{background:#eef7f1;color:#237a4b}
+    .ala-chip.warn{background:#fffaeb;color:#b54708}
+    .ala-chip.pending{background:#fef3f2;color:#b42318}
+    .ala-reminder{border:1px solid #fedf89;background:#fffaeb;color:#93370d;border-radius:10px;padding:9px 11px;margin:0 0 12px;font-size:12px;line-height:1.6}
+    @media(max-width:820px){.ala-row{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.ala-row{grid-template-columns:1fr}}
+  `;
+  document.head.appendChild(style);
+
+  Object.assign(state,{
+    annualAutoStaff:state.annualAutoStaff||[],
+    annualAutoCredits:state.annualAutoCredits||[],
+    annualAutoLoading:false,
+    annualAutoLoadedAt:0
+  });
+
+  const canManage=()=>!!state.profile&&['business_manager','organization_manager','admin'].includes(state.profile.role);
+  const today=()=>isoDate(new Date());
+  const duration=minutes=>{
+    const n=Math.max(0,Number(minutes)||0),h=Math.floor(n/60),m=n%60;
+    return h&&m?`${h}小時${m}分`:h?`${h}小時`:`${m}分鐘`;
+  };
+  const dateText=value=>value?rocDate(String(value).slice(0,10)+'T00:00:00'):'未設定';
+  const roleText=role=>roleLabels?.[role]||role||'—';
+  const daysUntil=value=>{
+    if(!value)return null;
+    const a=new Date(today()+'T00:00:00'),b=new Date(String(value).slice(0,10)+'T00:00:00');
+    return Math.round((b-a)/86400000);
+  };
+
+  async function loadMeta(force=false){
+    if(!state.profile||state.annualAutoLoading)return;
+    if(!force&&Date.now()-(state.annualAutoLoadedAt||0)<15000){enhance();return;}
+    state.annualAutoLoading=true;
+    try{
+      const staffQuery=canManage()
+        ? db.from('staff_users').select('id,display_name,role,is_active,hire_date,agreed_daily_hours').eq('is_active',true).order('display_name')
+        : db.from('staff_users').select('id,display_name,role,is_active,hire_date,agreed_daily_hours').eq('id',state.profile.id).limit(1);
+      const creditQuery=db.from('annual_leave_credits')
+        .select('id,staff_id,period_start,period_end,granted_minutes,remaining_minutes,label,note,entitlement_key,entitlement_days,daily_hours_snapshot,generation_source,settlement_status,auto_generated_at')
+        .order('period_start',{ascending:false});
+      const [staffRes,creditRes]=await Promise.all([staffQuery,creditQuery]);
+      if(staffRes.error)throw staffRes.error;
+      if(creditRes.error)throw creditRes.error;
+      state.annualAutoStaff=staffRes.data||[];
+      state.annualAutoCredits=creditRes.data||[];
+      state.annualAutoLoadedAt=Date.now();
+      enhance();
+    }catch(err){
+      console.error('讀取特休自動產生狀態失敗',err);
+    }finally{state.annualAutoLoading=false;}
+  }
+
+  function ownCurrentCredits(){
+    const staffId=String(state.profile?.id||'');
+    const t=today();
+    return (state.annualAutoCredits||[]).filter(c=>
+      String(c.staff_id)===staffId&&
+      c.settlement_status==='active'&&
+      String(c.period_start||'')<=t&&
+      String(c.period_end||'')>=t
+    );
+  }
+
+  function renderOwnReminder(){
+    if(state.page!=='overtime'||state.attendanceSection!=='annual')return;
+    const summary=document.querySelector('#content .al-summary');
+    if(!summary)return;
+    const current=ownCurrentCredits();
