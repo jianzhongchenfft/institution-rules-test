@@ -711,7 +711,7 @@
       <div class="page-head">
         <div><h1>🗓 加班休假</h1></div>
         <div class="actions">
-          ${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 新增申請</button><button id="clAddBtn" class="btn">＋ 使用換休</button>':''}
+          ${canSubmit?'<button id="otAddBtn" class="btn primary">＋ 申請加班</button><button id="clAddBtn" class="btn">＋ 使用換休</button>':''}
         </div>
       </div>
       ${canSubmit?`
