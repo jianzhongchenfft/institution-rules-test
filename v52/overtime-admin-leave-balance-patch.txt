@@ -4,10 +4,14 @@
   const today=()=>isoDate(new Date());
 
   function dur(minutes){
-    return overtimeDurationLabel(Math.max(0,Number(minutes)||0));
+    const n=Math.max(0,Number(minutes)||0);
+    const h=Math.floor(n/60),m=n%60;
+    if(h&&m)return h+'小時'+m+'分';
+    if(h)return h+'小時';
+    return m+'分鐘';
   }
   function roleLabel(role){
-    return overtimeRoleLabel(role);
+    return ({admin:'系統管理員',organization_manager:'機構負責人',business_manager:'業務負責人',supervisor:'居家督導員'})[role]||role||'—';
   }
   function currentCompBalance(staffId,date=today()){
     const credits=(state.compLeaveCredits||[])
