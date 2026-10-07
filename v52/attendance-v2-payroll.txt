@@ -2,7 +2,6 @@
 // Authoritative runtime source.
 
 
-/* ===== v52/payroll-period-guard-patch.txt ===== */
 // V5.2 共通版面去除重複標題 + 薪資結算月份防呆
 (() => {
   // 上方導覽列已顯示模組名稱與說明，內容區不再重複顯示相同標題。
@@ -76,7 +75,6 @@
 
 
 
-/* ===== v52/payroll-correction-patch.txt ===== */
 // V5.2 月結後更正單：已月結報表的附加式更正，換休取得／使用同步實際換休帳本
 // 換休取得與換休使用更正均保存實際日期與必要來源資料；換休使用以30分鐘為單位。
 (() => {
@@ -683,7 +681,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
 
 
 
-/* ===== v52/overtime-payroll-calc-patch.txt ===== */
 // V5.2 薪資計算：薪資基數、假日類型拆分、加班費試算
 (() => {
   const style=document.createElement('style');
@@ -1159,7 +1156,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
 })();
 
 
-/* ===== v52/overtime-payroll-summary-patch.txt ===== */
 // V5.2 薪資計算補強：新假別統計＋月結金額快照顯示
 (() => {
   const timed=new Set(['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime']);
@@ -1280,7 +1276,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
 })();
 
 
-/* ===== v52/overtime-payroll-edit-fix-patch.txt ===== */
 // V5.2 新假別編輯補強＋新申請預設換休
 (() => {
   const newTypes=new Set(['rest_day_overtime','national_holiday_overtime']);
@@ -1341,7 +1336,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
 
 
 
-/* ===== v52/overtime-personal-hours-patch.txt ===== */
 // V5.2 個人約定每日工時：依個人6/7/8小時換算時薪，超過約定工時比照法定倍率
 (() => {
   const phStyle=document.createElement('style');

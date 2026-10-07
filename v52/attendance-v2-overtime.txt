@@ -2,7 +2,6 @@
 // Authoritative runtime source.
 
 
-/* ===== v52/overtime-patch.txt ===== */
 // V5.2 加班／換休管理：申請與審核
 (() => {
   const overtimeStyle = document.createElement('style');
@@ -1222,7 +1221,6 @@
 })();
 
 
-/* ===== v52/overtime-workflow-tracking-patch.txt ===== */
 // V5.2 加班／換休流程補強：編輯狀態追蹤
 // 固定「週一至週五／週六／週日」日別判斷已移除；例假提醒改讀員工主檔設定。
 (() => {
@@ -1238,7 +1236,6 @@
 
 
 
-/* ===== v52/overtime-workflow-patch.txt ===== */
 // V5.2 加班／換休流程補強：只保留編輯追蹤、重疊檢核與撤回按鈕
 // 月份篩選由 overtime-month-filter-patch 處理；撤回動作由 overtime-withdraw-patch 處理。
 // 本檔不再包裝 navigate、不再執行資料重載、不再保留舊的 withdrawn 流程。
@@ -1424,7 +1421,6 @@
 
 
 
-/* ===== v52/overtime-withdraw-patch.txt ===== */
 // V5.2 加班／換休：待審核申請撤回（直接刪除，不追蹤原因）
 // 本檔只處理撤回，不再重載加班資料、不包裝 navigate、不覆寫換休餘額。
 (() => {
@@ -1515,7 +1511,6 @@
 
 
 
-/* ===== v52/overtime-integrity-patch.txt ===== */
 // V5.2 加班／換休資料完整性：月結鎖定、核准紀錄調整
 (() => {
   const style=document.createElement('style');
@@ -1719,7 +1714,6 @@
 })();
 
 
-/* ===== v52/comp-leave-expiry-patch.txt ===== */
 // V5.2 換休期限／到期管理：一般加班週年制到期、假日家訪換休永久有效、到期提醒
 // 換休台帳由 overtime-patch 統一載入；本檔只負責期限設定與明細呈現。
 (() => {
@@ -2042,7 +2036,6 @@
 
 
 
-/* ===== v52/overtime-month-filter-patch.txt ===== */
 // V5.2 加班／換休：月份篩選與顯示輔助
 // 本檔只處理畫面篩選與固定提示，不載入其他模組、不包裝 navigate、不重寫資料。
 (() => {
@@ -2155,7 +2148,6 @@
 
 
 
-/* ===== v52/overtime-regular-day-warning-patch.txt ===== */
 // V5.2 固定例假日設定＋申請提醒
 (() => {
   const labels=['週日','週一','週二','週三','週四','週五','週六'];
@@ -2329,7 +2321,6 @@
 
 
 
-/* ===== v52/overtime-admin-leave-balance-patch.txt ===== */
 // V5.2 管理者假別餘額總覽：換休＋特休
 (() => {
   const isManager=()=>!!state.profile&&['organization_manager','admin'].includes(state.profile.role);
