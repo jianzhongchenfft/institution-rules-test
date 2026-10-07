@@ -527,7 +527,7 @@
     const leavePending=state.compLeaveRows.filter(r=>r.status==='pending');
     return `
       <section class="ot-rule-card">
-        <h3>加班／換休取得申請</h3>
+        <h3>加班申請</h3>
         ${overtimeRenderTable(overtimePending,{review:true})}
       </section>
       <section class="ot-rule-card">
