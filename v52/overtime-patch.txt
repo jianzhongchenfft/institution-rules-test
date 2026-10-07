@@ -75,6 +75,7 @@
     overtimeLoaded: false,
     compLeaveRows: [],
     compLeaveLoaded: false,
+    leaveCancellationRows: state.leaveCancellationRows || [],
     compLeaveCredits: state.compLeaveCredits || [],
     compLeaveCreditsLoaded: false,
     payrollSettlements: [],
@@ -253,7 +254,7 @@
     if(!state.profile) return;
     showLoading(true);
     try{
-      const [overtimeResult,leaveResult,settlementResult,creditResult] = await Promise.all([
+      const [overtimeResult,leaveResult,settlementResult,creditResult,cancellationResult] = await Promise.all([
         db.from('overtime_requests')
           .select('id,applicant_staff_id,applicant_name,applicant_role,work_date,request_type,start_time,end_time,overtime_minutes,compensation_method,reason,holiday_case_count,comp_minutes,notes,status,review_note,submitted_at,reviewed_at,regular_day_weekday_snapshot,regular_day_warning,created_at,updated_at')
           .order('work_date',{ascending:false})
@@ -268,16 +269,22 @@
         db.from('comp_leave_credits')
           .select('id,staff_id,source_type,source_id,earned_date,earned_minutes,remaining_minutes,expires_on,source_label,created_at,updated_at')
           .order('earned_date',{ascending:true})
-          .order('created_at',{ascending:true})
+          .order('created_at',{ascending:true}),
+        db.from('leave_cancellation_requests')
+          .select('id,source_type,source_id,applicant_staff_id,applicant_name,leave_date,minutes,reason,status,requested_at,reviewed_at,review_note,created_at')
+          .eq('source_type','comp_leave')
+          .order('requested_at',{ascending:false})
       ]);
       if(overtimeResult.error) throw overtimeResult.error;
       if(leaveResult.error) throw leaveResult.error;
       if(settlementResult.error) throw settlementResult.error;
       if(creditResult.error) throw creditResult.error;
+      if(cancellationResult.error) throw cancellationResult.error;
       state.overtimeRows = overtimeResult.data || [];
       state.compLeaveRows = leaveResult.data || [];
       state.payrollSettlements = settlementResult.data || [];
       state.compLeaveCredits = creditResult.data || [];
+      state.leaveCancellationRows = cancellationResult.data || [];
       state.overtimeLoaded = true;
       state.compLeaveLoaded = true;
       state.payrollSettlementsLoaded = true;
@@ -287,6 +294,7 @@
       state.overtimeRows = [];
       state.compLeaveRows = [];
       state.compLeaveCredits = [];
+      state.leaveCancellationRows = [];
       state.compLeaveCreditsLoaded = false;
       toast('讀取加班／換休資料失敗：'+(err?.message||err),'error');
     }finally{
@@ -358,24 +366,64 @@
       </section>`;
   }
 
+  function compLeaveCancellation(sourceId){
+    return (state.leaveCancellationRows||[]).find(x=>x.source_type==='comp_leave'&&String(x.source_id)===String(sourceId))||null;
+  }
+
+  function compLeaveDisplayStatus(r){
+    const cancel=compLeaveCancellation(r.id);
+    if(cancel?.status==='approved') return {cls:'voided',text:'已銷假'};
+    if(r.status==='approved'&&cancel?.status==='pending') return {cls:'pending',text:'待銷假審核'};
+    return {cls:r.status,text:overtimeStatusLabel(r.status)};
+  }
+
+  function compLeaveCancellationNote(r){
+    const cancel=compLeaveCancellation(r.id);
+    if(!cancel) return '';
+    if(cancel.status==='pending') return `<div class="ot-detail">銷假原因：${escapeHTML(cancel.reason||'—')}</div>`;
+    if(cancel.status==='rejected') return `<div class="ot-reject">銷假退回：${escapeHTML(cancel.review_note||'未填寫原因')}</div>`;
+    if(cancel.status==='approved') return `<div class="ot-detail">銷假已核准：${escapeHTML(cancel.reason||'—')}</div>`;
+    return '';
+  }
+
+  function canRequestCompLeaveCancellation(r){
+    if(!overtimeCanSubmit()||String(r.applicant_staff_id)!==String(state.profile?.id)||r.status!=='approved')return false;
+    const cancel=compLeaveCancellation(r.id);
+    if(cancel&&['pending','approved'].includes(cancel.status))return false;
+    return String(r.leave_date||'')>isoDate(new Date());
+  }
+
+  function compLeaveCancellationReviewHTML(){
+    const rows=(state.leaveCancellationRows||[]).filter(x=>x.source_type==='comp_leave'&&x.status==='pending');
+    if(!rows.length)return '<div class="ot-empty"><div class="icon">✓</div><h3>目前沒有換休銷假申請</h3></div>';
+    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>申請人</th><th>休假日期</th><th>時數</th><th>銷假原因</th><th>操作</th></tr></thead><tbody>${rows.map(x=>`<tr>
+      <td><div class="ot-review-name">${escapeHTML(x.applicant_name||'—')}</div></td>
+      <td>${rocDate(String(x.leave_date)+'T00:00:00')}</td>
+      <td><span class="ot-amount">${overtimeDurationLabel(x.minutes)}</span></td>
+      <td>${escapeHTML(x.reason||'—')}</td>
+      <td><div class="ot-actions"><button class="btn sm primary" data-cl-cancel-approve="${x.id}">核准銷假</button><button class="btn sm" data-cl-cancel-reject="${x.id}">退回</button></div></td>
+    </tr>`).join('')}</tbody></table></div>`;
+  }
+
   function compLeaveUsageRenderTable(rows,{review=false}={}){
     if(!rows.length){
       return `<div class="ot-empty"><div class="icon">🕒</div><h3>目前沒有資料</h3></div>`;
     }
     return `<div class="ot-table-shell"><table class="ot-table"><thead><tr>
       ${review?'<th>申請人</th>':''}<th>換休日期</th><th>換休時間</th><th>使用時數</th><th>事由</th><th>狀態</th><th>操作</th>
-      </tr></thead><tbody>${rows.map(r=>`<tr>
+      </tr></thead><tbody>${rows.map(r=>{const ds=compLeaveDisplayStatus(r);return `<tr>
         ${review?`<td><div class="ot-review-name">${escapeHTML(r.applicant_name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.applicant_role))}</div></td>`:''}
         <td>${rocDate(r.leave_date+'T00:00:00')}</td>
         <td><div class="ot-type">${String(r.start_time||'').slice(0,5)}–${String(r.end_time||'').slice(0,5)}</div></td>
         <td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td>
-        <td><div>${escapeHTML(r.reason||'—')}</div>${r.notes?`<div class="ot-detail ot-note">備註：${escapeHTML(r.notes)}</div>`:''}${r.review_note?`<div class="ot-reject">審核說明：${escapeHTML(r.review_note)}</div>`:''}</td>
-        <td><span class="ot-status ${r.status}">${overtimeStatusLabel(r.status)}</span></td>
+        <td><div>${escapeHTML(r.reason||'—')}</div>${r.notes?`<div class="ot-detail ot-note">備註：${escapeHTML(r.notes)}</div>`:''}${r.review_note?`<div class="ot-reject">審核說明：${escapeHTML(r.review_note)}</div>`:''}${compLeaveCancellationNote(r)}</td>
+        <td><span class="ot-status ${ds.cls}">${escapeHTML(ds.text)}</span></td>
         <td><div class="ot-actions">
           ${!review && ['draft','rejected'].includes(r.status) && overtimeCanSubmit()?`<button class="btn sm" data-cl-edit="${r.id}">編輯</button>`:''}
+          ${!review && canRequestCompLeaveCancellation(r)?`<button class="btn sm" data-cl-cancel-request="${r.id}">申請銷假</button>`:''}
           ${review && r.status==='pending'?`<button class="btn sm primary" data-cl-approve="${r.id}">核准</button><button class="btn sm" data-cl-reject="${r.id}">退回</button>`:''}
         </div></td>
-      </tr>`).join('')}</tbody></table></div>`;
+      </tr>`}).join('')}</tbody></table></div>`;
   }
 
   function renderOvertimeReview(){
@@ -389,6 +437,10 @@
       <section class="ot-rule-card">
         <h3>換休使用申請</h3>
         ${compLeaveUsageRenderTable(leavePending,{review:true})}
+      </section>
+      <section class="ot-rule-card">
+        <h3>換休銷假申請</h3>
+        ${compLeaveCancellationReviewHTML()}
       </section>`;
   }
 
@@ -396,6 +448,9 @@
     document.querySelectorAll('[data-cl-edit]').forEach(btn=>btn.addEventListener('click',()=>openCompLeaveUsageModal(state.compLeaveRows.find(r=>r.id===btn.dataset.clEdit)||null)));
     document.querySelectorAll('[data-cl-approve]').forEach(btn=>btn.addEventListener('click',()=>reviewCompLeaveUsage(btn.dataset.clApprove,'approved')));
     document.querySelectorAll('[data-cl-reject]').forEach(btn=>btn.addEventListener('click',()=>openCompLeaveRejectModal(btn.dataset.clReject)));
+    document.querySelectorAll('[data-cl-cancel-request]').forEach(btn=>btn.addEventListener('click',()=>openCompLeaveCancellationModal(btn.dataset.clCancelRequest)));
+    document.querySelectorAll('[data-cl-cancel-approve]').forEach(btn=>btn.addEventListener('click',()=>reviewCompLeaveCancellation(btn.dataset.clCancelApprove,'approve')));
+    document.querySelectorAll('[data-cl-cancel-reject]').forEach(btn=>btn.addEventListener('click',()=>openCompLeaveCancellationRejectModal(btn.dataset.clCancelReject)));
   }
 
   function wireOvertimeTableActions(){
@@ -627,7 +682,7 @@
     const ownLeave=compLeaveOwnRows();
     const canSubmit=overtimeCanSubmit();
     const canReview=overtimeCanReview();
-    const reviewCount=summary.pending;
+    const reviewCount=summary.pending+(state.leaveCancellationRows||[]).filter(x=>x.source_type==='comp_leave'&&x.status==='pending').length;
     const validViews=canSubmit
       ? (canReview?['mine','balance','usage','review','payroll']:['mine','balance','usage'])
       : (canReview?['review','payroll']:['mine']);
@@ -1003,6 +1058,55 @@
       toast('儲存換休使用申請失敗：'+(err?.message||err),'error');
       return false;
     }finally{showLoading(false);}
+  }
+
+  function openCompLeaveCancellationModal(id){
+    const row=state.compLeaveRows.find(r=>String(r.id)===String(id));
+    if(!row||!canRequestCompLeaveCancellation(row)){toast('此筆換休目前無法申請銷假','warn');return;}
+    openModal({
+      title:'申請銷假｜換休',
+      html:`<div class="ot-rule-highlight" style="margin-top:0">原核准換休：<strong>${rocDate(row.leave_date+'T00:00:00')}　${String(row.start_time||'').slice(0,5)}–${String(row.end_time||'').slice(0,5)}</strong><br>銷假需由管理者審核；核准後才會將換休時數還回。</div><div class="field" style="margin-top:12px"><label>銷假原因 *</label><textarea id="clCancelReason" placeholder="例如：原行程取消，當日正常上班"></textarea></div>`,
+      confirmText:'送出銷假申請',
+      onConfirm:()=>submitCompLeaveCancellation(id)
+    });
+  }
+
+  async function submitCompLeaveCancellation(id){
+    const reason=String(document.getElementById('clCancelReason')?.value||'').trim();
+    if(!reason){toast('請填寫銷假原因','warn');return false;}
+    showLoading(true);
+    try{
+      const {error}=await db.rpc('request_leave_cancellation',{p_source_type:'comp_leave',p_source_id:id,p_reason:reason});
+      if(error)throw error;
+      closeModal();await loadOvertimeRows();renderOvertimePage();toast('銷假申請已送出審核','success');return true;
+    }catch(err){console.error('送出換休銷假失敗',err);toast('送出銷假失敗：'+(err?.message||err),'error');return false;}
+    finally{showLoading(false);}
+  }
+
+  async function reviewCompLeaveCancellation(id,action,note=null){
+    const req=(state.leaveCancellationRows||[]).find(x=>String(x.id)===String(id)&&x.source_type==='comp_leave');
+    if(!req||req.status!=='pending'){toast('此銷假申請目前不是待審核狀態','warn');return false;}
+    if(action==='approve'&&!confirm(`確定核准「${req.applicant_name}」${rocDate(String(req.leave_date)+'T00:00:00')} 的換休銷假嗎？\n\n核准後會將原扣除的換休時數還回。`))return false;
+    showLoading(true);
+    try{
+      const {error}=await db.rpc('review_leave_cancellation',{p_id:id,p_action:action,p_note:note||null});
+      if(error)throw error;
+      closeModal();await loadOvertimeRows();renderOvertimePage();toast(action==='approve'?'銷假已核准，換休時數已還回':'銷假申請已退回','success');return true;
+    }catch(err){console.error('審核換休銷假失敗',err);toast('審核銷假失敗：'+(err?.message||err),'error');return false;}
+    finally{showLoading(false);}
+  }
+
+  function openCompLeaveCancellationRejectModal(id){
+    openModal({
+      title:'退回換休銷假申請',
+      html:'<div class="field"><label>退回原因 *</label><textarea id="clCancelRejectReason" placeholder="請說明退回原因"></textarea></div>',
+      confirmText:'確認退回',
+      onConfirm:()=>{
+        const note=String(document.getElementById('clCancelRejectReason')?.value||'').trim();
+        if(!note){toast('請填寫退回原因','warn');return false;}
+        return reviewCompLeaveCancellation(id,'reject',note);
+      }
+    });
   }
 
   async function reviewCompLeaveUsage(id,status,note=null){
