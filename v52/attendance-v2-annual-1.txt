@@ -2,7 +2,6 @@
 // Authoritative Attendance V2 annual-leave module.
 
 
-/* ===== v52/annual-leave-patch.txt ===== */
 // V5.2 出勤／休假管理：特休（前台整合、資料獨立）
 (() => {
   const module = modules.find(m => m.id === 'overtime');

@@ -524,3 +524,16 @@ alter table public.annual_leave_credits
 alter table public.annual_leave_credits
   add constraint annual_leave_credits_generation_source_check
   check (generation_source in ('auto_weekly_anniversary','carryover'));
+
+
+-- Attendance V2 supporting indexes
+create index if not exists comp_leave_correction_restorations_credit_id_idx
+  on private.comp_leave_correction_restorations(credit_id);
+
+create index if not exists comp_leave_usages_voided_by_idx
+  on public.comp_leave_usages(voided_by)
+  where voided_by is not null;
+
+create index if not exists overtime_requests_voided_by_idx
+  on public.overtime_requests(voided_by)
+  where voided_by is not null;

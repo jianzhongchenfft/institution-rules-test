@@ -333,7 +333,6 @@
 
 
 
-/* ===== v52/annual-leave-auto-patch.txt ===== */
 // V5.2 特休週年制自動產生：狀態提示、到期提醒
 (() => {
   const style=document.createElement('style');

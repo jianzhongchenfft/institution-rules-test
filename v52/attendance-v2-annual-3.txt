@@ -68,7 +68,6 @@
 })();
 
 
-/* ===== v52/annual-leave-business-manager-access-patch.txt ===== */
 // V5.2 測試版：業務負責人不顯示特休額度控管，只保留個人特休帳本。
 (() => {
   const isBusinessManager=()=>state.profile?.role==='business_manager';
@@ -101,7 +100,6 @@
 
 
 
-/* ===== v52/annual-leave-expiry-patch.txt ===== */
 // V5.2 特休到期未休：工資結清／協議遞延
 (() => {
   const canResolve=()=>!!state.profile&&['organization_manager','admin'].includes(state.profile.role);
