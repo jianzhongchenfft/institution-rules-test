@@ -99,7 +99,8 @@
   function overtimeTypeLabel(type){
     return ({
       overtime:'平日加班',
-      holiday_overtime:'假日加班',
+      rest_day_overtime:'休息日加班',
+      national_holiday_overtime:'國定假日出勤',
       holiday_visit_comp:'假日家訪換休'
     })[type] || type || '—';
   }
@@ -352,7 +353,7 @@
   function overtimeSummary(){
     const {start,end}=overtimeMonthRange(state.overtimeMonth);
     const own=overtimeOwnRows().filter(r=>r.work_date>=start && r.work_date<=end && r.status==='approved');
-    const overtimeMinutes=own.filter(r=>['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime'].includes(r.request_type)).reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
+    const overtimeMinutes=own.filter(r=>['overtime','rest_day_overtime','national_holiday_overtime'].includes(r.request_type)).reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
     const compMinutes=own.filter(r=>r.request_type==='holiday_visit_comp').reduce((sum,r)=>sum+(Number(r.comp_minutes)||0),0);
     const pendingOvertime=state.overtimeRows.filter(r=>r.status==='pending').length;
     const pendingLeave=state.compLeaveRows.filter(r=>r.status==='pending').length;
@@ -902,13 +903,13 @@
       startParts.minute='00';
       endParts.minute='00';
     }
-    const compensation=existing?.compensation_method || (type==='holiday_visit_comp'?'comp_leave':'');
+    const compensation=existing?.compensation_method || 'comp_leave';
     return `
       <div class="form-grid">
         <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
         <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
         <div class="field"><label>日期 *</label><input id="otWorkDate" type="date" value="${escapeHTML(today)}"></div>
-        <div class="field"><label>申請類型 *</label><select id="otType"><option value="" ${!type?'selected':''} disabled>請選擇</option><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="holiday_overtime" ${type==='holiday_overtime'?'selected':''}>假日加班</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
+        <div class="field"><label>申請類型 *</label><select id="otType"><option value="" ${!type?'selected':''} disabled>請選擇</option><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="rest_day_overtime" ${type==='rest_day_overtime'?'selected':''}>休息日加班</option><option value="national_holiday_overtime" ${type==='national_holiday_overtime'?'selected':''}>國定假日出勤</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
         <div id="otTimeFields" class="field full">
           <div class="form-grid">
             <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="otStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="otStartMinute">${overtimeTenMinuteOptions(startParts.minute)}</select></div></div>
@@ -955,7 +956,7 @@
       updateOvertimeCalc();
     };
     typeEl?.addEventListener('change',()=>{
-      if(typeEl.value!=='holiday_visit_comp'&&compensationEl) compensationEl.value='';
+      if(typeEl.value!=='holiday_visit_comp'&&compensationEl&&!existing) compensationEl.value='comp_leave';
       updateFields();
     });
     ['otStartHour','otStartMinute','otEndHour','otEndMinute'].forEach(id=>$(id)?.addEventListener('change',updateOvertimeCalc));
@@ -994,7 +995,7 @@
     const notes=$('otNotes').value.trim();
     const start=overtimeSelectedTime('otStart');
     const end=overtimeSelectedTime('otEnd');
-    const timeBased=['overtime','holiday_overtime'].includes(type);
+    const timeBased=['overtime','rest_day_overtime','national_holiday_overtime'].includes(type);
     const compensationMethod=type==='holiday_visit_comp'?'comp_leave':$('otCompensation').value;
     const overtimeMinutes=timeBased?overtimeMinutesBetween(start,end):0;
     const caseCount=type==='holiday_visit_comp'?Math.max(0,Number($('otCaseCount')?.value)||0):null;
@@ -1008,6 +1009,9 @@
     if(timeBased && (!['00','10','20','30','40','50'].includes(String(start).slice(3,5)) || !['00','10','20','30','40','50'].includes(String(end).slice(3,5)))){toast('加班時間請以10分鐘為間隔','warn');return false;}
     if(timeBased && overtimeCrossesMidnight(start,end)){toast('跨午夜加班請分成兩筆申請：第一天申請至 00:00（視同 24:00），第二天改以隔日 00:00 起另行申請。','warn');return false;}
     if(timeBased && overtimeMinutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
+    if(type==='overtime'&&overtimeMinutes>240){toast('平日加班超過4小時，請先確認法定工時限制','warn');return false;}
+    if(type==='rest_day_overtime'&&overtimeMinutes>720){toast('休息日出勤不得超過12小時','warn');return false;}
+    if(type==='national_holiday_overtime'&&overtimeMinutes>720){toast('國定假日出勤超過12小時，請重新確認','warn');return false;}
     if(type==='holiday_visit_comp' && (caseCount<1 || caseCount>4)){toast('假日家訪案數請選擇1至4案','warn');return false;}
 
     const payload={
@@ -1476,7 +1480,6 @@
 
     const timedTypes=new Set([
       'overtime',
-      'holiday_overtime',
       'rest_day_overtime',
       'national_holiday_overtime'
     ]);
@@ -1673,7 +1676,7 @@
 
   function typeText(row,kind){
     if(kind==='leave') return '換休使用';
-    return ({overtime:'平日加班',holiday_overtime:'假日加班',holiday_visit_comp:'假日家訪換休'})[row.request_type]||row.request_type||'—';
+    return ({overtime:'平日加班',rest_day_overtime:'休息日加班',national_holiday_overtime:'國定假日出勤',holiday_visit_comp:'假日家訪換休'})[row.request_type]||row.request_type||'—';
   }
 
   function amountText(row,kind){

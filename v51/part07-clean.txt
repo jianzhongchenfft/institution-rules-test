@@ -65,7 +65,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!staffManagementRes.ok) throw new Error(`v52/staff-management.txt 載入失敗（${staffManagementRes.status}）`);
       eval(await staffManagementRes.text());
 
-      const staffScheduleRes = await fetch('v52/staff-work-schedule-ui.txt?v=org-manager-submit-v1-20261008',{cache:'no-store'});
+      const staffScheduleRes = await fetch('v52/staff-work-schedule-ui.txt?v=overtime-clean-v1-20261008',{cache:'no-store'});
       if(!staffScheduleRes.ok) throw new Error(`v52/staff-work-schedule-ui.txt 載入失敗（${staffScheduleRes.status}）`);
       eval(await staffScheduleRes.text());
 
@@ -95,13 +95,13 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       ];
       let attendanceV2Code='';
       for(const path of attendanceV2Files){
-        const res=await fetch(`${path}?v=org-manager-submit-v1-20261008`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=overtime-clean-v1-20261008`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         attendanceV2Code+='\n'+await res.text();
       }
       eval(attendanceV2Code);
 
-      const conciseUiRes=await fetch('v52/ui-concise-copy-patch.txt?v=org-manager-submit-v1-20261008',{cache:'no-store'});
+      const conciseUiRes=await fetch('v52/ui-concise-copy-patch.txt?v=overtime-clean-v1-20261008',{cache:'no-store'});
       if(!conciseUiRes.ok) throw new Error(`v52/ui-concise-copy-patch.txt 載入失敗（${conciseUiRes.status}）`);
       eval(await conciseUiRes.text());
 
