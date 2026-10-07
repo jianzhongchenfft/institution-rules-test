@@ -8,8 +8,8 @@
       </div>
       ${attendanceTabs('annual')}
       <section class="al-summary">
-        <article class="stat-card"><div class="stat-head"><span>本期特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${escapeHTML(alDuration(balance.granted))}</div></article>
-        <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-open-usage aria-pressed="${state.annualLeaveView==='usage'}"><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${escapeHTML(alDuration(balance.remaining))}</div><div class="stat-foot">已使用 ${escapeHTML(alDuration(balance.used))}・點擊查看明細</div></article>
+        <article class="stat-card"><div class="stat-head"><span>本期特休額度</span><span class="stat-icon">🌿</span></div><div class="stat-value">${escapeHTML(alDays(balance.granted))}</div></article>
+        <article class="stat-card al-summary-action ${state.annualLeaveView==='usage'?'active':''}" role="button" tabindex="0" data-al-open-usage aria-pressed="${state.annualLeaveView==='usage'}"><div class="stat-head"><span>目前剩餘特休</span><span class="stat-icon">✅</span></div><div class="stat-value">${escapeHTML(alDays(balance.remaining))}</div><div class="stat-foot">已使用 ${escapeHTML(alDays(balance.used))}・點擊查看明細</div></article>
       </section>
       <div class="al-toolbar">
         <div class="al-tabs">
@@ -100,14 +100,15 @@
     const sp=alTimeParts(existing?.start_time), ep=alTimeParts(existing?.end_time);
     if(!existing){ sp.minute='00'; ep.minute='00'; }
     const b=alBalance(state.profile?.id,date);
+    const workHours=alWorkHoursOn(state.profile?.id,date);
     return `<div class="form-grid">
       <div class="field"><label>申請人</label><input class="al-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
       <div class="field"><label>身分</label><input class="al-readonly" value="${escapeHTML(alRoleLabel(state.profile?.role))}" disabled></div>
       <div class="field"><label>特休日期 *</label><input id="alDate" type="date" value="${escapeHTML(date)}"></div>
-      <div class="field"><label>目前可再申請</label><input id="alBalanceValue" class="al-readonly" value="${escapeHTML(alDuration(b.available))}" disabled></div>
+      <div class="field"><label>目前可再申請</label><input id="alBalanceValue" class="al-readonly" value="${escapeHTML(alDays(b.available))}" disabled></div>
       <div class="field"><label>開始時間 *</label><div class="al-time-pair"><select id="alStartHour">${alTimeOptions(sp.hour)}</select><select id="alStartMinute"><option value="00" ${sp.minute==='00'?'selected':''}>00</option><option value="30" ${sp.minute==='30'?'selected':''}>30</option></select></div></div>
       <div class="field"><label>結束時間 *</label><div class="al-time-pair"><select id="alEndHour">${alTimeOptions(ep.hour)}</select><select id="alEndMinute"><option value="00" ${ep.minute==='00'?'selected':''}>00</option><option value="30" ${ep.minute==='30'?'selected':''}>30</option></select></div></div>
-      <div class="field full"><label>特休時數</label><div id="alDurationHelp" class="al-calc">系統將依開始與結束時間自動計算</div></div>
+      <div class="field full"><label>特休扣抵</label><div id="alDurationHelp" class="al-calc">系統將依開始與結束時間，以及特休日期當天有效的約定每日工時換算</div><div class="al-detail" id="alWorkHoursHelp">當日約定每日工時：${workHours?escapeHTML(String(workHours))+' 小時':'尚未設定'}</div></div>
       <div class="field full"><label>備註／事由</label><textarea id="alReason" placeholder="選填">${escapeHTML(existing?.reason||'')}</textarea></div>
       <div class="field full"><label>其他備註</label><textarea id="alNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
     </div>`;
@@ -117,18 +118,28 @@
     if(!alCanSubmit()){toast('目前帳號沒有特休申請權限','warn');return;}
     alRenderPageForm({
       title:existing?'編輯特休申請':'申請特休',
-      subtitle:existing?'修改既有特休申請內容，送出後依原審核流程處理。':'填寫特休日期與起訖時間後送出審核。',
+      subtitle:existing?'修改既有特休申請內容，送出後依原審核流程處理。':'填寫特休日期與起訖時間後，系統依當日有效工時換算特休天數。',
       html:annualLeaveFormHTML(existing),
       view:'mine',
       actions:`${!existing?'<button type="button" id="alPageDraft" class="btn">儲存草稿</button>':''}<button type="button" id="alPageSubmit" class="btn primary">送出審核</button>`
     });
     const update=()=>{
+      const date=$('alDate')?.value||isoDate(new Date());
       const start=alSelectedTime('alStart'), end=alSelectedTime('alEnd'), mins=alMinutesBetween(start,end);
-      $('alDurationHelp').textContent=start&&end&&mins>0?alDuration(mins):'請選擇完整且正確的起訖時間';
+      const hours=alWorkHoursOn(state.profile?.id,date);
+      const days=alLeaveDaysFor(mins,date,state.profile?.id);
+      const help=$('alDurationHelp');
+      const hoursHelp=$('alWorkHoursHelp');
+      if(hoursHelp)hoursHelp.textContent=`當日約定每日工時：${hours?hours+' 小時':'尚未設定'}`;
+      if(help)help.textContent=start&&end&&mins>0&&hours
+        ? `${alDuration(mins)} → 扣抵 ${alDays(days)}${mins>hours*60?'（單日最高扣抵1天）':''}`
+        :'請選擇完整且正確的起訖時間，並確認當日已有有效工時設定';
     };
     const updateBalance=()=>{
-      const b=alBalance(state.profile?.id,$('alDate').value||isoDate(new Date()));
-      $('alBalanceValue').value=alDuration(b.available);
+      const date=$('alDate').value||isoDate(new Date());
+      const b=alBalance(state.profile?.id,date);
+      $('alBalanceValue').value=alDays(b.available);
+      update();
     };
     ['alStartHour','alStartMinute','alEndHour','alEndMinute'].forEach(id=>$(id)?.addEventListener('change',update));
     $('alDate')?.addEventListener('change',updateBalance);
@@ -147,8 +158,11 @@
     if(!start||!end){toast('請選擇完整的開始與結束時間','warn');return false;}
     if(!['00','30'].includes(start.slice(3,5))||!['00','30'].includes(end.slice(3,5))){toast('特休時間請以30分鐘為間隔','warn');return false;}
     if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
+    const workHours=alWorkHoursOn(state.profile.id,leaveDate);
+    if(status==='pending'&&!workHours){toast('此日期尚未設定有效的約定每日工時，請先至人員管理補齊工時時間軸','warn');return false;}
+    const requestedDays=alLeaveDaysFor(minutes,leaveDate,state.profile.id);
     const balance=alBalance(state.profile.id,leaveDate);
-    if(status==='pending' && minutes>balance.available){toast(`所選日期目前可用特休僅 ${alDuration(balance.available)}`,'warn');return false;}
+    if(status==='pending' && requestedDays>balance.available+0.0000005){toast(`所選日期目前可用特休僅 ${alDays(balance.available)}`,'warn');return false;}
     const payload={
       applicant_staff_id:state.profile.id,
       applicant_name:state.profile.display_name,
@@ -189,7 +203,7 @@
     if(!alCanReview()){toast('目前帳號沒有特休審核權限','warn');return;}
     const row=(state.annualLeaveRows||[]).find(r=>String(r.id)===String(id));
     if(!row||row.status!=='pending'){toast('此特休申請目前不是待審核狀態','warn');return;}
-    if(status==='approved'&&!confirm(`確定核准「${row.applicant_name}」${alDate(row.leave_date)} ${alDuration(row.minutes)} 特休嗎？`)) return;
+    if(status==='approved'&&!confirm(`確定核准「${row.applicant_name}」${alDate(row.leave_date)} ${alDays(row.leave_days)} 特休嗎？\n\n實際時段：${alDuration(row.minutes)}；當日每日工時 ${Number(row.work_hours_snapshot)||'—'} 小時。`)) return;
     showLoading(true);
     try{
       const {error}=await db.from('annual_leave_requests').update({
@@ -229,7 +243,7 @@
     if(!row||!alCanRequestCancellation(row)){toast('此筆特休目前無法申請銷假','warn');return;}
     openModal({
       title:'申請銷假｜特休',
-      html:`<div class="al-calc">原核准特休：<strong>${escapeHTML(alDate(row.leave_date))}　${escapeHTML(alTime(row.start_time))}–${escapeHTML(alTime(row.end_time))}</strong><br>銷假需由管理者審核；核准後才會將特休時數還回。</div><div class="field" style="margin-top:12px"><label>銷假原因 *</label><textarea id="alCancelReason" placeholder="例如：原行程取消，當日正常上班"></textarea></div>`,
+      html:`<div class="al-calc">原核准特休：<strong>${escapeHTML(alDate(row.leave_date))}　${escapeHTML(alTime(row.start_time))}–${escapeHTML(alTime(row.end_time))}</strong><br>銷假需由管理者審核；核准後才會將原扣除的特休天數還回。</div><div class="field" style="margin-top:12px"><label>銷假原因 *</label><textarea id="alCancelReason" placeholder="例如：原行程取消，當日正常上班"></textarea></div>`,
       confirmText:'送出銷假申請',
       onConfirm:()=>submitAnnualCancellation(id)
     });
@@ -250,12 +264,12 @@
   async function reviewAnnualCancellation(id,action,note=null){
     const req=(state.annualLeaveCancellationRows||[]).find(x=>String(x.id)===String(id));
     if(!req||req.status!=='pending'){toast('此銷假申請目前不是待審核狀態','warn');return false;}
-    if(action==='approve'&&!confirm(`確定核准「${req.applicant_name}」${alDate(req.leave_date)} 的特休銷假嗎？\n\n核准後會將原扣除的特休時數還回。`))return false;
+    if(action==='approve'&&!confirm(`確定核准「${req.applicant_name}」${alDate(req.leave_date)} 的特休銷假嗎？\n\n核准後會將原扣除的特休天數還回。`))return false;
     showLoading(true);
     try{
       const {error}=await db.rpc('review_leave_cancellation',{p_id:id,p_action:action,p_note:note||null});
       if(error)throw error;
-      closeModal();await loadAnnualLeaveData();renderAnnualLeavePage();toast(action==='approve'?'銷假已核准，特休時數已還回':'銷假申請已退回','success');return true;
+      closeModal();await loadAnnualLeaveData();renderAnnualLeavePage();toast(action==='approve'?'銷假已核准，特休天數已還回':'銷假申請已退回','success');return true;
     }catch(err){console.error('審核特休銷假失敗',err);toast('審核銷假失敗：'+(err?.message||err),'error');return false;}
     finally{showLoading(false);}
   }
