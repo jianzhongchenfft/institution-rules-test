@@ -336,7 +336,7 @@
       await loadStaffManagement(true);
       const updated=(state.staffMgmtSystem||[]).find(x=>String(x.id)===String(s.id));
       renderSystemDetail(updated?.id||s.id);
-      toast('人員出勤基本資料已更新','success');
+      toast('人員出勤基本資料已更新；特休資格已同步檢查','success');
     }catch(err){
       console.error(err);
       toast('儲存人員資料失敗：'+(err?.message||err),'error');
