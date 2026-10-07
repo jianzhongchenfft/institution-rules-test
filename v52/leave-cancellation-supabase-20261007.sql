@@ -152,16 +152,16 @@ begin
       raise exception '目前帳號沒有換休銷假審核權限。' using errcode='42501';
     end if;
 
-    select status into v_source_status
-    from public.comp_leave_usages
-    where id=v_req.source_id
-    for update;
-
-    if v_source_status<>'approved' then
-      raise exception '原換休紀錄已不是已核准狀態，請重新整理後確認。' using errcode='P0001';
-    end if;
-
     if p_action='approve' then
+      select status into v_source_status
+      from public.comp_leave_usages
+      where id=v_req.source_id
+      for update;
+
+      if v_source_status<>'approved' then
+        raise exception '原換休紀錄已不是已核准狀態，請重新整理後確認。' using errcode='P0001';
+      end if;
+
       update public.comp_leave_usages
       set status='voided',
           void_reason='銷假：'||v_req.reason,
@@ -179,16 +179,16 @@ begin
       raise exception '目前帳號沒有特休銷假審核權限。' using errcode='42501';
     end if;
 
-    select status into v_source_status
-    from public.annual_leave_requests
-    where id=v_req.source_id
-    for update;
-
-    if v_source_status<>'approved' then
-      raise exception '原特休紀錄已不是已核准狀態，請重新整理後確認。' using errcode='P0001';
-    end if;
-
     if p_action='approve' then
+      select status into v_source_status
+      from public.annual_leave_requests
+      where id=v_req.source_id
+      for update;
+
+      if v_source_status<>'approved' then
+        raise exception '原特休紀錄已不是已核准狀態，請重新整理後確認。' using errcode='P0001';
+      end if;
+
       update public.annual_leave_requests
       set status='voided',
           void_reason='銷假：'||v_req.reason,
