@@ -102,10 +102,38 @@
     const snapshot=Number(credit?.daily_hours_snapshot);
     return Number.isFinite(snapshot)&&snapshot>0?snapshot:null;
   }
-  function alLeaveDaysFor(minutes,date,staffId=state.profile?.id){
+  function alWorkScheduleOn(staffId,date){
+    return (state.annualLeaveWorkHours||[])
+      .filter(x=>String(x.staff_id)===String(staffId)&&String(x.effective_from)<=String(date)&&x.work_start_time&&x.work_end_time)
+      .sort((a,b)=>String(b.effective_from).localeCompare(String(a.effective_from))||String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]||null;
+  }
+  function alTimeToMinutes(value){
+    if(!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(value||'')))return null;
+    const [h,m]=String(value).split(':').map(Number);
+    return h*60+m;
+  }
+  function alChargeMinutesFor(start,end,date,staffId=state.profile?.id){
+    const row=alWorkScheduleOn(staffId,date);
+    const s=alTimeToMinutes(start),e=alTimeToMinutes(end);
+    if(!row||s===null||e===null||e<=s)return null;
+    const ws=alTimeToMinutes(String(row.work_start_time).slice(0,5));
+    const we=alTimeToMinutes(String(row.work_end_time).slice(0,5));
+    if(ws===null||we===null)return null;
+    const overlap=(a,b,c,d)=>Math.max(0,Math.min(b,d)-Math.max(a,c));
+    if(row.break_start_time&&row.break_end_time){
+      const bs=alTimeToMinutes(String(row.break_start_time).slice(0,5));
+      const be=alTimeToMinutes(String(row.break_end_time).slice(0,5));
+      if(bs===null||be===null)return null;
+      return overlap(s,e,ws,bs)+overlap(s,e,be,we);
+    }
+    return overlap(s,e,ws,we);
+  }
+  function alLeaveDaysFor(minutes,date,staffId=state.profile?.id,start=null,end=null){
     const hours=alWorkHoursOn(staffId,date);
     if(!hours)return 0;
-    return Math.round(Math.min(1,(Math.max(0,Number(minutes)||0)/(hours*60)))*1000000)/1000000;
+    const charge=start&&end?alChargeMinutesFor(start,end,date,staffId):Math.max(0,Number(minutes)||0);
+    if(charge===null)return 0;
+    return Math.round(Math.min(1,charge/(hours*60))*1000000)/1000000;
   }
   function alDate(value){
     if(!value) return '—';
@@ -151,7 +179,7 @@
     const remaining=credits.reduce((s,c)=>s+(Number(c.remaining_days)||0),0);
     const pending=(state.annualLeaveRows||[])
       .filter(r=>String(r.applicant_staff_id)===String(staffId) && r.status==='pending' && credits.some(c=>String(r.leave_date)>=String(c.period_start)&&String(r.leave_date)<=String(c.period_end)))
-      .reduce((s,r)=>s+(Number(r.leave_days)||alLeaveDaysFor(r.minutes,r.leave_date,staffId)||0),0);
+      .reduce((s,r)=>s+(Number(r.leave_days)||alLeaveDaysFor(r.minutes,r.leave_date,staffId,r.start_time,r.end_time)||0),0);
     return {granted,used:Math.max(0,granted-remaining),remaining,pending,available:Math.max(0,remaining-pending)};
   }
 
@@ -261,11 +289,11 @@
         ? db.from('staff_users').select('id,display_name,role,hire_date,is_active,agreed_daily_hours').eq('is_active',true).order('display_name',{ascending:true})
         : db.from('staff_users').select('id,display_name,role,hire_date,is_active,agreed_daily_hours').eq('id',state.profile.id).limit(1);
       const tasks=[
-        db.from('annual_leave_requests').select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,start_time,end_time,minutes,work_hours_snapshot,leave_days,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at').order('leave_date',{ascending:false}).order('created_at',{ascending:false}),
+        db.from('annual_leave_requests').select('id,applicant_staff_id,applicant_name,applicant_role,leave_date,start_time,end_time,minutes,charge_minutes,work_hours_snapshot,leave_days,reason,notes,status,review_note,submitted_at,reviewed_at,created_at,updated_at').order('leave_date',{ascending:false}).order('created_at',{ascending:false}),
         db.from('annual_leave_credits').select('id,staff_id,period_start,period_end,granted_days,remaining_days,granted_minutes,remaining_minutes,label,note,created_by_name,entitlement_days,daily_hours_snapshot,generation_source,settlement_status,created_at,updated_at').order('period_end',{ascending:true}).order('created_at',{ascending:true}),
         db.from('annual_leave_allocations').select('id,credit_id,request_id,allocation_date,minutes,days,is_active,reversed_at,created_at').order('created_at',{ascending:false}),
         db.from('leave_cancellation_requests').select('id,source_type,source_id,applicant_staff_id,applicant_name,leave_date,minutes,reason,status,requested_at,reviewed_at,review_note,created_at').eq('source_type','annual_leave').order('requested_at',{ascending:false}),
-        db.from('staff_work_hours_history').select('id,staff_id,effective_from,agreed_daily_hours,note,created_at').order('effective_from',{ascending:false}).order('created_at',{ascending:false}),
+        db.from('staff_work_hours_history').select('id,staff_id,effective_from,agreed_daily_hours,work_start_time,work_end_time,break_start_time,break_end_time,note,created_at').order('effective_from',{ascending:false}).order('created_at',{ascending:false}),
         staffQuery
       ];
       const results=await Promise.all(tasks);
