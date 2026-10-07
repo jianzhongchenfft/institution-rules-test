@@ -825,7 +825,7 @@
     const nearest=current.slice().sort((a,b)=>String(a.period_end).localeCompare(String(b.period_end)))[0];
     const d=daysUntil(nearest.period_end);
     const countdown=d===0?'今天到期':d>0?`剩 ${d} 天`:'已到期';
-    const html=`📅 本期特休到期日：<strong>${escapeHTML(dateText(nearest.period_end))}</strong>（${escapeHTML(countdown)}）。下一期特休將依週年制與年資自動產生；到期未休依既有結清／遞延規則處理。<span class="muted">若有遞延特休，仍以各批次有效期間為準。</span>`;
+    const html=`📅本期特休到期日：<strong>${escapeHTML(dateText(nearest.period_end))}</strong>（${escapeHTML(countdown)}）。`;
     if(existing){
       existing.className='attendance-expiry-reminder';
       if(existing.innerHTML!==html)existing.innerHTML=html;
