@@ -1516,7 +1516,7 @@
 
 
 /* ===== v52/overtime-integrity-patch.txt ===== */
-// V5.2 加班／換休資料完整性：月結鎖定、核准紀錄作廢／更正
+// V5.2 加班／換休資料完整性：月結鎖定、核准紀錄調整
 (() => {
   const style=document.createElement('style');
   style.id='v52-overtime-integrity-style';
