@@ -1081,7 +1081,6 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
 
   document.addEventListener('click',e=>{
     const b=e.target.closest?.('button');if(!b)return;
-    if(b.dataset.payrollDetail&&prCanReview()){const id=b.dataset.payrollDetail;setTimeout(()=>prAppendPayrollDetail(id),0);}
     const modal=b.closest('.modal,.ot-page-form');if(!modal)return;
     const submit=b.id==='modalConfirm'||b.textContent.trim()==='儲存草稿';
     if(!submit)return;
@@ -1104,7 +1103,7 @@ ${start}～${end==='00:00'?'24:00':end}｜${direction>0?'增加認列':'減少�
       renderOvertimePage();
       return;
     }
-    prEnsureSettingsButton();prEnhanceTypeSelect();prEnhancePayroll();prEnhanceCorrectionModal();prNormalizeLabels();
+    prEnsureSettingsButton();prEnhanceTypeSelect();prEnhancePayroll();prEnhanceCorrectionModal();
   }
 
   const prLifecycle=()=>{
