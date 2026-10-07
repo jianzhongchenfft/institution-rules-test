@@ -195,10 +195,7 @@
     attachDateGuard(document.getElementById('clDate'));
   }
 
-  const observer=new MutationObserver(mutations=>{
-    const relevant=mutations.some(m=>m.addedNodes&&m.addedNodes.length);
-    if(relevant) setTimeout(enhance,0);
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-  setTimeout(enhance,0);
+  window.AttendanceV2Lifecycle?.register('overtime:render','overtime-integrity',enhance);
+  window.AttendanceV2Lifecycle?.register('overtime:form','overtime-integrity-form',enhance);
+  enhance();
 })();
