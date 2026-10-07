@@ -682,7 +682,6 @@
   function renderPayrollReport(){
     const settlement=payrollSettlementForMonth();
     const rows=payrollReportRows();
-    const totals=payrollTotals(rows,settlement);
     const settledInfo=settlement
       ? `已結算｜${escapeHTML(settlement.settled_by_name||'—')}・${rocDate(settlement.settled_at)}`
       : '尚未結算';
@@ -705,24 +704,20 @@
         </div>
       </section>
 
-      <section class="ot-summary" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-        <article class="stat-card">
-          <div class="stat-head"><span>應付加班時數</span><span class="stat-icon">⏱</span></div>
-          <div class="stat-value" data-payroll-overtime-total>${overtimeDurationLabel(totals.overtimePayMinutes)}</div>
-        </article>
+      <section class="ot-summary" style="grid-template-columns:1fr">
         <article class="stat-card">
           <div class="stat-head"><span>應付加班費</span><span class="stat-icon">💰</span></div>
           <div class="stat-value" data-payroll-money-total style="font-size:22px">—</div>
+          <div class="stat-foot" data-payroll-source-summary>金額來源載入中</div>
         </article>
       </section>
 
       <section class="ot-rule-card">
         <h3>員工月結摘要</h3>
         ${rows.length?`<div class="ot-table-shell"><table class="ot-table">
-          <thead><tr><th>員工</th><th>應付加班時數</th><th>應付加班費</th><th>本月換休異動</th><th>操作</th></tr></thead>
+          <thead><tr><th>員工</th><th>應付加班費</th><th>本月換休異動</th><th>操作</th></tr></thead>
           <tbody>${rows.map(r=>`<tr data-payroll-staff-id="${escapeHTML(String(r.staffId))}">
             <td><div class="ot-review-name">${escapeHTML(r.name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.role))}</div></td>
-            <td data-payroll-overtime-minutes><span class="ot-amount">${overtimeDurationLabel(r.overtimePayMinutes)}</span></td>
             <td data-payroll-money-cell><span class="pr-money missing">—</span></td>
             <td data-payroll-comp-change>${escapeHTML(compChange(r))}</td>
             <td><button class="btn sm" data-payroll-detail="${escapeHTML(String(r.staffId))}">查看明細</button></td>
@@ -1982,36 +1977,10 @@
   }
 
 
-  function cePayrollPanel(){
-    if(state.page!=='overtime'||state.overtimeView!=='payroll'||!state.compLeaveExpiryLoaded||!ceCanReview())return;
-    const main=document.getElementById('otMain');
-    if(!main)return;
-
-    document.getElementById('cePayrollExpiryPanel')?.remove();
-    const month=String(state.overtimeMonth||'');
-    if(!/^\d{4}-\d{2}$/.test(month))return;
-    const start=month+'-01';
-    const [y,m]=month.split('-').map(Number);
-    const end=isoDate(new Date(y,m,0));
-    const rows=(state.compLeaveCredits||[])
-      .filter(c=>!ceIsPermanentHoliday(c)&&c.expires_on&&String(c.expires_on)>=start&&String(c.expires_on)<=end&&(Number(c.remaining_minutes)||0)>0);
-    if(!rows.length)return;
-
-    const total=rows.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
-    const names=new Map((state.compLeaveExpiryStaff||[]).map(s=>[String(s.id),s.display_name]));
-    const html=`<section id="cePayrollExpiryPanel" class="ot-rule-card">
-      <h3>本月一般加班換休到期結清</h3>
-      <p>以下為本月到期仍未休完的一般加班換休；到期後會自動排除於可用換休餘額，並依原加班日薪資基數與倍率順位折算加班費。假日家訪換休無到期限制，不列入本表。</p>
-      <div class="ot-rule-highlight">本月到期未休合計：<strong>${escapeHTML(ceDuration(total))}</strong>。</div>
-      <div style="margin-top:12px"><div class="ot-table-shell"><table class="ot-table"><thead><tr><th>員工</th><th>來源日期</th><th>來源</th><th>到期日</th><th>待結清時數</th></tr></thead><tbody>${rows.map(c=>`<tr><td><strong>${escapeHTML(names.get(String(c.staff_id))||'—')}</strong></td><td>${ceDate(c.earned_date)}</td><td>${escapeHTML(c.source_label||'換休')}</td><td>${ceDate(c.expires_on)}</td><td><span class="ot-amount">${escapeHTML(ceDuration(c.remaining_minutes))}</span></td></tr>`).join('')}</tbody></table></div></div>
-    </section>`;
-    main.insertAdjacentHTML('beforeend',html);
-  }
 
   function ceEnhance(){
     if(state.page!=='overtime'||!state.compLeaveExpiryLoaded)return;
     ceAnniversaryReminder();
-    cePayrollPanel();
   }
 
   function ceLifecycle(){
