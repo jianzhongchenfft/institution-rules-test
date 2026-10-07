@@ -10,6 +10,7 @@
   Object.assign(state,{
     staffMgmtSystem:state.staffMgmtSystem||[],
     staffMgmtWorkers:state.staffMgmtWorkers||[],
+    staffMgmtHoursHistory:state.staffMgmtHoursHistory||[],
     staffMgmtLoaded:false,
     staffMgmtLoading:false,
     staffMgmtQuery:'',
@@ -76,7 +77,12 @@
       .sm-help{font-size:10.5px;color:#667085;line-height:1.55;margin-top:5px}
       .sm-footer{display:flex;align-items:center;gap:8px;justify-content:flex-end}
       .sm-note{border:1px solid #eaded9;background:#fffaf8;border-radius:10px;padding:10px 12px;color:#667085;font-size:11px;line-height:1.6;margin-bottom:12px}
-      @media(max-width:760px){.sm-summary{grid-template-columns:1fr}.sm-form-grid{grid-template-columns:1fr}.sm-field.full{grid-column:auto}.sm-search{min-width:0;max-width:none;width:100%}}
+      .sm-history{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+      .sm-history-row{display:grid;grid-template-columns:130px 110px minmax(0,1fr);gap:10px;padding:9px 11px;border-top:1px solid var(--line);align-items:center;font-size:11px;color:#475467}
+      .sm-history-row:first-child{border-top:0}
+      .sm-history-row strong{color:#344054}
+      .sm-history-head{background:#faf8f7;color:#667085;font-weight:900;font-size:10.5px}
+      @media(max-width:760px){.sm-history-row{grid-template-columns:1fr}.sm-summary{grid-template-columns:1fr}.sm-form-grid{grid-template-columns:1fr}.sm-field.full{grid-column:auto}.sm-search{min-width:0;max-width:none;width:100%}}
     `;
     document.head.appendChild(style);
   }
@@ -86,7 +92,7 @@
     if(state.staffMgmtLoaded&&!force)return;
     state.staffMgmtLoading=true;
     try{
-      const [systemRes,workersRes]=await Promise.all([
+      const [systemRes,workersRes,hoursRes]=await Promise.all([
         db.from('staff_users')
           .select('id,email,display_name,role,is_active,hire_date,agreed_daily_hours,can_supervise,regular_day_weekday,created_at,updated_at')
           .order('is_active',{ascending:false})
@@ -94,12 +100,18 @@
         db.from('care_workers')
           .select('id,staff_user_id,worker_name,phone,employment_status,hire_date,leave_date,transportation,service_areas,notes,created_at,updated_at')
           .order('employment_status',{ascending:true})
-          .order('worker_name',{ascending:true})
+          .order('worker_name',{ascending:true}),
+        db.from('staff_work_hours_history')
+          .select('id,staff_id,effective_from,agreed_daily_hours,note,created_by_name,created_at')
+          .order('effective_from',{ascending:false})
+          .order('created_at',{ascending:false})
       ]);
       if(systemRes.error)throw systemRes.error;
       if(workersRes.error)throw workersRes.error;
+      if(hoursRes.error)throw hoursRes.error;
       state.staffMgmtSystem=systemRes.data||[];
       state.staffMgmtWorkers=workersRes.data||[];
+      state.staffMgmtHoursHistory=hoursRes.data||[];
       state.staffMgmtLoaded=true;
     }catch(err){
       console.error('讀取人員管理資料失敗',err);
@@ -136,6 +148,12 @@
     return missing;
   }
 
+  function workHoursHistoryFor(staffId){
+    return (state.staffMgmtHoursHistory||[])
+      .filter(x=>String(x.staff_id)===String(staffId))
+      .sort((a,b)=>String(b.effective_from).localeCompare(String(a.effective_from))||String(b.created_at).localeCompare(String(a.created_at)));
+  }
+
   function renderStaffManagement(){
     if(state.page!=='staff')return;
     const activeSystem=(state.staffMgmtSystem||[]).filter(x=>x.is_active!==false).length;
@@ -160,7 +178,7 @@
         <div class="sm-summary-card"><div class="sm-summary-label">待補出勤基本資料</div><div class="sm-summary-value">${missingSystem}</div></div>
       </section>
 
-      <div class="sm-note">「到職日、約定每日工時、固定例假日」以本模組為唯一設定入口；加班／換休與特休會直接讀取這裡的資料，不再各自建立設定頁。</div>
+      <div class="sm-note">「到職日、目前約定每日工時、固定例假日」以本模組為主要設定入口；工時另依生效日保留歷程，供加班與特休回看當時有效資料。</div>
 
       <section class="sm-panel">
         <div class="sm-panel-head">
@@ -240,6 +258,8 @@
     const s=(state.staffMgmtSystem||[]).find(x=>String(x.id)===String(id));
     if(!s){toast('找不到人員資料','error');return;}
     const editable=canEditSystem();
+    const hoursHistory=workHoursHistoryFor(s.id);
+    const today=isoDate(new Date());
     $('content').innerHTML=`
       <div class="sm-detail">
         <div class="sm-detail-head">
@@ -264,16 +284,21 @@
 
         <section class="sm-card">
           <h3>出勤共用資料</h3>
-          <div class="sm-note">這裡的資料會直接提供加班／換休與特休使用。修改後不會建立另一份額度資料。</div>
+          <div class="sm-note">到職日與固定例假日維護目前資料；約定每日工時採「生效日＋歷程」保存。特休與加班計算需要回看過去日期時，會使用當時有效的工時，不會用今天的工時回推。</div>
           <div class="sm-form-grid">
             <div class="sm-field">
               <label>到職日 *</label>
               ${editable?`<input id="smHireDate" type="date" value="${esc(s.hire_date||'')}">`:`<div class="sm-readonly">${esc(dateText(s.hire_date))}</div>`}
             </div>
             <div class="sm-field">
-              <label>約定每日工時 *</label>
+              <label>目前約定每日工時 *</label>
               ${editable?`<input id="smDailyHours" type="number" min="0.5" max="8" step="0.5" value="${esc(s.agreed_daily_hours??'')}" placeholder="例如 8">`:`<div class="sm-readonly">${esc(hoursText(s.agreed_daily_hours))}</div>`}
-              <div class="sm-help">特休天數會依該期生效時的每日工時快照換算。</div>
+              <div class="sm-help">若修改工時，請同時指定這次工時開始生效的日期。</div>
+            </div>
+            <div class="sm-field">
+              <label>工時生效日</label>
+              ${editable?`<input id="smHoursEffectiveFrom" type="date" value="${today}">`:`<div class="sm-readonly">—</div>`}
+              <div class="sm-help">只有工時數值變更時才會新增一筆歷程；不會覆蓋舊紀錄。</div>
             </div>
             <div class="sm-field">
               <label>固定例假日 *</label>
@@ -285,6 +310,17 @@
               <div class="sm-readonly">${s.can_supervise?'是':'否'}</div>
             </div>
           </div>
+        </section>
+
+        <section class="sm-card">
+          <h3>約定工時歷程</h3>
+          <div class="sm-help" style="margin:-4px 0 10px">同一生效日若有修正，以最後建立的紀錄為準；舊紀錄仍保留供查核。</div>
+          ${hoursHistory.length?`
+            <div class="sm-history">
+              <div class="sm-history-row sm-history-head"><span>生效日</span><span>每日工時</span><span>說明</span></div>
+              ${hoursHistory.map(h=>`<div class="sm-history-row"><span>${esc(dateText(h.effective_from))}</span><strong>${esc(hoursText(h.agreed_daily_hours))}</strong><span>${esc(h.note||'—')}<div class="sm-sub">${esc(h.created_by_name||'—')}・建立 ${esc(rocDate(h.created_at))}</div></span></div>`).join('')}
+            </div>`
+            :'<div class="sm-empty" style="padding:18px">目前尚無工時歷程；下一次調整工時時會從這裡開始保留。</div>'}
         </section>
 
         <div class="sm-footer">
@@ -304,10 +340,18 @@
     const hireDate=$('smHireDate')?.value||null;
     const dailyRaw=$('smDailyHours')?.value;
     const dailyHours=dailyRaw===''||dailyRaw===null?null:Number(dailyRaw);
+    const hoursEffectiveFrom=$('smHoursEffectiveFrom')?.value||null;
     const weekday=Number($('smRegularDay')?.value);
+    const oldHours=Number(s.agreed_daily_hours);
+    const hoursChanged=(dailyHours===null&&s.agreed_daily_hours!==null&&s.agreed_daily_hours!==undefined)
+      ||(dailyHours!==null&&(!Number.isFinite(oldHours)||Math.abs(dailyHours-oldHours)>0.0001));
 
     if(dailyHours!==null&&(!Number.isFinite(dailyHours)||dailyHours<=0||dailyHours>8)){
       toast('約定每日工時需大於0且不超過8小時','warn');
+      return;
+    }
+    if(hoursChanged&&!hoursEffectiveFrom){
+      toast('修改約定每日工時時，請填寫工時生效日','warn');
       return;
     }
     if(!Number.isInteger(weekday)||weekday<0||weekday>6){
@@ -317,26 +361,39 @@
 
     showLoading(true);
     try{
-      const {error}=await db.from('staff_users')
+      const {error:baseError}=await db.from('staff_users')
         .update({
           hire_date:hireDate,
-          agreed_daily_hours:dailyHours,
           regular_day_weekday:weekday,
           updated_at:new Date().toISOString()
         })
         .eq('id',s.id);
-      if(error)throw error;
+      if(baseError)throw baseError;
+
+      if(hoursChanged){
+        if(dailyHours===null){
+          throw new Error('約定每日工時不可清空；如需變更請輸入新的工時與生效日');
+        }
+        const {error:hoursError}=await db.rpc('save_staff_work_hours_timeline',{
+          p_staff_id:s.id,
+          p_effective_from:hoursEffectiveFrom,
+          p_agreed_daily_hours:dailyHours,
+          p_note:'由人員管理調整'
+        });
+        if(hoursError)throw hoursError;
+      }
 
       state.staffMgmtLoaded=false;
       state.compLeaveExpiryLoaded=false;
       state.compLeaveExpiryStaff=[];
       state.annualAutoLoadedAt=0;
       state.personalHoursLoaded=false;
+      state.payrollRatesLoaded=false;
 
       await loadStaffManagement(true);
       const updated=(state.staffMgmtSystem||[]).find(x=>String(x.id)===String(s.id));
       renderSystemDetail(updated?.id||s.id);
-      toast('人員出勤基本資料已更新；特休資格已同步檢查','success');
+      toast(hoursChanged?'人員資料已更新，工時歷程與特休資格已同步檢查':'人員出勤基本資料已更新','success');
     }catch(err){
       console.error(err);
       toast('儲存人員資料失敗：'+(err?.message||err),'error');
