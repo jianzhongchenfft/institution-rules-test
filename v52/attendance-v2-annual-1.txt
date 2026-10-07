@@ -357,7 +357,7 @@
       ${review?`<td><strong>${escapeHTML(r.applicant_name||'—')}</strong><div class="al-detail">${escapeHTML(alRoleLabel(r.applicant_role))}</div></td>`:''}
       <td>${escapeHTML(alDate(r.leave_date))}</td>
       <td>${escapeHTML(alTime(r.start_time))}–${escapeHTML(alTime(r.end_time))}</td>
-      <td><span class="al-amount">${escapeHTML(alDays(r.leave_days))}</span><div class="al-detail">${escapeHTML(alDuration(r.minutes))}${r.work_hours_snapshot?`｜每日 ${escapeHTML(String(Number(r.work_hours_snapshot)))} 小時`:''}</div></td>
+      <td><span class="al-amount">${escapeHTML(alDays(r.leave_days))}</span><div class="al-detail">扣抵 ${escapeHTML(alDuration(r.charge_minutes??r.minutes))}${r.work_hours_snapshot?`｜每日 ${escapeHTML(String(Number(r.work_hours_snapshot)))} 小時`:''}</div></td>
       <td><span class="al-status ${escapeHTML(ds.cls)}">${escapeHTML(ds.text)}</span>${r.review_note?`<div class="al-detail">${escapeHTML(r.review_note)}</div>`:''}${alCancellationNote(r)}</td>
       <td>${escapeHTML(r.reason||r.notes||'—')}</td>
       <td><div class="al-actions">
