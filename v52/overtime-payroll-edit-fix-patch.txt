@@ -51,23 +51,7 @@
     defaultCompLeave();
   }
 
-  let q=false;
-  const obs=new MutationObserver(ms=>{
-    if(q||!ms.some(m=>m.addedNodes?.length))return;
-    q=true;
-    setTimeout(()=>{q=false;apply();},80);
-  });
-  obs.observe(document.body,{childList:true,subtree:true});
-  setTimeout(apply,250);
+  window.AttendanceV2Lifecycle?.register('overtime:form','overtime-payroll-edit-fix',apply);
+  apply();
 })();
 
-// 載入全站介面文字精簡規則。
-(async()=>{
-  try{
-    const res=await fetch('v52/ui-concise-copy-patch.txt',{cache:'no-store'});
-    if(!res.ok)throw new Error(`v52/ui-concise-copy-patch.txt 載入失敗（${res.status}）`);
-    eval(await res.text());
-  }catch(err){
-    console.error('介面文字精簡模組載入失敗',err);
-  }
-})();
