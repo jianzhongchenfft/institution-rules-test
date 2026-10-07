@@ -1914,7 +1914,7 @@
 
     const html=`<section id="ceExpiryPanel" class="ot-rule-card">
       <h3>換休期限與剩餘明細</h3>
-      ${missingHire?'<div class="ce-warn">目前尚未設定到職日，因此一般加班換休無法計算法定最終到期日。請由機構負責人或系統管理員完成設定。</div>':''}
+      ${missingHire?'<div class="ce-warn">目前尚未設定到職日，因此一般加班換休無法計算法定最終到期日。請至「人員管理」完成設定。</div>':''}
       ${b.soon>0?`<div class="ce-warn">未來30天內有 <strong>${escapeHTML(ceDuration(b.soon))}</strong> 一般加班換休即將到期，建議優先安排。</div>`:''}
       ${b.expired>0?`<div class="ot-rule-highlight">已有 <strong>${escapeHTML(ceDuration(b.expired))}</strong> 一般加班換休到期未休，不再列入可用換休，請於薪資作業中辦理結清。</div>`:''}
       <div style="margin-top:12px">${credits.length
@@ -1954,72 +1954,8 @@
     main.insertAdjacentHTML('beforeend',html);
   }
 
-  function ceEnsureSettingsButton(){
-    if(state.page!=='overtime'||!ceCanReview())return;
-    const reload=document.getElementById('otReload');
-    if(!reload||document.getElementById('ceHireSettingsBtn'))return;
-
-    const btn=document.createElement('button');
-    btn.id='ceHireSettingsBtn';
-    btn.className='btn';
-    btn.textContent='📅 換休期限設定';
-    btn.title='設定員工到職日，以計算一般加班換休的週年制到期日';
-    btn.addEventListener('click',ceOpenHireSettings);
-    const anchor=document.getElementById('otCorrectionBtn')||reload;
-    anchor.insertAdjacentElement('afterend',btn);
-  }
-
-  function ceOpenHireSettings(){
-    if(!ceCanReview()){
-      toast('目前帳號沒有設定換休期限的權限','warn');
-      return;
-    }
-
-    const staff=(state.compLeaveExpiryStaff||[]).filter(s=>s.is_active!==false);
-    openModal({
-      title:'換休期限設定｜到職週年制',
-      html:`<div class="ot-rule-highlight" style="margin-top:0">系統依到職日計算一般加班換休所屬特休週年年度末日，並以該日作為最終到期日。假日家訪換休屬機構額外獎勵換休，無到期限制，不受此設定影響。</div>
-      <div class="ce-hire-grid" style="margin-top:12px">${staff.map(s=>`<div class="ce-hire-row"><div><div class="ce-hire-name">${escapeHTML(s.display_name||'—')}</div><div class="ce-hire-role">${escapeHTML(ceRole(s.role))}</div></div><input type="date" data-ce-hire-id="${escapeHTML(String(s.id))}" data-ce-original="${escapeHTML(s.hire_date||'')}" value="${escapeHTML(s.hire_date||'')}"></div>`).join('')}</div>`,
-      confirmText:'儲存到職日',
-      onConfirm:ceSaveHireSettings,
-      large:true
-    });
-  }
-
-  async function ceSaveHireSettings(){
-    const changed=[...document.querySelectorAll('[data-ce-hire-id]')]
-      .filter(input=>String(input.value||'')!==String(input.dataset.ceOriginal||''));
-    if(!changed.length){
-      closeModal();
-      toast('到職日沒有變更','success');
-      return true;
-    }
-
-    showLoading(true);
-    try{
-      for(const input of changed){
-        const {error}=await db.from('staff_users')
-          .update({hire_date:input.value||null,updated_at:new Date().toISOString()})
-          .eq('id',input.dataset.ceHireId);
-        if(error)throw error;
-      }
-      closeModal();
-      state.compLeaveExpiryLoaded=false;
-      navigate('overtime');
-      toast('到職日已更新，一般加班換休到期日將依最新資料重新載入','success');
-      return true;
-    }catch(err){
-      console.error(err);
-      toast('儲存到職日失敗：'+(err?.message||err),'error');
-      return false;
-    }finally{
-      showLoading(false);
-    }
-  }
-
   function ceEnhance(){
     if(state.page!=='overtime'||!state.compLeaveExpiryLoaded)return;
-    ceEnsureSettingsButton();
     ceAnniversaryReminder();
     ceBalancePanel();
     cePayrollPanel();
@@ -2155,9 +2091,6 @@
   let staffLoaded=false;
   let staffLoading=false;
 
-  function canManage(){
-    return !!state.profile && ['organization_manager','admin'].includes(state.profile.role);
-  }
   function parseDate(value){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||'')))return null;
     const d=new Date(String(value)+'T00:00:00');
@@ -2230,80 +2163,8 @@
     update(false);
   }
 
-  function renderSettingsPage(){
-    const rows=staffCache.map(s=>{
-      const value=s.regular_day_weekday===null||s.regular_day_weekday===undefined?'':String(s.regular_day_weekday);
-      return '<tr><td><strong>'+escapeHTML(s.display_name||'未命名')+'</strong><div class="ot-detail">'+escapeHTML(roleLabels[s.role]||s.role||'—')+'</div></td><td><select data-rd-staff="'+escapeHTML(s.id)+'">'+
-        labels.map((x,i)=>'<option value="'+i+'" '+(value===String(i)?'selected':'')+'>'+x+'</option>').join('')+
-        '</select></td></tr>';
-    }).join('');
-    $('content').innerHTML=
-      '<div class="ot-page-form">'+
-        '<div class="ot-page-form-head"><div>'+
-          '<button type="button" id="rdBack" class="btn" style="margin-bottom:10px">← 返回加班休假</button>'+
-          '<div class="ot-page-form-title">固定例假日設定</div>'+
-          '<div class="ot-page-form-sub">設定每位員工固定例假的星期。申請加班碰到該日只會提醒，不會自動禁止送出。</div>'+
-        '</div></div>'+
-        '<div class="ot-page-form-card">'+
-          '<div class="ot-rule-highlight" style="margin-top:0;margin-bottom:12px">目前不再以「週日＝例假、週六＝休息日」固定判斷；系統只依這裡設定的固定例假星期提醒。若個別週次有臨時調整，仍由申請人與審核者依實際排班確認。</div>'+
-          '<div class="ot-table-shell"><table class="ot-table" style="min-width:560px"><thead><tr><th>員工</th><th>固定例假日</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-        '</div>'+
-        '<div class="modal-foot ot-page-form-footer"><button type="button" id="rdCancel" class="btn">返回</button><span class="spacer"></span><button type="button" id="rdSave" class="btn primary">儲存設定</button></div>'+
-      '</div>';
-    $('rdBack')?.addEventListener('click',()=>navigate('overtime'));
-    $('rdCancel')?.addEventListener('click',()=>navigate('overtime'));
-    $('rdSave')?.addEventListener('click',saveSettings);
-    window.scrollTo({top:0,behavior:'auto'});
-  }
-
-  async function openSettings(){
-    if(!canManage()){toast('目前帳號沒有例假日設定權限','warn');return;}
-    showLoading(true);
-    try{
-      await loadStaff(true);
-      renderSettingsPage();
-    }finally{
-      showLoading(false);
-    }
-  }
-
-  async function saveSettings(){
-    if(!canManage())return;
-    const inputs=[...document.querySelectorAll('[data-rd-staff]')];
-    showLoading(true);
-    try{
-      for(const el of inputs){
-        const weekday=Number(el.value);
-        const {error}=await db.from('staff_users')
-          .update({regular_day_weekday:weekday,updated_at:new Date().toISOString()})
-          .eq('id',el.dataset.rdStaff);
-        if(error)throw error;
-      }
-      staffLoaded=false;
-      await loadStaff(true);
-      toast('固定例假日設定已儲存','success');
-      navigate('overtime');
-    }catch(err){
-      console.error(err);
-      toast('儲存例假日設定失敗：'+(err?.message||err),'error');
-    }finally{
-      showLoading(false);
-    }
-  }
-
   function enhanceOvertimePage(){
     if(state.page!=='overtime')return;
-    if(canManage()){
-      const reload=document.getElementById('otReload');
-      if(reload&&!document.getElementById('rdSettingsBtn')){
-        const b=document.createElement('button');
-        b.id='rdSettingsBtn';
-        b.className='btn';
-        b.textContent='📅 例假日設定';
-        b.addEventListener('click',openSettings);
-        reload.insertAdjacentElement('beforebegin',b);
-      }
-    }
     bindApplicationWarning();
   }
 
