@@ -2176,7 +2176,7 @@
   window.AttendanceV2Lifecycle?.register('overtime:render','regular-day-warning',enhanceOvertimePage);
   window.AttendanceV2Lifecycle?.register('overtime:form','regular-day-warning-form',enhanceOvertimePage);
 
-  window.v52RegularDayApi={openSettings,loadStaff};
+  window.v52RegularDayApi={loadStaff};
   enhanceOvertimePage();
 })();
 
