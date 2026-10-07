@@ -77,65 +77,23 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!mobileScheduleRes.ok) throw new Error(`v52/schedule-mobile-patch.txt 載入失敗（${mobileScheduleRes.status}）`);
       eval(await mobileScheduleRes.text());
 
-      const overtimeRes = await fetch('v52/overtime-patch.txt?v=leave-cancellation-v1-20261007',{cache:'no-store'});
-      if(!overtimeRes.ok) throw new Error(`v52/overtime-patch.txt 載入失敗（${overtimeRes.status}）`);
-      eval(await overtimeRes.text());
+      const attendanceV2Files=[
+        'v52/attendance-v2-core.txt',
+        'v52/attendance-v2-overtime.txt',
+        'v52/attendance-v2-payroll.txt',
+        'v52/attendance-v2-annual.txt'
+      ];
+      let attendanceV2Code='';
+      for(const path of attendanceV2Files){
+        const res=await fetch(`${path}?v=attendance-v2-refactor-20261007`,{cache:'no-store'});
+        if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
+        attendanceV2Code+='\n'+await res.text();
+      }
+      eval(attendanceV2Code);
 
-      const payrollGuardRes = await fetch('v52/payroll-period-guard-patch.txt?v=attendance-runtime-v4-20261005',{cache:'no-store'});
-      if(!payrollGuardRes.ok) throw new Error(`v52/payroll-period-guard-patch.txt 載入失敗（${payrollGuardRes.status}）`);
-      eval(await payrollGuardRes.text());
-
-      const overtimeIntegrityRes = await fetch('v52/overtime-integrity-patch.txt?v=leave-cancellation-v1-20261007',{cache:'no-store'});
-      if(!overtimeIntegrityRes.ok) throw new Error(`v52/overtime-integrity-patch.txt 載入失敗（${overtimeIntegrityRes.status}）`);
-      eval(await overtimeIntegrityRes.text());
-
-      const payrollCorrectionRes = await fetch('v52/payroll-correction-patch.txt?v=attendance-runtime-v4-20261005',{cache:'no-store'});
-      if(!payrollCorrectionRes.ok) throw new Error(`v52/payroll-correction-patch.txt 載入失敗（${payrollCorrectionRes.status}）`);
-      eval(await payrollCorrectionRes.text());
-
-      const compLeaveExpiryRes = await fetch('v52/comp-leave-expiry-patch.txt?v=attendance-runtime-v4-20261005',{cache:'no-store'});
-      if(!compLeaveExpiryRes.ok) throw new Error(`v52/comp-leave-expiry-patch.txt 載入失敗（${compLeaveExpiryRes.status}）`);
-      eval(await compLeaveExpiryRes.text());
-
-      const overtimeWorkflowRes = await fetch('v52/overtime-workflow-patch.txt?v=attendance-fullpage-v1-20261006',{cache:'no-store'});
-      if(!overtimeWorkflowRes.ok) throw new Error(`v52/overtime-workflow-patch.txt 載入失敗（${overtimeWorkflowRes.status}）`);
-      eval(await overtimeWorkflowRes.text());
-
-      const overtimeWorkflowTrackingRes = await fetch('v52/overtime-workflow-tracking-patch.txt?v=regular-day-warning-v1-20261007',{cache:'no-store'});
-      if(!overtimeWorkflowTrackingRes.ok) throw new Error(`v52/overtime-workflow-tracking-patch.txt 載入失敗（${overtimeWorkflowTrackingRes.status}）`);
-      eval(await overtimeWorkflowTrackingRes.text());
-
-      const overtimePayrollCalcRes = await fetch('v52/overtime-payroll-calc-patch.txt?v=attendance-fullpage-v1-20261006',{cache:'no-store'});
-      if(!overtimePayrollCalcRes.ok) throw new Error(`v52/overtime-payroll-calc-patch.txt 載入失敗（${overtimePayrollCalcRes.status}）`);
-      eval(await overtimePayrollCalcRes.text());
-
-      const overtimePayrollSummaryRes = await fetch('v52/overtime-payroll-summary-patch.txt?v=attendance-runtime-v4-20261005',{cache:'no-store'});
-      if(!overtimePayrollSummaryRes.ok) throw new Error(`v52/overtime-payroll-summary-patch.txt 載入失敗（${overtimePayrollSummaryRes.status}）`);
-      eval(await overtimePayrollSummaryRes.text());
-
-      const overtimePayrollEditFixRes = await fetch('v52/overtime-payroll-edit-fix-patch.txt?v=attendance-fullpage-v1-20261006',{cache:'no-store'});
-      if(!overtimePayrollEditFixRes.ok) throw new Error(`v52/overtime-payroll-edit-fix-patch.txt 載入失敗（${overtimePayrollEditFixRes.status}）`);
-      eval(await overtimePayrollEditFixRes.text());
-
-      const overtimePersonalHoursRes = await fetch('v52/overtime-personal-hours-patch.txt?v=attendance-fullpage-v1-20261006',{cache:'no-store'});
-      if(!overtimePersonalHoursRes.ok) throw new Error(`v52/overtime-personal-hours-patch.txt 載入失敗（${overtimePersonalHoursRes.status}）`);
-      eval(await overtimePersonalHoursRes.text());
-
-      const overtimeMonthFilterRes = await fetch('v52/overtime-month-filter-patch.txt?v=attendance-fullpage-v1-20261006',{cache:'no-store'});
-      if(!overtimeMonthFilterRes.ok) throw new Error(`v52/overtime-month-filter-patch.txt 載入失敗（${overtimeMonthFilterRes.status}）`);
-      eval(await overtimeMonthFilterRes.text());
-
-      const overtimeWithdrawRes = await fetch('v52/overtime-withdraw-patch.txt?v=attendance-fullpage-v1-20261006',{cache:'no-store'});
-      if(!overtimeWithdrawRes.ok) throw new Error(`v52/overtime-withdraw-patch.txt 載入失敗（${overtimeWithdrawRes.status}）`);
-      eval(await overtimeWithdrawRes.text());
-
-      const regularDayWarningRes = await fetch('v52/overtime-regular-day-warning-patch.txt?v=regular-day-warning-v1-20261007',{cache:'no-store'});
-      if(!regularDayWarningRes.ok) throw new Error(`v52/overtime-regular-day-warning-patch.txt 載入失敗（${regularDayWarningRes.status}）`);
-      eval(await regularDayWarningRes.text());
-
-      const adminLeaveBalanceRes = await fetch('v52/overtime-admin-leave-balance-patch.txt?v=admin-leave-balance-v1-20261007',{cache:'no-store'});
-      if(!adminLeaveBalanceRes.ok) throw new Error(`v52/overtime-admin-leave-balance-patch.txt 載入失敗（${adminLeaveBalanceRes.status}）`);
-      eval(await adminLeaveBalanceRes.text());
+      const conciseUiRes=await fetch('v52/ui-concise-copy-patch.txt?v=attendance-v2-refactor-20261007',{cache:'no-store'});
+      if(!conciseUiRes.ok) throw new Error(`v52/ui-concise-copy-patch.txt 載入失敗（${conciseUiRes.status}）`);
+      eval(await conciseUiRes.text());
 
       const eventTrackingFiles=[
         'v52/event-core.txt',
