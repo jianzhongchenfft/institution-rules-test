@@ -3,33 +3,32 @@ Date: 2026-10-07
 
 Authoritative runtime files:
 1. attendance-v2-core.txt
-   - lifecycle registry / render hooks
+   - lifecycle registry / shared UI hooks
 2. attendance-v2-overtime.txt
-   - overtime application
-   - comp leave use / balance
-   - withdrawal
-   - approved record adjustment
-   - comp leave expiry
+   - overtime application / approval
+   - comp leave ledger / use / expiry
    - regular-day warning
+   - approved-record adjustment
    - manager leave balance
 3. attendance-v2-payroll.txt
-   - payroll month guard
+   - wage basis
    - overtime pay calculation
-   - wage base / daily hours
-   - settlement snapshot
-   - post-settlement corrections
-4. attendance-v2-annual.txt
-   - annual leave requests / credits
-   - automatic entitlement status
-   - business-manager display rules
-   - annual leave expiry / carryover
+   - payroll settlement / correction
+4. attendance-v2-annual-1.txt
+5. attendance-v2-annual-2.txt
+6. attendance-v2-annual-3.txt
+   - the three annual fragments are concatenated in order and evaluated once
+   - annual leave request / approval / cancellation
+   - automatic anniversary entitlement
+   - annual leave ledger / expiry / carryover
+   - manual annual-leave credit creation has been removed
 
-Runtime invariants:
-- No MutationObserver is used by Attendance V2 runtime.
-- Attendance modules do not load other Attendance modules.
-- part07 is the single entry point for Attendance V2 loading.
-- Render-dependent enhancements run through AttendanceV2Lifecycle.
-- Monthly overtime summary must use one timed-type definition:
-  overtime, holiday_overtime (legacy), rest_day_overtime, national_holiday_overtime.
-- Legacy patch files remain in the repository for history / rollback only and are not loaded by part07.
-- Database formulas and payroll calculation rules were not changed by this front-end refactor.
+Architecture rules:
+- part07 is the single Attendance V2 loader.
+- Attendance V2 runtime uses no MutationObserver.
+- Attendance V2 runtime modules do not fetch other Attendance modules.
+- Legacy attendance patch files are retained only in backup branches, not in main.
+- Staff hire_date is the single anniversary-cycle source.
+- Database function private.staff_anniversary_period is the single anniversary-period calculation.
+- Normal annual leave credits are system-generated; carryover credits are created only by the expiry/carryover workflow.
+- Comp leave and annual leave keep separate ledgers; they share the anniversary-cycle source, not balances.
