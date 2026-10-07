@@ -133,6 +133,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!regularDayWarningRes.ok) throw new Error(`v52/overtime-regular-day-warning-patch.txt 載入失敗（${regularDayWarningRes.status}）`);
       eval(await regularDayWarningRes.text());
 
+      const adminLeaveBalanceRes = await fetch('v52/overtime-admin-leave-balance-patch.txt?v=admin-leave-balance-v1-20261007',{cache:'no-store'});
+      if(!adminLeaveBalanceRes.ok) throw new Error(`v52/overtime-admin-leave-balance-patch.txt 載入失敗（${adminLeaveBalanceRes.status}）`);
+      eval(await adminLeaveBalanceRes.text());
+
       const eventTrackingFiles=[
         'v52/event-core.txt',
         'v52/event-detail.txt',
