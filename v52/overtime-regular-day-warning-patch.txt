@@ -46,7 +46,7 @@
     }
     const label=labels[Number(staff.regular_day_weekday)]||'—';
     if(isRegularDay(date,staff.regular_day_weekday)){
-      return '<div class="rd-warning">⚠ 此日期為你的固定例假日（'+escapeHTML(label)+'）。系統僅提醒，不會禁止送出；請先確認實際排班與出勤原因。</div>';
+      return '<div class="rd-warning">⚠ 此日期為你的固定例假日（'+escapeHTML(label)+'），原則上不得加班，請先確認實際排班與出勤原因。</div>';
     }
     return '<div class="rd-note">固定例假日：'+escapeHTML(label)+'</div>';
   }
