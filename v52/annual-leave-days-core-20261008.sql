@@ -57,6 +57,9 @@ alter table public.annual_leave_allocations
 alter table public.annual_leave_settlement_events
   add column if not exists days numeric(10,6);
 
+create index if not exists staff_work_hours_history_created_by_idx
+  on public.staff_work_hours_history(created_by);
+
 -- private.allocate_annual_leave_request
 CREATE OR REPLACE FUNCTION private.allocate_annual_leave_request()
  RETURNS trigger
