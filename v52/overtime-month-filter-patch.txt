@@ -188,25 +188,7 @@
     applyTableMonthFilter();
   }
 
-  let queued=false;
-  function scheduleEnhance(){
-    if(queued)return;
-    queued=true;
-    queueMicrotask(()=>{
-      queued=false;
-      enhance();
-    });
-  }
-
-  const observer=new MutationObserver(mutations=>{
-    if(mutations.some(m=>m.addedNodes?.length||m.removedNodes?.length))scheduleEnhance();
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('[data-ot-view],#otReload,#otAddBtn'))scheduleEnhance();
-  });
-  document.addEventListener('change',e=>{
-    if(['otMonth','otWorkDate','otType','otStartHour','otStartMinute','otEndHour','otEndMinute','otCompensation'].includes(e.target?.id))scheduleEnhance();
-  });
+  window.AttendanceV2Lifecycle?.register('overtime:render','overtime-month-filter',enhance);
+  window.AttendanceV2Lifecycle?.register('overtime:form','overtime-month-filter-form',enhance);
+  enhance();
 })();
