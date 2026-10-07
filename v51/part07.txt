@@ -61,6 +61,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       }
       eval(caseContactCode);
 
+      const staffManagementRes = await fetch('v52/staff-management.txt?v=staff-management-v1-20261007',{cache:'no-store'});
+      if(!staffManagementRes.ok) throw new Error(`v52/staff-management.txt 載入失敗（${staffManagementRes.status}）`);
+      eval(await staffManagementRes.text());
+
       const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
       eval(await scheduleRes.text());
@@ -115,6 +119,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
+      else if(state.profile && state.page==='staff') navigate('staff');
       else if(state.profile && state.page==='cases') navigate('cases');
       else if(state.profile && state.page==='schedule') navigate('schedule');
       else if(state.profile && state.page==='overtime') navigate('overtime');
