@@ -137,17 +137,11 @@
     renderManagerPanel();
   }
 
-  let timer=null;
-  const observer=new MutationObserver(()=>{
+  const alaLifecycle=()=>{
     if(state.page!=='overtime'||state.attendanceSection!=='annual')return;
-    clearTimeout(timer);
-    timer=setTimeout(()=>loadMeta(false),40);
-  });
-  observer.observe(document.getElementById('content'),{childList:true,subtree:true});
-
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('#alReload'))setTimeout(()=>loadMeta(true),100);
-  });
-
+    if(!state.annualAutoLoaded)loadMeta(false);
+    else enhance();
+  };
+  window.AttendanceV2Lifecycle?.register('annual:render','annual-auto',alaLifecycle);
   if(state.profile&&state.page==='overtime'&&state.attendanceSection==='annual')loadMeta(true);
 })();
