@@ -162,12 +162,9 @@
   style.textContent='.rd-warning{border:1px solid #fecdca;background:#fef3f2;color:#b42318;border-radius:9px;padding:8px 10px;font-size:11px;font-weight:800;line-height:1.55}.rd-note{font-size:10.5px;color:#667085;line-height:1.5}';
   document.head.appendChild(style);
 
-  const observer=new MutationObserver(()=>enhanceOvertimePage());
-  observer.observe(document.body,{childList:true,subtree:true});
-  document.addEventListener('click',e=>{
-    if(e.target.closest?.('[data-ot-view],#otAddBtn,#otReload'))setTimeout(enhanceOvertimePage,30);
-  });
+  window.AttendanceV2Lifecycle?.register('overtime:render','regular-day-warning',enhanceOvertimePage);
+  window.AttendanceV2Lifecycle?.register('overtime:form','regular-day-warning-form',enhanceOvertimePage);
 
   window.v52RegularDayApi={openSettings,loadStaff};
-  setTimeout(enhanceOvertimePage,50);
+  enhanceOvertimePage();
 })();
