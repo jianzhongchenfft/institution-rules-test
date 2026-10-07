@@ -243,6 +243,10 @@
     };
   }
 
+  function compLeaveIsHolidayVisitCredit(c){
+    return String(c?.source_label||'').includes('假日家訪');
+  }
+
   function compLeaveSourceBreakdown(staffId,asOfDate=null){
     const fallback=isoDate(new Date());
     const rawDate=String(asOfDate||fallback);
@@ -250,11 +254,11 @@
     const credits=(state.compLeaveCredits||[])
       .filter(x=>String(x.staff_id)===String(staffId))
       .filter(x=>String(x.earned_date||'')<=asOf&&(!x.expires_on||String(x.expires_on)>=asOf));
-    const isHoliday=x=>String(x.source_label||'').includes('假日家訪');
-    const ordinary=credits.filter(x=>!isHoliday(x)).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
-    const holidayVisit=credits.filter(isHoliday).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
+    const ordinary=credits.filter(x=>!compLeaveIsHolidayVisitCredit(x)).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
+    const holidayVisit=credits.filter(compLeaveIsHolidayVisitCredit).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
     return {ordinary,holidayVisit,total:ordinary+holidayVisit};
   }
+
   function compLeaveSourceAvailability(staffId,asOfDate=null,excludeUsageId=null){
     const base=compLeaveSourceBreakdown(staffId,asOfDate);
     const pending=(state.compLeaveRows||[])
@@ -390,7 +394,71 @@
   }
 
   function renderCompLeaveOverview(){
-    return '';
+    const staffId=state.profile?.id;
+    const today=isoDate(new Date());
+    const allCredits=(state.compLeaveCredits||[])
+      .filter(c=>String(c.staff_id)===String(staffId))
+      .filter(c=>(Number(c.remaining_minutes)||0)>0);
+
+    const usable=allCredits
+      .filter(c=>String(c.earned_date||'')<=today)
+      .filter(c=>!c.expires_on||String(c.expires_on)>=today)
+      .sort((a,b)=>{
+        const aExpiry=compLeaveIsHolidayVisitCredit(a)?'9999-12-31':String(a.expires_on||'9999-12-31');
+        const bExpiry=compLeaveIsHolidayVisitCredit(b)?'9999-12-31':String(b.expires_on||'9999-12-31');
+        return aExpiry.localeCompare(bExpiry)
+          ||String(a.earned_date||'').localeCompare(String(b.earned_date||''))
+          ||String(a.created_at||'').localeCompare(String(b.created_at||''));
+      });
+
+    const expiredMinutes=allCredits
+      .filter(c=>!compLeaveIsHolidayVisitCredit(c)&&c.expires_on&&String(c.expires_on)<today)
+      .reduce((sum,c)=>sum+(Number(c.remaining_minutes)||0),0);
+
+    const soonMinutes=usable
+      .filter(c=>{
+        if(compLeaveIsHolidayVisitCredit(c)||!c.expires_on)return false;
+        const d=Math.round((new Date(String(c.expires_on)+'T00:00:00')-new Date(today+'T00:00:00'))/86400000);
+        return d>=0&&d<=30;
+      })
+      .reduce((sum,c)=>sum+(Number(c.remaining_minutes)||0),0);
+
+    const missingExpiry=allCredits.some(c=>
+      !compLeaveIsHolidayVisitCredit(c)
+      && String(c.earned_date||'')<=today
+      && !c.expires_on
+    );
+
+    return `<section class="ot-rule-card">
+      <h3>換休期限與剩餘明細</h3>
+      <p>僅列出目前仍可使用的換休額度；一般加班換休依到期日優先使用，假日家訪換休無到期限制。</p>
+      ${missingExpiry?'<div class="ot-rule-highlight">部分一般加班換休尚未產生到期日，請先確認人員管理中的到職日資料。</div>':''}
+      ${soonMinutes>0?`<div class="ot-rule-highlight">未來30天內有 <strong>${escapeHTML(overtimeDurationLabel(soonMinutes))}</strong> 一般加班換休即將到期，建議優先安排。</div>`:''}
+      ${expiredMinutes>0?`<div class="ot-rule-highlight">已有 <strong>${escapeHTML(overtimeDurationLabel(expiredMinutes))}</strong> 一般加班換休到期未休，不再列入可用額度，請於薪資作業中辦理結清。</div>`:''}
+      <div style="margin-top:12px">
+        ${usable.length
+          ? `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>取得日期</th><th>來源</th><th>原始額度</th><th>剩餘</th><th>到期日</th><th>狀態</th></tr></thead><tbody>${usable.map(c=>{
+              const holiday=compLeaveIsHolidayVisitCredit(c);
+              const expiryText=holiday?'無到期限制':(c.expires_on?rocDate(String(c.expires_on)+'T00:00:00'):'待設定');
+              let status='有效';
+              if(holiday)status='無到期限制';
+              else if(c.expires_on){
+                const d=Math.round((new Date(String(c.expires_on)+'T00:00:00')-new Date(today+'T00:00:00'))/86400000);
+                if(d===0)status='今天到期';
+                else if(d<=30)status=`${d}天內到期`;
+              }
+              return `<tr>
+                <td>${rocDate(String(c.earned_date)+'T00:00:00')}</td>
+                <td>${escapeHTML(c.source_label||'換休')}</td>
+                <td>${escapeHTML(overtimeDurationLabel(c.earned_minutes))}</td>
+                <td><strong>${escapeHTML(overtimeDurationLabel(c.remaining_minutes))}</strong></td>
+                <td>${escapeHTML(expiryText)}</td>
+                <td>${escapeHTML(status)}</td>
+              </tr>`;
+            }).join('')}</tbody></table></div>`
+          : '<div class="ot-empty"><div class="icon">🕒</div><h3>目前沒有可用換休額度</h3></div>'}
+      </div>
+    </section>`;
   }
 
   function compLeaveCancellation(sourceId){
@@ -1763,28 +1831,12 @@
 })();
 
 
-// V5.2 換休期限／到期管理：一般加班週年制到期、假日家訪換休永久有效、到期提醒
-// 換休台帳由 overtime-patch 統一載入；本檔只負責期限設定與明細呈現。
+// V5.2 換休到期管理：只處理週年到期提醒與薪資結清；換休帳本由主模組直接渲染。
 (() => {
   const style=document.createElement('style');
   style.id='v52-comp-leave-expiry-style';
-  style.textContent=`
-    .ce-chip{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:10.5px;font-weight:900;white-space:nowrap}
-    .ce-chip.ok{background:#eef7f1;color:#237a4b}
-    .ce-chip.soon{background:#fffaeb;color:#b54708}
-    .ce-chip.expired{background:#fef3f2;color:#b42318}
-    .ce-chip.missing{background:#f2f4f7;color:#667085}
-    .ce-chip.used{background:#f8fafc;color:#98a2b3}
-    .ce-chip.future{background:#eef4ff;color:#3538cd}
-    .ce-chip.permanent{background:#eef4ff;color:#3538cd}
-    .ce-warn{margin-top:7px;border:1px solid #fedf89;background:#fffaeb;color:#93370d;border-radius:8px;padding:7px 9px;font-size:11px;line-height:1.55}
-    .ce-hire-grid{display:grid;gap:8px}
-    .ce-hire-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(150px,190px);gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0}
-    .ce-hire-row:last-child{border-bottom:0}
-    .ce-hire-name{font-weight:900;color:#344054}
-    .ce-hire-role{font-size:11px;color:#667085;margin-top:2px}
-    @media(max-width:560px){.ce-hire-row{grid-template-columns:1fr}.ce-hire-row input{width:100%}}
-  `;
+  style.textContent=``;
+
   document.head.appendChild(style);
 
   Object.assign(state,{
@@ -1817,9 +1869,6 @@
     return (state.compLeaveExpiryStaff||[]).find(s=>String(s.id)===String(staffId))||null;
   }
 
-  function ceCredits(staffId){
-    return (state.compLeaveCredits||[]).filter(c=>String(c.staff_id)===String(staffId));
-  }
 
   function ceIsPermanentHoliday(c){
     if(!c||c.source_type!=='overtime_request')return false;
@@ -1834,23 +1883,6 @@
     return Math.round((b-a)/86400000);
   }
 
-  function ceBalance(staffId,asOf=ceToday()){
-    const credits=ceCredits(staffId);
-    const eligible=credits.filter(c=>String(c.earned_date)<=asOf&&(!c.expires_on||String(c.expires_on)>=asOf));
-    const remaining=eligible.reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
-    const expired=credits
-      .filter(c=>!ceIsPermanentHoliday(c)&&c.expires_on&&String(c.expires_on)<asOf&&(Number(c.remaining_minutes)||0)>0)
-      .reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
-    const missing=credits
-      .filter(c=>!ceIsPermanentHoliday(c)&&!c.expires_on&&(Number(c.remaining_minutes)||0)>0)
-      .reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
-    const soon=credits.filter(c=>{
-      if(ceIsPermanentHoliday(c)||!c.expires_on||(Number(c.remaining_minutes)||0)<=0||String(c.earned_date)>asOf)return false;
-      const d=Math.round((new Date(String(c.expires_on)+'T00:00:00')-new Date(asOf+'T00:00:00'))/86400000);
-      return d>=0&&d<=30;
-    }).reduce((s,c)=>s+(Number(c.remaining_minutes)||0),0);
-    return {remaining,expired,missing,soon};
-  }
 
   async function ceLoad(force=false){
     if(!state.profile||state.compLeaveExpiryLoading)return;
@@ -1878,17 +1910,6 @@
     }
   }
 
-  function ceStatus(c){
-    const rem=Number(c.remaining_minutes)||0;
-    if(rem<=0)return {cls:'used',text:'已用完'};
-    if(String(c.earned_date||'')>ceToday())return {cls:'future',text:'尚未取得'};
-    if(ceIsPermanentHoliday(c))return {cls:'permanent',text:'無到期限制'};
-    if(!c.expires_on)return {cls:'missing',text:'待設定到職日'};
-    const d=ceDaysUntil(c.expires_on);
-    if(d<0)return {cls:'expired',text:'已到期，待結清'};
-    if(d<=30)return {cls:'soon',text:`${d}天內到期`};
-    return {cls:'ok',text:'有效'};
-  }
 
   function ceAddYearsClamped(date,years){
     const [y,m,d]=String(date||'').slice(0,10).split('-').map(Number);
@@ -1947,44 +1968,6 @@
     summary.insertAdjacentElement('afterend',box);
   }
 
-  function ceBalancePanel(){
-    if(state.page!=='overtime'||state.overtimeView!=='balance'||!state.compLeaveExpiryLoaded)return;
-    const main=document.getElementById('otMain');
-    if(!main)return;
-
-    document.getElementById('ceExpiryPanel')?.remove();
-    const staffId=state.profile?.id;
-    const today=ceToday();
-    const allCredits=ceCredits(staffId).slice();
-    const credits=allCredits
-      .filter(c=>(Number(c.remaining_minutes)||0)>0)
-      .filter(c=>!c.expires_on||String(c.expires_on)>=today)
-      .sort((a,b)=>{
-        const aExpiry=ceIsPermanentHoliday(a)?'9999-12-31':String(a.expires_on||'9999-12-31');
-        const bExpiry=ceIsPermanentHoliday(b)?'9999-12-31':String(b.expires_on||'9999-12-31');
-        return aExpiry.localeCompare(bExpiry)
-          ||String(a.earned_date).localeCompare(String(b.earned_date))
-          ||String(a.created_at).localeCompare(String(b.created_at));
-      });
-    const b=ceBalance(staffId);
-    const hasOrdinaryCredit=allCredits.some(c=>!ceIsPermanentHoliday(c)&&(Number(c.remaining_minutes)||0)>0);
-    const missingHire=!ceStaff(staffId)?.hire_date&&hasOrdinaryCredit;
-
-    const html=`<section id="ceExpiryPanel" class="ot-rule-card">
-      <h3>換休期限與剩餘明細</h3><p>僅列出目前仍可使用的換休額度；一般加班換休依到期日優先使用，假日家訪換休無到期限制。</p>
-      ${missingHire?'<div class="ce-warn">目前尚未設定到職日，因此一般加班換休無法計算法定最終到期日。請至「人員管理」完成設定。</div>':''}
-      ${b.soon>0?`<div class="ce-warn">未來30天內有 <strong>${escapeHTML(ceDuration(b.soon))}</strong> 一般加班換休即將到期，建議優先安排。</div>`:''}
-      ${b.expired>0?`<div class="ot-rule-highlight">已有 <strong>${escapeHTML(ceDuration(b.expired))}</strong> 一般加班換休到期未休，不再列入可用換休，請於薪資作業中辦理結清。</div>`:''}
-      <div style="margin-top:12px">${credits.length
-        ? `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>取得日期</th><th>來源</th><th>原始額度</th><th>剩餘</th><th>到期日</th><th>狀態</th></tr></thead><tbody>${credits.map(c=>{
-            const s=ceStatus(c);
-            const expiryText=ceIsPermanentHoliday(c)?'無到期限制':(c.expires_on?ceDate(c.expires_on):'待設定');
-            return `<tr><td>${ceDate(c.earned_date)}</td><td>${escapeHTML(c.source_label||'換休')}</td><td>${escapeHTML(ceDuration(c.earned_minutes))}</td><td><strong>${escapeHTML(ceDuration(c.remaining_minutes))}</strong></td><td>${escapeHTML(expiryText)}</td><td><span class="ce-chip ${s.cls}">${escapeHTML(s.text)}</span></td></tr>`;
-          }).join('')}</tbody></table></div>`
-        : '<div class="ot-empty"><div class="icon">🕒</div><h3>目前沒有可用換休額度</h3></div>'}</div>
-    </section>`;
-    main.insertAdjacentHTML('beforeend',html);
-  }
 
   function cePayrollPanel(){
     if(state.page!=='overtime'||state.overtimeView!=='payroll'||!state.compLeaveExpiryLoaded||!ceCanReview())return;
@@ -2015,7 +1998,6 @@
   function ceEnhance(){
     if(state.page!=='overtime'||!state.compLeaveExpiryLoaded)return;
     ceAnniversaryReminder();
-    ceBalancePanel();
     cePayrollPanel();
   }
 
