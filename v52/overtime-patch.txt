@@ -305,7 +305,7 @@
   function overtimeSummary(){
     const {start,end}=overtimeMonthRange(state.overtimeMonth);
     const own=overtimeOwnRows().filter(r=>r.work_date>=start && r.work_date<=end && r.status==='approved');
-    const overtimeMinutes=own.filter(r=>['overtime','holiday_overtime'].includes(r.request_type)).reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
+    const overtimeMinutes=own.filter(r=>['overtime','holiday_overtime','rest_day_overtime','national_holiday_overtime'].includes(r.request_type)).reduce((sum,r)=>sum+(Number(r.overtime_minutes)||0),0);
     const compMinutes=own.filter(r=>r.request_type==='holiday_visit_comp').reduce((sum,r)=>sum+(Number(r.comp_minutes)||0),0);
     const pendingOvertime=state.overtimeRows.filter(r=>r.status==='pending').length;
     const pendingLeave=state.compLeaveRows.filter(r=>r.status==='pending').length;
@@ -736,6 +736,7 @@
     wireOvertimeTableActions();
     wireCompLeaveActions();
     wirePayrollActions();
+    window.AttendanceV2Lifecycle?.runSoon('overtime:render',{view:state.overtimeView});
   }
 
   function otFormSetDirty(dirty){
@@ -857,6 +858,7 @@
     $('modalConfirm')?.addEventListener('click',()=>saveOvertime(existing,'pending'));
     updateFields();
     window.scrollTo({top:0,behavior:'auto'});
+    window.AttendanceV2Lifecycle?.runSoon('overtime:form',{kind:'overtime',existingId:existing?.id||null});
   }
 
   function updateOvertimeCalc(){
@@ -997,6 +999,7 @@
     $('modalConfirm')?.addEventListener('click',()=>saveCompLeaveUsage(existing,'pending'));
     updateDuration();
     window.scrollTo({top:0,behavior:'auto'});
+    window.AttendanceV2Lifecycle?.runSoon('overtime:form',{kind:'comp_leave',existingId:existing?.id||null});
   }
 
   async function saveCompLeaveUsage(existing,status){
