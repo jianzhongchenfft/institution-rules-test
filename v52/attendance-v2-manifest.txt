@@ -1,0 +1,35 @@
+Attendance V2 runtime architecture
+Date: 2026-10-07
+
+Authoritative runtime files:
+1. attendance-v2-core.txt
+   - lifecycle registry / render hooks
+2. attendance-v2-overtime.txt
+   - overtime application
+   - comp leave use / balance
+   - withdrawal
+   - approved record adjustment
+   - comp leave expiry
+   - regular-day warning
+   - manager leave balance
+3. attendance-v2-payroll.txt
+   - payroll month guard
+   - overtime pay calculation
+   - wage base / daily hours
+   - settlement snapshot
+   - post-settlement corrections
+4. attendance-v2-annual.txt
+   - annual leave requests / credits
+   - automatic entitlement status
+   - business-manager display rules
+   - annual leave expiry / carryover
+
+Runtime invariants:
+- No MutationObserver is used by Attendance V2 runtime.
+- Attendance modules do not load other Attendance modules.
+- part07 is the single entry point for Attendance V2 loading.
+- Render-dependent enhancements run through AttendanceV2Lifecycle.
+- Monthly overtime summary must use one timed-type definition:
+  overtime, holiday_overtime (legacy), rest_day_overtime, national_holiday_overtime.
+- Legacy patch files remain in the repository for history / rollback only and are not loaded by part07.
+- Database formulas and payroll calculation rules were not changed by this front-end refactor.
