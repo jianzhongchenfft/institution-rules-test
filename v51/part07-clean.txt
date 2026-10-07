@@ -65,7 +65,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       if(!staffManagementRes.ok) throw new Error(`v52/staff-management.txt 載入失敗（${staffManagementRes.status}）`);
       eval(await staffManagementRes.text());
 
-      const staffScheduleRes = await fetch('v52/staff-work-schedule-ui.txt?v=payroll-clean-v1-1-20261008',{cache:'no-store'});
+      const staffScheduleRes = await fetch('v52/staff-work-schedule-ui.txt?v=payroll-asset-reset-v1-20261008',{cache:'no-store'});
       if(!staffScheduleRes.ok) throw new Error(`v52/staff-work-schedule-ui.txt 載入失敗（${staffScheduleRes.status}）`);
       eval(await staffScheduleRes.text());
 
@@ -88,20 +88,20 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       const attendanceV2Files=[
         'v52/attendance-v2-core.txt',
         'v52/attendance-v2-overtime.txt',
-        'v52/attendance-v2-payroll.txt',
+        'v52/attendance-v2-payroll-clean.txt',
         'v52/attendance-v2-annual-1.txt',
         'v52/attendance-v2-annual-2.txt',
         'v52/attendance-v2-annual-3.txt'
       ];
       let attendanceV2Code='';
       for(const path of attendanceV2Files){
-        const res=await fetch(`${path}?v=payroll-clean-v1-1-20261008`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=payroll-asset-reset-v1-20261008`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         attendanceV2Code+='\n'+await res.text();
       }
       eval(attendanceV2Code);
 
-      const conciseUiRes=await fetch('v52/ui-concise-copy-patch.txt?v=payroll-clean-v1-1-20261008',{cache:'no-store'});
+      const conciseUiRes=await fetch('v52/ui-concise-copy-patch.txt?v=payroll-asset-reset-v1-20261008',{cache:'no-store'});
       if(!conciseUiRes.ok) throw new Error(`v52/ui-concise-copy-patch.txt 載入失敗（${conciseUiRes.status}）`);
       eval(await conciseUiRes.text());
 
