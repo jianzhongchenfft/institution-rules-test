@@ -24,6 +24,8 @@ create index if not exists staff_work_hours_history_staff_effective_idx
   on public.staff_work_hours_history(staff_id,effective_from desc,created_at desc);
 
 alter table public.staff_work_hours_history enable row level security;
+revoke all on table public.staff_work_hours_history from anon;
+revoke all on table public.staff_work_hours_history from authenticated;
 grant select, insert on table public.staff_work_hours_history to authenticated;
 
 drop policy if exists staff_work_hours_read on public.staff_work_hours_history;
@@ -102,6 +104,37 @@ where not exists (
     and h.created_at=r.created_at
 );
 
+-- Preserve known historical hours from already-issued annual-leave snapshots.
+insert into public.staff_work_hours_history(
+  staff_id,effective_from,agreed_daily_hours,note,created_by,created_by_name,created_at
+)
+select
+  c.staff_id,
+  c.period_start,
+  c.daily_hours_snapshot,
+  '由既有特休工時快照匯入',
+  coalesce(c.created_by, u.id),
+  coalesce(nullif(c.created_by_name,''),'系統歷程轉換'),
+  coalesce(c.auto_generated_at,c.created_at,now())
+from public.annual_leave_credits c
+join public.staff_users s on s.id=c.staff_id
+left join lateral (
+  select au.id
+  from auth.users au
+  where lower(au.email)=lower(s.email)
+  limit 1
+) u on true
+where c.daily_hours_snapshot is not null
+  and c.period_start is not null
+  and coalesce(c.created_by,u.id) is not null
+  and not exists (
+    select 1
+    from public.staff_work_hours_history h
+    where h.staff_id=c.staff_id
+      and h.effective_from=c.period_start
+      and h.agreed_daily_hours=c.daily_hours_snapshot
+  );
+
 create or replace function private.generate_annual_leave_credits(
   p_as_of date default ((now() at time zone 'Asia/Taipei'))::date
 )
@@ -172,9 +205,24 @@ begin
       continue;
     end if;
 
+    -- 1. Effective-dated work-hours timeline is authoritative.
     select private.staff_agreed_daily_hours_on(v_staff.id, v_start)
       into v_daily_hours;
 
+    -- 2. Preserve an already-issued legacy entitlement snapshot when the
+    --    historical timeline did not yet exist.
+    if v_daily_hours is null then
+      select c.daily_hours_snapshot
+        into v_daily_hours
+      from public.annual_leave_credits c
+      where c.staff_id=v_staff.id
+        and c.entitlement_key=v_key
+        and c.daily_hours_snapshot is not null
+      order by c.created_at desc
+      limit 1;
+    end if;
+
+    -- 3. Backward-compatible payroll snapshot fallback.
     if v_daily_hours is null then
       select r.agreed_daily_hours
         into v_daily_hours
@@ -185,6 +233,7 @@ begin
       limit 1;
     end if;
 
+    -- 4. Last fallback only when no historical evidence exists.
     v_daily_hours := coalesce(v_daily_hours, v_staff.agreed_daily_hours);
 
     if v_daily_hours is null or v_daily_hours <= 0 or v_daily_hours > 8 then
@@ -432,3 +481,11 @@ begin
   return v_rate_id;
 end;
 $function$;
+
+-- Work-hours changes now recalculate from the effective-dated history trigger.
+-- Keep the staff_users trigger only for hire-date / active-status changes.
+drop trigger if exists trg_staff_annual_leave_profile_update on public.staff_users;
+create trigger trg_staff_annual_leave_profile_update
+after update of hire_date, is_active on public.staff_users
+for each row
+execute function private.refresh_annual_leave_after_staff_change();
