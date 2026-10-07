@@ -85,13 +85,13 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       ];
       let attendanceV2Code='';
       for(const path of attendanceV2Files){
-        const res=await fetch(`${path}?v=attendance-v2-expiry-countdown-20261007`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=attendance-v2-expiry-copy-v2-20261007`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         attendanceV2Code+='\n'+await res.text();
       }
       eval(attendanceV2Code);
 
-      const conciseUiRes=await fetch('v52/ui-concise-copy-patch.txt?v=attendance-v2-expiry-countdown-20261007',{cache:'no-store'});
+      const conciseUiRes=await fetch('v52/ui-concise-copy-patch.txt?v=attendance-v2-expiry-copy-v2-20261007',{cache:'no-store'});
       if(!conciseUiRes.ok) throw new Error(`v52/ui-concise-copy-patch.txt 載入失敗（${conciseUiRes.status}）`);
       eval(await conciseUiRes.text());
 
