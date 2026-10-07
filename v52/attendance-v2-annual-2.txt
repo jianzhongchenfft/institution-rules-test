@@ -383,6 +383,11 @@
     const n=Math.max(0,Number(minutes)||0),h=Math.floor(n/60),m=n%60;
     return h&&m?`${h}小時${m}分`:h?`${h}小時`:`${m}分鐘`;
   };
+  const dayText=value=>{
+    const n=Math.max(0,Number(value)||0);
+    const rounded=Math.round(n*100)/100;
+    return `${String(rounded).replace(/\.0+$/,'')}天`;
+  };
   const dateText=value=>value?rocDate(String(value).slice(0,10)+'T00:00:00'):'未設定';
   const roleText=role=>roleLabels?.[role]||role||'—';
   const daysUntil=value=>{
@@ -400,7 +405,7 @@
         ? db.from('staff_users').select('id,display_name,role,is_active,hire_date,agreed_daily_hours').eq('is_active',true).order('display_name')
         : db.from('staff_users').select('id,display_name,role,is_active,hire_date,agreed_daily_hours').eq('id',state.profile.id).limit(1);
       const creditQuery=db.from('annual_leave_credits')
-        .select('id,staff_id,period_start,period_end,granted_minutes,remaining_minutes,label,note,entitlement_key,entitlement_days,daily_hours_snapshot,generation_source,settlement_status,auto_generated_at')
+        .select('id,staff_id,period_start,period_end,granted_days,remaining_days,granted_minutes,remaining_minutes,label,note,entitlement_key,entitlement_days,daily_hours_snapshot,generation_source,settlement_status,auto_generated_at')
         .order('period_start',{ascending:false});
       const [staffRes,creditRes]=await Promise.all([staffQuery,creditQuery]);
       if(staffRes.error)throw staffRes.error;
