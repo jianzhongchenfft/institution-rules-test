@@ -157,8 +157,7 @@
   function newMeasure(){return {id:uid(),text:'',executor:'居服員',measure_type:'',service_code:'',proposed_service:''};}
   function positiveMonths(x){var v=Number(x);return Number.isInteger(v)&&v>=1&&v<=120?v:0;}
   function monthsFor(goal,planDate){
-    var v=positiveMonths(goal.review_months);if(v)return v;
-    if(goal.review_months!==undefined&&goal.review_months!==null&&String(goal.review_months)!=='')return 0;
+    if(Object.prototype.hasOwnProperty.call(goal,'review_months'))return positiveMonths(goal.review_months);
     // Older drafts used an actual date: preserve the approximate cycle instead of discarding it.
     if(goal.review_date&&planDate){
       var a=String(planDate).split('-').map(Number),b=String(goal.review_date).split('-').map(Number);
@@ -204,7 +203,7 @@
         && (!s.valid_to||s.valid_to>=today());
     });
   }
-  function measureMode(m){return m.measure_type||(m.service_code?'service':'pending');}
+  function measureMode(m){return Object.prototype.hasOwnProperty.call(m,'measure_type')?m.measure_type:(m.service_code?'service':'pending');}
   function approvedServiceOptions(code,caseId){
     var rows=serviceForCase(caseId),items=['<option value="">請選擇個管師目前核定的服務</option>'];
     if(code&&!rows.some(function(s){return s.service_code===code;})){
