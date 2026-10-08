@@ -32,3 +32,5 @@ Architecture rules:
 - Database function private.staff_anniversary_period is the single anniversary-period calculation.
 - Normal annual leave credits are system-generated; carryover credits are created only by the expiry/carryover workflow.
 - Comp leave and annual leave keep separate ledgers; they share the anniversary-cycle source, not balances.
+- Ordinary and holiday-visit comp leave use independent leave_type credit, pending, and usage balances; one usage never mixes the two.
+- Usage defaults to ordinary and can be changed to holiday_visit before submission.
