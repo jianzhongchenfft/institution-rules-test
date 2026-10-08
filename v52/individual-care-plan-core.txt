@@ -534,41 +534,41 @@
       '</optgroup>';
     return result;
   }
-  function renderProblem(p,i,locked){
+  function renderProblem(p,i,locked,correction){
     var selected=issueValue(p),title=p.title||'';
     return '<div class="icp-problem">'+
       '<div class="icp-actions"><strong style="margin-right:auto">照顧問題 '+(i+1)+'</strong>'+
-      (!locked?'<button type="button" class="btn sm" data-action="removeProblem" data-i="'+i+'">刪除問題</button>':'')+'</div>'+
-      '<div class="icp-field"><label>照顧問題 *</label><select data-issue="'+i+'" '+(locked?'disabled':'')+'>'+selectOptions(selected)+'</select></div>'+
+      (!locked&&!correction?'<button type="button" class="btn sm" data-action="removeProblem" data-i="'+i+'">刪除問題</button>':'')+'</div>'+
+      '<div class="icp-field"><label>照顧問題 *</label><select data-issue="'+i+'" '+(locked||correction?'disabled':'')+'>'+selectOptions(selected)+'</select></div>'+
       (selected==='__custom__'
         ?field('自訂照顧問題名稱 *',title,'data-path="problems.'+i+'.title" '+(locked?'disabled':'')+' placeholder="請輸入照顧問題名稱"')
         :'')+
       area('問題說明及評估依據 *',p.rationale,'data-path="problems.'+i+'.rationale" '+(locked?'disabled':''),issueExample(p.title))+
       (!locked?'<button type="button" class="btn sm" data-action="assessmentFindings" data-i="'+i+'">帶入本次評估發現</button>':'')+
-      (!locked&&goalSuggestions(p.title).length?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
+      (!locked&&!correction&&goalSuggestions(p.title).length?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
       (p.goals||[]).map(function(g,j){
         var months=monthsFor(g,L.editing.plan_date),due=dueFromMonths(L.editing.plan_date,months);
         return '<div class="icp-goal"><div class="icp-actions"><strong style="margin-right:auto">照顧目標 '+(j+1)+'</strong>'+
-          (!locked?'<button type="button" class="btn sm" data-action="removeGoal" data-i="'+i+'" data-j="'+j+'">刪除目標</button>':'')+'</div>'+
+          (!locked&&!correction?'<button type="button" class="btn sm" data-action="removeGoal" data-i="'+i+'" data-j="'+j+'">刪除目標</button>':'')+'</div>'+
           area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''),goalExample(p.title))+
           '<div class="icp-cols">'+area('評值標準 *',g.criteria,'data-path="problems.'+i+'.goals.'+j+'.criteria" '+(locked?'disabled':''),criteriaExample(p.title))+
           '<div class="icp-field"><label>預定評值時間 *</label><div style="display:flex;align-items:center;gap:8px">'+
-          '<input style="max-width:110px" type="number" min="1" max="120" step="1" data-path="problems.'+i+'.goals.'+j+'.review_months" value="'+h(g.review_months!==undefined?g.review_months:months)+'" '+(locked?'disabled':'')+'><span>個月後</span></div>'+
+          '<input style="max-width:110px" type="number" min="1" max="120" step="1" data-path="problems.'+i+'.goals.'+j+'.review_months" value="'+h(g.review_months!==undefined?g.review_months:months)+'" '+(locked||correction?'disabled':'')+'><span>個月後</span></div>'+
           '<div class="icp-muted" data-icp-due="'+i+'.'+j+'">'+(due?'預計評值日：'+fmt(due):'請輸入有效的月份（1～120）')+'</div></div></div>'+
           '<div style="margin-top:10px"><strong>執行策略／照顧措施 *</strong></div>'+
           (g.measures||[]).map(function(m,k){
             var base='problems.'+i+'.goals.'+j+'.measures.'+k,mode=measureMode(m);
             return '<div class="icp-measure">'+
               '<div class="icp-actions"><strong style="margin-right:auto">措施 '+(k+1)+'</strong>'+
-              (!locked?'<button type="button" class="btn sm" data-action="removeMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">刪除措施</button>':'')+'</div>'+
-              '<div class="icp-field"><label>服務項目／措施類型 *</label><select data-measure-choice="'+i+'.'+j+'.'+k+'" '+(locked?'disabled':'')+'>'+serviceChoiceOptions(m,L.editing.case_id,locked,L.editing)+'</select></div>'+
+              (!locked&&!correction?'<button type="button" class="btn sm" data-action="removeMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">刪除措施</button>':'')+'</div>'+
+              '<div class="icp-field"><label>服務項目／措施類型 *</label><select data-measure-choice="'+i+'.'+j+'.'+k+'" '+(locked||correction?'disabled':'')+'>'+serviceChoiceOptions(m,L.editing.case_id,locked,L.editing)+'</select></div>'+
               (mode==='pending'
                 ?field('擬新增／調整服務項目 *',m.proposed_service||m.service_code||'','data-path="'+base+'.proposed_service" '+(locked?'disabled':'')+' placeholder="例如：建議新增BA07協助沐浴及洗頭"')
                 :'')+
               area(mode==='pending'?'建議調整內容及與A單位協調事項 *':'具體執行策略／照顧措施 *',m.text,'data-path="'+base+'.text" '+(locked?'disabled':''),measurePlaceholder(p.title,m))+
-              (!locked&&measureSuggestion(p.title,m)?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">＋帶入對應措施建議</button></div>':'')+
+              (!locked&&!correction&&measureSuggestion(p.title,m)?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">＋帶入對應措施建議</button></div>':'')+
               (mode==='non_service'||mode==='pending'
-                ?field('負責執行／協調人員 *',m.executor||'督導','data-path="'+base+'.executor" '+(locked?'disabled':''))
+                ?field('負責執行／協調人員 *',m.executor||'督導','data-path="'+base+'.executor" '+(locked||correction?'disabled':''))
                 :'')+
               (mode==='pending'
                 ?'<div class="icp-note">尚未核定｜僅記錄建議與後續協調，不能作為居服員提供服務的依據。待A單位核定後，再修訂計畫。</div>'
@@ -579,10 +579,10 @@
                     :'')+
             '</div>';
           }).join('')+
-          (!locked?'<div class="icp-actions"><button type="button" class="btn sm" data-action="addMeasure" data-i="'+i+'" data-j="'+j+'">＋新增措施</button></div>':'')+
+          (!locked&&!correction?'<div class="icp-actions"><button type="button" class="btn sm" data-action="addMeasure" data-i="'+i+'" data-j="'+j+'">＋新增措施</button></div>':'')+
         '</div>';
       }).join('')+
-      (!locked?'<button type="button" class="btn sm" data-action="addGoal" data-i="'+i+'">＋新增照顧目標</button>':'')+'</div>';
+      (!locked&&!correction?'<button type="button" class="btn sm" data-action="addGoal" data-i="'+i+'">＋新增照顧目標</button>':'')+'</div>';
   }
   function renderForm(keepScroll){
     var originalScroll=keepScroll?window.scrollY:0;
@@ -590,13 +590,16 @@
     var c=caseBy(p.case_id),e=L.events.find(function(x){return x.id===p.assessment_event_id;});
     var summary=summaryFor(p.assessment_event_id);
     var snap=p.assessment_snapshot||{key_findings:summary&&summary.key_findings||'',care_recommendations:summary&&summary.care_recommendations||''};
-    var locked=p.status==='completed',body=p.plan_content||{},care=body.caregiver||{};
+    var locked=p.status==='completed',correction=p.revision_type==='correction',body=p.plan_content||{},care=body.caregiver||{};
     var previous=plansFor(p.case_id).some(function(x){return x.status==='completed'&&x.assessment_event_id!==p.assessment_event_id;});
     shell(c.case_name+'｜'+(locked?'查看':'填寫')+'計畫擬定',
       '對應評估：'+(e?fmt(e.planned_date)+'｜'+eventName(e):'—'),
       '<button id="icpFormBack" class="btn">← 返回個案</button>',
+      (p.revision_type?'<div class="icp-card"><h3>'+h(p.revision_type==='correction'?'文字更正':'計畫修訂')+'｜'+h(planVersionLabel(p))+'</h3>'+
+        (correction?'<div class="icp-note">更正只能調整文字敘述，不可變更照顧問題分類、目標數量、措施類型、服務碼及評值期間。涉及照顧內容變動，請改用「修訂計畫」。</div>':'')+
+        area('更正／修訂原因 *',p.revision_reason,'data-header="revision_reason" '+(locked?'disabled':''),'例如：因個案近期照顧需求變化，調整照顧目標與執行措施。')+'</div>':'')+
       '<div class="icp-card"><h3>一、基本資料與本次評估摘要</h3><div class="icp-cols">'+
-      field('計畫擬定日期 *',p.plan_date,'type="date" data-header="plan_date" '+(locked?'disabled':''))+
+      field('計畫擬定日期 *',p.plan_date,'type="date" data-header="plan_date" '+(locked||correction?'disabled':''))+
       field('負責督導',staffName(p.responsible_staff_id||c.supervisor_id),'disabled')+
       '</div><div class="icp-muted">主要評估發現／問題與需求</div><p style="white-space:pre-wrap">'+h(snap.key_findings||'未填寫')+'</p>'+
       '<div class="icp-muted">照顧服務重點／建議</div><p style="white-space:pre-wrap">'+h(snap.care_recommendations||'未填寫')+'</p>'+
@@ -604,9 +607,9 @@
       '<div class="icp-card"><h3>本案個管師目前核定的BA／GA服務</h3>'+
       (serviceForCase(p.case_id).length?'<div class="icp-muted">'+serviceForCase(p.case_id).map(function(s){return h(s.service_code+' '+(s.service_name||'')+(s.approved_quantity==null?'':'｜核定 '+s.approved_quantity+' 支'));}).join('　／　')+'</div>':'<div class="icp-note">目前沒有有效的BA／GA核定服務資料。可先建立照顧問題及草稿，服務措施須待個管師核定並更新資料後才能完成。</div>')+'</div>'+
       '<div class="icp-card"><div class="icp-actions"><h3 style="margin-right:auto">二、本次照顧問題與照顧目標</h3>'+
-      (!locked&&previous?'<button class="btn sm" data-action="copyPrevious">帶入前次計畫</button>':'')+
-      (!locked?'<button class="btn sm" data-action="addProblem">＋新增照顧問題</button>':'')+'</div>'+
-      (body.problems||[]).map(function(x,i){return renderProblem(x,i,locked);}).join('')+'</div>'+
+      (!locked&&!p.root_plan_id&&previous?'<button class="btn sm" data-action="copyPrevious">帶入前次計畫</button>':'')+
+      (!locked&&!correction?'<button class="btn sm" data-action="addProblem">＋新增照顧問題</button>':'')+'</div>'+
+      (body.problems||[]).map(function(x,i){return renderProblem(x,i,locked,correction);}).join('')+'</div>'+
       '<div class="icp-card"><h3>三、主要照顧者共同執行</h3>'+
       '<div class="icp-field"><label>參與情形</label><select data-path="caregiver.participation" '+(locked?'disabled':'')+'>'+
       ['','有主要照顧者參與','無主要照顧者','其他支持者參與'].map(function(x){return '<option value="'+h(x)+'" '+(x===(care.participation||'')?'selected':'')+'>'+(x||'請選擇')+'</option>';}).join('')+'</select></div>'+
@@ -616,7 +619,7 @@
       '<div class="icp-card"><h3>四、整體判斷與後續安排</h3>'+
       area('整體判斷與後續安排',care.overall_plan,'data-path="caregiver.overall_plan" '+(locked?'disabled':''),'例如：目前照顧目標與服務安排尚符合需求，建議維持；另因洗澡需求增加，將聯繫A單位協助評估BA07調整，待核定後再安排服務。')+
       '<div class="icp-muted" data-icp-quarterly>下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div></div>'+
-      (locked?'<div class="icp-note">此計畫已完成，第一階段先採唯讀保護；正式修訂與追蹤評值將在第二階段加入。</div>':
+      (locked?'<div class="icp-note">此版本已完成且不可直接覆蓋。如需調整請由「目前計畫」建立更正或修訂版本。</div>':
       '<div class="icp-footer"><span class="icp-muted" style="margin-right:auto">'+(L.dirty?'尚有未儲存變更':'可儲存草稿後再繼續')+'</span><button id="icpSaveDraft" class="btn">儲存草稿</button><button id="icpComplete" class="btn primary">完成計畫</button></div>'));
     $('icpFormBack').onclick=function(){if(leaveOK()){L.editing=null;L.dirty=false;renderCase();}};
     if(locked){window.scrollTo(0,originalScroll);return;}
@@ -717,6 +720,7 @@
   }
   async function save(finish){
     var p=L.editing;if(!p||p.status==='completed')return;
+    if(p.root_plan_id&&!String(p.revision_reason||'').trim()){toast('請填寫更正／修訂原因','error');return;}
     if(finish){var err=validate(p);if(err){toast(err,'error');return;}}
     syncReviewDates(p);
     // Older pending drafts could store proposals in service_code: keep the proposal, but never treat as approved service.
@@ -731,12 +735,16 @@
     showLoading(true);
     try{
       var data={case_id:p.case_id,assessment_event_id:p.assessment_event_id,plan_date:p.plan_date,plan_content:p.plan_content,status:finish?'completed':'draft'};
+      if(p.root_plan_id){
+        data.revision_reason=p.revision_reason;
+        if(!p.id){data.root_plan_id=p.root_plan_id;data.previous_version_id=p.previous_version_id;data.revision_type=p.revision_type;}
+      }
       var q=p.id?db.from('individual_care_plans').update(data).eq('id',p.id).select().single():db.from('individual_care_plans').insert(data).select().single();
       var rs=await q;if(rs.error)throw rs.error;
       var idx=L.plans.findIndex(function(x){return x.id===rs.data.id;});
       if(idx>=0)L.plans[idx]=rs.data;else L.plans.unshift(rs.data);
       L.dirty=false;
-      toast(finish?'照顧計畫已完成':'草稿已儲存','success');
+      toast(finish?(p.root_plan_id?'照顧計畫新版本已完成':'照顧計畫已完成'):'草稿已儲存','success');
       L.editing=null;renderCase();
     }catch(e){
       console.error(e);
