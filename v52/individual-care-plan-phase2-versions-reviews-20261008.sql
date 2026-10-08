@@ -272,7 +272,7 @@ create table public.individual_care_plan_reviews(
  reviewed_by_staff_id uuid references public.staff_users(id),
  created_by uuid not null,
  constraint individual_care_plan_reviews_reason_check check (
-   result not in ('partial','unmet','unable') or nullif(btrim(comments),'') is not null
+   nullif(btrim(comments),'') is not null
  )
 );
 create index individual_care_plan_reviews_case_date on public.individual_care_plan_reviews(case_id,review_date desc,created_at desc);
