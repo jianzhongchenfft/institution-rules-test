@@ -61,7 +61,7 @@ begin
       new.version_no := 1;
     else
       select * into v_parent from public.individual_care_plans
-        where id=new.root_plan_id and root_plan_id is null and status='completed' for update;
+        where id=new.root_plan_id and root_plan_id is null and status='completed';
       if not found then raise exception 'CARE_PLAN_ROOT_NOT_COMPLETED'; end if;
       if v_parent.case_id is distinct from new.case_id
         or v_parent.assessment_event_id is distinct from new.assessment_event_id then
