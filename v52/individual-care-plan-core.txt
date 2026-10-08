@@ -1,4 +1,4 @@
-// 個別化照顧計畫｜第一階段（測試版）
+// 計畫擬定｜第一階段（測試版）
 (function(){
   if(window.individualCarePlanApi)return;
   var ROLES=['supervisor','business_manager','organization_manager','admin'];
@@ -142,7 +142,7 @@
     return measureSuggestion(problem,measure)||'例如：依核定服務範圍及個案能力提供必要協助，留意安全並回報異常。';
   }
   var L={cases:[],events:[],summaries:[],plans:[],services:[],staff:[],owner:'mine',filter:'all',search:'',sort:'name',caseId:null,tab:'current',editing:null,dirty:false,loaded:false};
-  var currentModule={section:'每天工作',id:'individualCarePlans',icon:'📝',label:'個別化照顧計畫',crumb:'計畫擬定與照顧目標',ready:true,features:['照顧問題','照顧目標','執行策略','評估連動']};
+  var currentModule={section:'每天工作',id:'individualCarePlans',icon:'📝',label:'計畫擬定',crumb:'照顧問題、目標及措施',ready:true,features:['照顧問題','照顧目標','執行策略','評估連動']};
   if(!modules.some(function(m){return m.id==='individualCarePlans';})){
     var idx=modules.findIndex(function(m){return m.id==='assessments';});
     modules.splice(idx<0?1:idx+1,0,currentModule);
@@ -201,7 +201,7 @@
     var counts={waiting:all.filter(function(c){return status(c)==='待擬定';}).length,draft:all.filter(function(c){return status(c)==='草稿';}).length,done:all.filter(function(c){return status(c)==='執行中';}).length,no_assessment:all.filter(function(c){return status(c)==='尚無完成評估';}).length};
     var rows=all.filter(function(c){return (!L.search||c.case_name.includes(L.search)||String(c.case_no||'').includes(L.search))&&(L.filter==='all'||({waiting:'待擬定',draft:'草稿',done:'執行中',no_assessment:'尚無完成評估'})[L.filter]===status(c));});
     rows.sort(function(a,b){return L.sort==='status'?status(a).localeCompare(status(b),'zh-Hant'):a.case_name.localeCompare(b.case_name,'zh-Hant');});
-    shell('📝 個別化照顧計畫','依個案集中管理本期計畫；完整評值與版本管理將於下一階段加入。',
+    shell('📝 計畫擬定','依個案集中管理本期計畫；完整評值與版本管理將於下一階段加入。',
       '<button id="icpReload" class="btn">↻ 重新整理</button>',
       '<section class="icp-grid">'+[
         ['waiting','待擬定',counts.waiting],['draft','草稿',counts.draft],['done','執行中',counts.done],['no_assessment','尚無完成評估',counts.no_assessment]
@@ -224,7 +224,7 @@
     var ps=plansFor(c.id),evs=eventFor(c),latest=evs[0],matching=latest&&ps.find(function(p){return p.assessment_event_id===latest.id;});
     var actions=evs.filter(function(e){return !ps.some(function(p){return p.assessment_event_id===e.id;});});
     var current=ps[0],readOnly='<div class="icp-note">第二階段將加入獨立目標評值、臨時評值與歷史修訂版本。目前已完成的計畫採唯讀保護。</div>';
-    shell(c.case_name+'｜個別化照顧計畫','負責督導：'+staffName(c.supervisor_id),
+    shell(c.case_name+'｜計畫擬定','負責督導：'+staffName(c.supervisor_id),
       '<button class="btn" id="icpBack">← 返回列表</button>',
       '<div class="icp-tab"><button data-icp-tab="current" class="'+(L.tab==='current'?'active':'')+'">目前計畫</button><button data-icp-tab="review" class="'+(L.tab==='review'?'active':'')+'">追蹤評值</button><button data-icp-tab="history" class="'+(L.tab==='history'?'active':'')+'">歷史紀錄</button></div>'+
       (L.tab==='review'?'<div class="icp-card"><h3>追蹤評值</h3>'+readOnly+'</div>':
@@ -302,32 +302,37 @@
     if(!confirm('帶入前次計畫將取代目前編輯中的照顧問題，確定繼續嗎？'))return;
     L.editing.plan_content.problems=fresh;syncReviewDates(L.editing);L.dirty=true;renderForm(true);
   }
-  // Bring older draft fields forward once, without losing previously entered notes.
+  // On draft edit, merge older fields into the single current field without losing notes.
+  // Completed plans remain immutable in storage; merging only affects their read-only display.
   function normalizeCaregiver(plan){
     var body=plan.plan_content||{},care=body.caregiver;
     if(!care){body.caregiver={};return false;}
-    var keys=['guidance','communication','need_transfer','transfer_detail','next_review_date'];
-    if(!keys.some(function(k){return Object.prototype.hasOwnProperty.call(care,k);}))return false;
+    var oldFields=['guidance','communication','need_transfer','transfer_detail','next_review_date','notes'];
+    if(!oldFields.some(function(k){return Object.prototype.hasOwnProperty.call(care,k);}))return false;
     if(!String(care.guidance_communication||'').trim()){
-      var notes=[];
-      if(String(care.guidance||'').trim())notes.push('照顧技巧指導：'+String(care.guidance).trim());
-      if(String(care.communication||'').trim())notes.push('溝通方式與說明：'+String(care.communication).trim());
-      care.guidance_communication=notes.join('\n');
+      var messages=[];
+      if(String(care.guidance||'').trim())messages.push('照顧技巧指導：'+String(care.guidance).trim());
+      if(String(care.communication||'').trim())messages.push('溝通方式與說明：'+String(care.communication).trim());
+      care.guidance_communication=messages.join('\n');
     }
-    if(!String(care.overall_plan||'').trim()){
-      var actions=[];
-      if(String(care.transfer_detail||'').trim())actions.push(String(care.transfer_detail).trim());
-      else if(care.need_transfer==='yes')actions.push('原紀錄勾選需轉介，待補充後續處理');
-      if(String(care.next_review_date||'').trim())actions.push('原預定完整評值日期：'+care.next_review_date);
-      care.overall_plan=actions.join('\n');
+    var actions=String(care.overall_plan||'').trim();
+    if(!actions){
+      var oldActions=[];
+      if(String(care.transfer_detail||'').trim())oldActions.push(String(care.transfer_detail).trim());
+      else if(care.need_transfer==='yes')oldActions.push('原紀錄勾選需轉介，待補充後續處理');
+      if(String(care.next_review_date||'').trim())oldActions.push('原預定完整評值日期：'+care.next_review_date);
+      actions=oldActions.join('\n');
     }
-    keys.forEach(function(k){delete care[k];});
+    var note=String(care.notes||'').trim();
+    if(note && !actions.includes(note)) actions+=(actions?'\n':'')+'原補充備註：'+note;
+    care.overall_plan=actions;
+    oldFields.forEach(function(k){delete care[k];});
     return true;
   }
   function newForm(eventId){
     var existing=L.plans.find(function(p){return p.assessment_event_id===eventId;});
     if(existing)return openForm(existing.id);
-    L.editing={id:null,case_id:L.caseId,assessment_event_id:eventId,plan_date:today(),status:'draft',plan_content:{problems:[newProblem()],caregiver:{participation:'',collaboration:'',guidance_communication:'',feedback:'',overall_plan:'',notes:''}}};
+    L.editing={id:null,case_id:L.caseId,assessment_event_id:eventId,plan_date:today(),status:'draft',plan_content:{problems:[newProblem()],caregiver:{participation:'',collaboration:'',guidance_communication:'',feedback:'',overall_plan:''}}};
     L.dirty=false;renderForm();
   }
   function openForm(id){
@@ -424,7 +429,7 @@
     var snap=p.assessment_snapshot||{key_findings:summary&&summary.key_findings||'',care_recommendations:summary&&summary.care_recommendations||''};
     var locked=p.status==='completed',body=p.plan_content||{},care=body.caregiver||{};
     var previous=plansFor(p.case_id).some(function(x){return x.status==='completed'&&x.assessment_event_id!==p.assessment_event_id;});
-    shell(c.case_name+'｜'+(locked?'查看':'填寫')+'個別化照顧計畫',
+    shell(c.case_name+'｜'+(locked?'查看':'填寫')+'計畫擬定',
       '對應評估：'+(e?fmt(e.planned_date)+'｜'+eventName(e):'—'),
       '<button id="icpFormBack" class="btn">← 返回個案</button>',
       '<div class="icp-card"><h3>一、基本資料與本次評估摘要</h3><div class="icp-cols">'+
@@ -447,9 +452,7 @@
       area('服務對象／照顧者意見',care.feedback,'data-path="caregiver.feedback" '+(locked?'disabled':''),'例如：個案希望維持目前居服員與服務時段，家屬表示可配合後續觀察。')+'</div>'+
       '<div class="icp-card"><h3>四、整體判斷與後續安排</h3>'+
       area('整體判斷與後續安排',care.overall_plan,'data-path="caregiver.overall_plan" '+(locked?'disabled':''),'例如：目前照顧目標與服務安排尚符合需求，建議維持；另因洗澡需求增加，將聯繫A單位協助評估BA07調整，待核定後再安排服務。')+
-      '<div class="icp-muted" data-icp-quarterly>下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div>'+
-      (!locked&&!care.notes?'<button class="btn sm" id="icpShowNotes">＋補充備註</button>':'')+
-      (locked||care.notes?area('補充備註',care.notes,'data-path="caregiver.notes" '+(locked?'disabled':'')):'<div id="icpNotes"></div>')+'</div>'+
+      '<div class="icp-muted" data-icp-quarterly>下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div></div>'+
       (locked?'<div class="icp-note">此計畫已完成，第一階段先採唯讀保護；正式修訂與追蹤評值將在第二階段加入。</div>':
       '<div class="icp-footer"><span class="icp-muted" style="margin-right:auto">'+(L.dirty?'尚有未儲存變更':'可儲存草稿後再繼續')+'</span><button id="icpSaveDraft" class="btn">儲存草稿</button><button id="icpComplete" class="btn primary">完成計畫</button></div>'));
     $('icpFormBack').onclick=function(){if(leaveOK()){L.editing=null;L.dirty=false;renderCase();}};
@@ -481,7 +484,6 @@
       };
     });
     document.querySelectorAll('[data-action]').forEach(function(el){el.onclick=function(){handle(el);};});
-    if($('icpShowNotes'))$('icpShowNotes').onclick=function(){var target=$('icpNotes');if(!target){return;}target.innerHTML=area('補充備註',care.notes,'data-path="caregiver.notes"','例如：其他需要留意的特殊安排、家屬回饋或後續追蹤提醒。');target.querySelector('textarea').addEventListener('input',onField);$('icpShowNotes').style.display='none';};
     $('icpSaveDraft').onclick=function(){save(false);};
     $('icpComplete').onclick=function(){save(true);};
     window.scrollTo(0,originalScroll);
@@ -591,10 +593,10 @@
   }
   function leaveOK(){return !L.dirty||confirm('目前有尚未儲存的變更，確定離開嗎？');}
   async function start(){
-    if(!usable()){shell('個別化照顧計畫','', '', '<div class="icp-card">此帳號沒有使用權限。</div>');return;}
+    if(!usable()){shell('計畫擬定','', '', '<div class="icp-card">此帳號沒有使用權限。</div>');return;}
     showLoading(true);
     try{await load();renderList();}
-    catch(e){console.error(e);shell('個別化照顧計畫','','<button id="icpRetry" class="btn">重試</button>','<div class="icp-card">載入失敗：'+h(e.message||e)+'</div>');$('icpRetry').onclick=start;}
+    catch(e){console.error(e);shell('計畫擬定','','<button id="icpRetry" class="btn">重試</button>','<div class="icp-card">載入失敗：'+h(e.message||e)+'</div>');$('icpRetry').onclick=start;}
     finally{showLoading(false);}
   }
   function openCase(id){L.caseId=id;L.editing=null;L.tab='current';L.dirty=false;renderCase();}
@@ -602,7 +604,7 @@
   navigate=function(id){
     if(id!=='individualCarePlans'&&L.editing&&!leaveOK())return;
     if(id!=='individualCarePlans'){L.editing=null;L.dirty=false;return oldNavigate(id);}
-    state.page='individualCarePlans';renderNav();$('topTitle').textContent='個別化照顧計畫';$('crumb').textContent='個案照顧計畫';$('sidebar').classList.remove('open');
+    state.page='individualCarePlans';renderNav();$('topTitle').textContent='計畫擬定';$('crumb').textContent='計畫擬定';$('sidebar').classList.remove('open');
     $('content').innerHTML='<div class="empty compact"><h3>正在載入照顧計畫</h3></div>';
     start();
   };
