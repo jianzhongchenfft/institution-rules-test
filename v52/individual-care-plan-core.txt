@@ -264,14 +264,14 @@
       html+=renderReviewTab(effective);
     }else if(L.tab==='history'){
       html+='<div class="icp-card"><h3>計畫版本紀錄</h3>'+
-        '<div class="icp-table-shell"><table class="icp-table"><thead><tr><th>計畫日期</th><th>版本與類型</th><th>評估日期</th><th>狀態</th><th>更正／修訂原因</th><th></th></tr></thead><tbody>'+
-        (ps.length?ps.map(function(p){return '<tr><td>'+fmt(p.plan_date)+'</td><td>'+h(planVersionLabel(p))+'</td><td>'+fmt(p.assessment_date)+'</td><td>'+(p.status==='draft'?'草稿':'已完成')+'</td><td>'+h(p.revision_reason||'—')+'</td><td><button class="btn sm" data-icp-open="'+h(p.id)+'">'+(p.status==='draft'?'繼續填寫':'查看')+'</button></td></tr>';}).join(''):'<tr><td colspan="6">目前沒有計畫版本</td></tr>')+
+        '<div class="icp-table-shell"><table class="icp-table"><thead><tr><th>計畫日期</th><th>版本與類型</th><th>評估日期</th><th>狀態</th><th>完成／修改時間</th><th></th></tr></thead><tbody>'+
+        (ps.length?ps.map(function(p){return '<tr><td>'+fmt(p.plan_date)+'</td><td>'+h(planVersionLabel(p))+'</td><td>'+fmt(p.assessment_date)+'</td><td>'+(p.status==='draft'?'草稿':'已完成')+'</td><td>'+h(p.completed_at||p.updated_at?new Date(p.completed_at||p.updated_at).toLocaleString('zh-TW',{hour12:false}):'—')+'</td><td><button class="btn sm" data-icp-open="'+h(p.id)+'">'+(p.status==='draft'?'繼續填寫':'查看')+'</button></td></tr>';}).join(''):'<tr><td colspan="6">目前沒有計畫版本</td></tr>')+
         '</tbody></table></div></div>';
     }else{
       html+='<div class="icp-card"><h3>目前有效計畫</h3>'+
         (effective?'<p>'+fmt(effective.plan_date)+'｜'+h(planVersionLabel(effective))+'｜已完成</p>'+
           '<div class="icp-actions" style="justify-content:flex-start"><button class="btn primary" data-icp-open="'+h(effective.id)+'">查看目前計畫</button>'+
-          '<button class="btn" id="icpCorrect">更正文字</button><button class="btn" id="icpRevise">修訂計畫</button></div>':
+          '<button class="btn" id="icpEdit">修改計畫</button></div>':
           '<p class="icp-muted">目前尚無完成的照顧計畫。</p>')+'</div>';
       if(draft){
         html+='<div class="icp-card"><h3>尚未完成的草稿</h3><p>'+h(draft.revision_type?planVersionLabel(draft):'初次照顧計畫')+'</p><button class="btn primary" data-icp-open="'+h(draft.id)+'">繼續編輯草稿</button></div>';
@@ -294,19 +294,18 @@
     document.querySelectorAll('[data-icp-tab]').forEach(function(el){el.onclick=function(){L.tab=el.dataset.icpTab;L.reviewing=null;renderCase();};});
     document.querySelectorAll('[data-icp-open]').forEach(function(el){el.onclick=function(e){e.stopPropagation();openForm(el.dataset.icpOpen);};});
     if($('icpCreate'))$('icpCreate').onclick=function(){newForm($('icpEventPick').value);};
-    if($('icpCorrect'))$('icpCorrect').onclick=function(){beginRevision(effective,'correction');};
-    if($('icpRevise'))$('icpRevise').onclick=function(){beginRevision(effective,'revision');};
+    if($('icpEdit'))$('icpEdit').onclick=function(){beginRevision(effective);};
     bindReviewTab(effective);
   }
-  function beginRevision(previous,kind){
+  function beginRevision(previous){
     if(!previous||previous.status!=='completed')return;
     var open=plansFor(previous.case_id).find(function(x){return x.root_plan_id&&x.status==='draft';});
-    if(open){toast('此個案已有未完成的更正／修訂草稿，請先完成該草稿。','error');openForm(open.id);return;}
-    // Keep the whole workflow on the full-page editor; reason is entered there.
+    if(open){openForm(open.id);return;}
+    // Make a new version automatically; history and operator timestamps are recorded by the existing database trigger.
     var copy=JSON.parse(JSON.stringify(previous.plan_content||{}));
     L.editing={
       id:null,root_plan_id:planRootId(previous),previous_version_id:previous.id,
-      revision_type:kind,revision_reason:'',version_no:Number(previous.version_no||1)+1,
+      revision_type:'revision',version_no:Number(previous.version_no||1)+1,
       case_id:previous.case_id,assessment_event_id:previous.assessment_event_id,
       plan_date:previous.plan_date,status:'draft',plan_content:copy,
       responsible_staff_id:previous.responsible_staff_id,assessment_snapshot:previous.assessment_snapshot
@@ -606,9 +605,7 @@
     shell(c.case_name+'｜'+(locked?'查看':'填寫')+'計畫擬定',
       '對應評估：'+(e?fmt(e.planned_date)+'｜'+eventName(e):'—'),
       '<button id="icpFormBack" class="btn">← 返回個案</button>',
-      (p.revision_type?'<div class="icp-card"><h3>'+h(p.revision_type==='correction'?'文字更正':'計畫修訂')+'｜'+h(planVersionLabel(p))+'</h3>'+
-        (correction?'<div class="icp-note">更正只能調整文字敘述，不可變更照顧問題分類、目標數量、措施類型、服務碼及評值期間。涉及照顧內容變動，請改用「修訂計畫」。</div>':'')+
-        area('更正／修訂原因 *',p.revision_reason,'data-header="revision_reason" '+(locked?'disabled':''),'例如：因個案近期照顧需求變化，調整照顧目標與執行措施。')+'</div>':'')+
+      (p.revision_type?'<div class="icp-note">此為'+h(planVersionLabel(p))+'，完成後會自動保留前一版本及本次修改人員、時間。</div>':'')+
       '<div class="icp-card"><h3>一、基本資料與本次評估摘要</h3><div class="icp-cols">'+
       field('計畫擬定日期 *',p.plan_date,'type="date" data-header="plan_date" '+(locked||correction?'disabled':''))+
       field('負責督導',staffName(p.responsible_staff_id||c.supervisor_id),'disabled')+
@@ -628,9 +625,9 @@
       area('照顧指導與溝通情形',care.guidance_communication,'data-path="caregiver.guidance_communication" '+(locked?'disabled':''),'例如：已向案女說明沐浴安全及防滑注意事項，案女表示了解，將評估改善浴室環境。')+
       area('服務對象／照顧者意見',care.feedback,'data-path="caregiver.feedback" '+(locked?'disabled':''),'例如：個案希望維持目前居服員與服務時段，家屬表示可配合後續觀察。')+'</div>'+
       '<div class="icp-card"><h3>四、整體判斷與後續安排</h3>'+
-      area('整體判斷與後續安排',care.overall_plan,'data-path="caregiver.overall_plan" '+(locked?'disabled':''),'例如：目前照顧目標與服務安排尚符合需求，建議維持；另因洗澡需求增加，將聯繫A單位協助評估BA07調整，待核定後再安排服務。')+
+      area('整體判斷與後續安排 *',care.overall_plan,'data-path="caregiver.overall_plan" '+(locked?'disabled':''),'例如：目前照顧目標與服務安排尚符合需求，建議維持；另因洗澡需求增加，將聯繫A單位協助評估BA07調整，待核定後再安排服務。')+
       '<div class="icp-muted" data-icp-quarterly>下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div></div>'+
-      (locked?'<div class="icp-note">此版本已完成且不可直接覆蓋。如需調整請由「目前計畫」建立更正或修訂版本。</div>':
+      (locked?'<div class="icp-note">此版本已完成。如需修改請回到「目前計畫」點選「修改計畫」，系統會自動保留歷史版本。</div>':
       '<div class="icp-footer"><span class="icp-muted" style="margin-right:auto">'+(L.dirty?'尚有未儲存變更':'可儲存草稿後再繼續')+'</span><button id="icpSaveDraft" class="btn">儲存草稿</button><button id="icpComplete" class="btn primary">完成計畫</button></div>'));
     $('icpFormBack').onclick=function(){if(leaveOK()){L.editing=null;L.dirty=false;renderCase();}};
     if(locked){window.scrollTo(0,originalScroll);return;}
@@ -706,6 +703,8 @@
   }
   function validate(p){
     if(!p.plan_date)return '請選擇計畫日期';
+    if(!String((p.plan_content.caregiver||{}).overall_plan||'').trim())
+      return '請填寫「整體判斷與後續安排」';
     var problems=p.plan_content.problems||[];
     if(!problems.length)return '請至少新增一項照顧問題';
     for(var i=0;i<problems.length;i++){
@@ -731,7 +730,6 @@
   }
   async function save(finish){
     var p=L.editing;if(!p||p.status==='completed')return;
-    if(p.root_plan_id&&!String(p.revision_reason||'').trim()){toast('請填寫更正／修訂原因','error');return;}
     if(finish){var err=validate(p);if(err){toast(err,'error');return;}}
     syncReviewDates(p);
     // Older pending drafts could store proposals in service_code: keep the proposal, but never treat as approved service.
@@ -746,9 +744,10 @@
     showLoading(true);
     try{
       var data={case_id:p.case_id,assessment_event_id:p.assessment_event_id,plan_date:p.plan_date,plan_content:p.plan_content,status:finish?'completed':'draft'};
-      if(p.root_plan_id){
-        data.revision_reason=p.revision_reason;
-        if(!p.id){data.root_plan_id=p.root_plan_id;data.previous_version_id=p.previous_version_id;data.revision_type=p.revision_type;}
+      if(p.root_plan_id&&!p.id){
+        data.root_plan_id=p.root_plan_id;
+        data.previous_version_id=p.previous_version_id;
+        data.revision_type=p.revision_type;
       }
       var q=p.id?db.from('individual_care_plans').update(data).eq('id',p.id).select().single():db.from('individual_care_plans').insert(data).select().single();
       var rs=await q;if(rs.error)throw rs.error;
