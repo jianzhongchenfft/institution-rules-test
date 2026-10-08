@@ -355,7 +355,7 @@
             '</select></div><div class="icp-field"><label>後續處置 *</label><select data-review-field="disposition">'+
               reviewOptions([['maintain','維持'],['adjust','調整'],['end','結束']],v.disposition)+
             '</select></div></div>'+
-            area('評值說明'+(['partial','unmet','unable'].includes(v.result)?' *':''),v.comments,'data-review-field="comments"','例如：說明本次評值依據、未達成原因及下一步處理。')+'</div>';
+            area('評值說明 *',v.comments,'data-review-field="comments"','例如：說明本次評值的具體依據、達成情形，以及必要的後續安排。')+'</div>';
         }).join('')+
         '<div class="icp-actions"><button id="icpReviewCancel" class="btn">取消</button><button id="icpReviewSave" class="btn primary">送出評值</button></div></div>';
     }
@@ -396,8 +396,8 @@
     for(var i=0;i<targets.length;i++){
       var x=targets[i],v=editing.values[x.goal.id];
       if(!v||!v.result){toast('請完成所有照顧目標的評值結果','error');return;}
-      if(['partial','unmet','unable'].includes(v.result)&&!String(v.comments||'').trim()){
-        toast('部分達成、未達成或無法評值時，需填寫原因與後續說明','error');return;
+      if(!String(v.comments||'').trim()){
+        toast('每項照顧目標都必須填寫評值說明','error');return;
       }
       rows.push({plan_id:plan.id,case_id:plan.case_id,problem_id:String(x.problem.id),goal_id:String(x.goal.id),
         batch_id:batch,review_type:editing.type,review_date:editing.review_date,result:v.result,
