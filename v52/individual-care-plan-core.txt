@@ -64,7 +64,7 @@
   }
   var style=document.createElement('style');
   style.id='individual-care-plan-style';
-  style.textContent='.icp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.icp-table-shell{overflow:auto;border:1px solid var(--line);background:#fff;border-radius:14px}.icp-table{border-collapse:collapse;min-width:800px;width:100%}.icp-table th,.icp-table td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px}.icp-table th{background:#faf8f7;color:#667085}.icp-table tbody tr{cursor:pointer}.icp-table tbody tr:hover{background:#fffaf8}.icp-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.icp-toolbar .icp-spacer{flex:1}.icp-segment{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px}.icp-segment button{padding:7px 10px;border:0;border-radius:8px;background:transparent;cursor:pointer}.icp-segment button.active{background:#fff1eb;color:#a45d49;font-weight:bold}.icp-shell{max-width:1180px;margin:0 auto;padding-bottom:90px}.icp-card{border:1px solid var(--line);background:#fff;border-radius:14px;padding:18px;margin:12px 0}.icp-card h3{margin:0 0 12px;font-size:15px}.icp-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.icp-field label{font-size:12px;font-weight:800;color:#344054}.icp-field input,.icp-field textarea,.icp-field select{width:100%;min-height:36px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;box-sizing:border-box}.icp-field textarea{min-height:75px;resize:vertical}.icp-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.icp-problem{border:1px solid #e2d6d0;border-radius:12px;padding:14px;margin:10px 0;background:#fffdfb}.icp-goal{border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0;background:#fff}.icp-measure{display:grid;grid-template-columns:minmax(0,3fr) minmax(140px,1fr) auto;gap:8px;align-items:end;margin:7px 0}.icp-muted{color:#667085;font-size:11px;line-height:1.6}.icp-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.icp-footer{position:sticky;bottom:10px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;padding:11px;display:flex;justify-content:flex-end;gap:9px;z-index:10}.icp-note{background:#fff7ed;border-radius:9px;padding:10px;font-size:12px;color:#92502e}.icp-tab{margin-bottom:12px}.icp-tab button{padding:8px 14px;border:1px solid var(--line);background:#fff;cursor:pointer}.icp-tab button.active{background:#fff1eb;color:#a45d49;font-weight:900}@media(max-width:750px){.icp-grid{grid-template-columns:repeat(2,1fr)}.icp-cols,.icp-measure{grid-template-columns:1fr}.icp-card{padding:12px}}';
+  style.textContent='.icp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.icp-table-shell{overflow:auto;border:1px solid var(--line);background:#fff;border-radius:14px}.icp-table{border-collapse:collapse;min-width:800px;width:100%}.icp-table th,.icp-table td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px}.icp-table th{background:#faf8f7;color:#667085}.icp-table tbody tr{cursor:pointer}.icp-table tbody tr:hover{background:#fffaf8}.icp-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.icp-toolbar .icp-spacer{flex:1}.icp-segment{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px}.icp-segment button{padding:7px 10px;border:0;border-radius:8px;background:transparent;cursor:pointer}.icp-segment button.active{background:#fff1eb;color:#a45d49;font-weight:bold}.icp-shell{max-width:1180px;margin:0 auto;padding-bottom:90px}.icp-card{border:1px solid var(--line);background:#fff;border-radius:14px;padding:18px;margin:12px 0}.icp-card h3{margin:0 0 12px;font-size:15px}.icp-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.icp-field label{font-size:12px;font-weight:800;color:#344054}.icp-field input,.icp-field textarea,.icp-field select{width:100%;min-height:36px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;box-sizing:border-box}.icp-field textarea{min-height:75px;resize:vertical}.icp-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.icp-problem{border:1px solid #e2d6d0;border-radius:12px;padding:14px;margin:10px 0;background:#fffdfb}.icp-goal{border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0;background:#fff}.icp-measure{display:block;border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0}.icp-muted{color:#667085;font-size:11px;line-height:1.6}.icp-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.icp-footer{position:sticky;bottom:10px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;padding:11px;display:flex;justify-content:flex-end;gap:9px;z-index:10}.icp-note{background:#fff7ed;border-radius:9px;padding:10px;font-size:12px;color:#92502e}.icp-tab{margin-bottom:12px}.icp-tab button{padding:8px 14px;border:1px solid var(--line);background:#fff;cursor:pointer}.icp-tab button.active{background:#fff1eb;color:#a45d49;font-weight:900}@media(max-width:750px){.icp-grid{grid-template-columns:repeat(2,1fr)}.icp-cols{grid-template-columns:1fr}.icp-card{padding:12px}}';
   document.head.appendChild(style);
 
   function usable(){return !!state.profile&&ROLES.includes(state.profile.role);}
@@ -73,7 +73,6 @@
   function today(){return isoDate(new Date());}
   function field(label,value,attr){return '<div class="icp-field"><label>'+h(label)+'</label><input '+(attr||'')+' value="'+h(value||'')+'"></div>';}
   function area(label,value,attr){return '<div class="icp-field"><label>'+h(label)+'</label><textarea '+(attr||'')+'>'+h(value||'')+'</textarea></div>';}
-  function opts(arr,selected){return arr.map(function(x){return '<option value="'+h(x)+'"'+(x===selected?' selected':'')+'>'+h(x)+'</option>';}).join('');}
   function caseBy(id){return L.cases.find(function(c){return c.id===id;});}
   function eventFor(c){return L.events.filter(function(x){return x.case_id===c.id;}).sort(function(a,b){return String(b.planned_date).localeCompare(String(a.planned_date));});}
   function plansFor(id){return L.plans.filter(function(x){return x.case_id===id;}).sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});}
@@ -204,16 +203,6 @@
     });
   }
   function measureMode(m){return Object.prototype.hasOwnProperty.call(m,'measure_type')?m.measure_type:(m.service_code?'service':'pending');}
-  function approvedServiceOptions(code,caseId){
-    var rows=serviceForCase(caseId),items=['<option value="">請選擇個管師目前核定的服務</option>'];
-    if(code&&!rows.some(function(s){return s.service_code===code;})){
-      items.push('<option value="'+h(code)+'" selected disabled>原紀錄 '+h(code)+'（目前未核定，請重新選擇）</option>');
-    }
-    rows.forEach(function(s){
-      items.push('<option value="'+h(s.service_code)+'"'+(code===s.service_code?' selected':'')+'>'+h(s.service_code+'｜'+(s.service_name||'')+(s.approved_quantity==null?'':'｜核定 '+s.approved_quantity+' 支'))+'</option>');
-    });
-    return items.join('');
-  }
   function copyPrevious(){
     var others=plansFor(L.caseId).filter(function(p){return p.status==='completed'&&p.assessment_event_id!==L.editing.assessment_event_id;});
     if(!others.length){toast('此個案沒有可帶入的前次完成計畫','error');return;}
@@ -289,7 +278,7 @@
           '<div style="margin-top:10px"><strong>執行策略／照顧措施 *</strong></div>'+
           (g.measures||[]).map(function(m,k){
             var base='problems.'+i+'.goals.'+j+'.measures.'+k,mode=measureMode(m);
-            return '<div class="icp-measure" style="display:block">'+
+            return '<div class="icp-measure">'+
               '<div class="icp-actions"><strong style="margin-right:auto">措施 '+(k+1)+'</strong>'+
               (!locked?'<button type="button" class="btn sm" data-action="removeMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">刪除措施</button>':'')+'</div>'+
               '<div class="icp-field"><label>服務項目／措施類型 *</label><select data-measure-choice="'+i+'.'+j+'.'+k+'" '+(locked?'disabled':'')+'>'+serviceChoiceOptions(m,L.editing.case_id,locked,L.editing)+'</select></div>'+
