@@ -125,7 +125,7 @@
   }
   var style=document.createElement('style');
   style.id='individual-care-plan-style';
-  style.textContent='.icp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.icp-table-shell{overflow:auto;border:1px solid var(--line);background:#fff;border-radius:14px}.icp-table{border-collapse:collapse;min-width:800px;width:100%}.icp-table th,.icp-table td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px}.icp-table th{background:#faf8f7;color:#667085}.icp-table tbody tr{cursor:pointer}.icp-table tbody tr:hover{background:#fffaf8}.icp-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.icp-toolbar .icp-spacer{flex:1}.icp-segment{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px}.icp-segment button{padding:7px 10px;border:0;border-radius:8px;background:transparent;cursor:pointer}.icp-segment button.active{background:#fff1eb;color:#a45d49;font-weight:bold}.icp-shell{max-width:1180px;margin:0 auto;padding-bottom:90px}.icp-card{border:1px solid var(--line);background:#fff;border-radius:14px;padding:18px;margin:12px 0}.icp-card h3{margin:0 0 12px;font-size:15px}.icp-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.icp-field label{font-size:12px;font-weight:800;color:#344054}.icp-field input,.icp-field textarea,.icp-field select{width:100%;min-height:36px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;box-sizing:border-box}.icp-field textarea{min-height:75px;resize:vertical}.icp-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.icp-problem{border:1px solid #e2d6d0;border-radius:12px;padding:14px;margin:10px 0;background:#fffdfb}.icp-goal{border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0;background:#fff}.icp-measure{display:block;border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0}.icp-muted{color:#667085;font-size:11px;line-height:1.6}.icp-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.icp-footer{position:sticky;bottom:10px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;padding:11px;display:flex;justify-content:flex-end;gap:9px;z-index:10}.icp-note{background:#fff7ed;border-radius:9px;padding:10px;font-size:12px;color:#92502e}.icp-tab{margin-bottom:12px}.icp-tab button{padding:8px 14px;border:1px solid var(--line);background:#fff;cursor:pointer}.icp-tab button.active{background:#fff1eb;color:#a45d49;font-weight:900}@media(max-width:750px){.icp-grid{grid-template-columns:repeat(2,1fr)}.icp-cols{grid-template-columns:1fr}.icp-card{padding:12px}}';
+  style.textContent='.icp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.icp-table-shell{overflow:auto;border:1px solid var(--line);background:#fff;border-radius:14px}.icp-table{border-collapse:collapse;min-width:800px;width:100%}.icp-table th,.icp-table td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px}.icp-table th{background:#faf8f7;color:#667085}.icp-table tbody tr{cursor:pointer}.icp-table tbody tr:hover{background:#fffaf8}.icp-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.icp-toolbar .icp-spacer{flex:1}.icp-segment{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px}.icp-segment button{padding:7px 10px;border:0;border-radius:8px;background:transparent;cursor:pointer}.icp-segment button.active{background:#fff1eb;color:#a45d49;font-weight:bold}.icp-shell{max-width:1180px;margin:0 auto;padding-bottom:90px}.icp-card{border:1px solid var(--line);background:#fff;border-radius:14px;padding:18px;margin:12px 0}.icp-card h3{margin:0 0 12px;font-size:15px}.icp-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.icp-field label{font-size:12px;font-weight:800;color:#344054}.icp-field input,.icp-field textarea,.icp-field select{width:100%;min-height:36px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;box-sizing:border-box}.icp-field textarea{min-height:75px;resize:vertical}.icp-field textarea::placeholder,.icp-field input::placeholder{color:#98a2b3;opacity:1}.icp-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.icp-problem{border:1px solid #e2d6d0;border-radius:12px;padding:14px;margin:10px 0;background:#fffdfb}.icp-goal{border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0;background:#fff}.icp-measure{display:block;border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0}.icp-muted{color:#667085;font-size:11px;line-height:1.6}.icp-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.icp-footer{position:sticky;bottom:10px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;padding:11px;display:flex;justify-content:flex-end;gap:9px;z-index:10}.icp-note{background:#fff7ed;border-radius:9px;padding:10px;font-size:12px;color:#92502e}.icp-tab{margin-bottom:12px}.icp-tab button{padding:8px 14px;border:1px solid var(--line);background:#fff;cursor:pointer}.icp-tab button.active{background:#fff1eb;color:#a45d49;font-weight:900}@media(max-width:750px){.icp-grid{grid-template-columns:repeat(2,1fr)}.icp-cols{grid-template-columns:1fr}.icp-card{padding:12px}}';
   document.head.appendChild(style);
 
   function usable(){return !!state.profile&&ROLES.includes(state.profile.role);}
@@ -133,7 +133,10 @@
   function uid(){return window.crypto&&crypto.randomUUID?crypto.randomUUID():'id-'+Date.now()+'-'+Math.random().toString(36).slice(2);}
   function today(){return isoDate(new Date());}
   function field(label,value,attr){return '<div class="icp-field"><label>'+h(label)+'</label><input '+(attr||'')+' value="'+h(value||'')+'"></div>';}
-  function area(label,value,attr){return '<div class="icp-field"><label>'+h(label)+'</label><textarea '+(attr||'')+'>'+h(value||'')+'</textarea></div>';}
+  // Placeholder text is only a hint; it is never saved as a field value.
+  function area(label,value,attr,example){
+    return '<div class="icp-field"><label>'+h(label)+'</label><textarea '+(attr||'')+(example?' placeholder="'+h(example)+'"':'')+'>'+h(value||'')+'</textarea></div>';
+  }
   function caseBy(id){return L.cases.find(function(c){return c.id===id;});}
   function eventFor(c){return L.events.filter(function(x){return x.case_id===c.id;}).sort(function(a,b){return String(b.planned_date).localeCompare(String(a.planned_date));});}
   function plansFor(id){return L.plans.filter(function(x){return x.case_id===id;}).sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});}
@@ -273,15 +276,37 @@
     if(!confirm('帶入前次計畫將取代目前編輯中的照顧問題，確定繼續嗎？'))return;
     L.editing.plan_content.problems=fresh;syncReviewDates(L.editing);L.dirty=true;renderForm(true);
   }
+  // Bring older draft fields forward once, without losing previously entered notes.
+  function normalizeCaregiver(plan){
+    var body=plan.plan_content||{},care=body.caregiver;
+    if(!care){body.caregiver={};return false;}
+    var keys=['guidance','communication','need_transfer','transfer_detail','next_review_date'];
+    if(!keys.some(function(k){return Object.prototype.hasOwnProperty.call(care,k);}))return false;
+    if(!String(care.guidance_communication||'').trim()){
+      var notes=[];
+      if(String(care.guidance||'').trim())notes.push('照顧技巧指導：'+String(care.guidance).trim());
+      if(String(care.communication||'').trim())notes.push('溝通方式與說明：'+String(care.communication).trim());
+      care.guidance_communication=notes.join('\n');
+    }
+    if(!String(care.overall_plan||'').trim()){
+      var actions=[];
+      if(String(care.transfer_detail||'').trim())actions.push(String(care.transfer_detail).trim());
+      else if(care.need_transfer==='yes')actions.push('原紀錄勾選需轉介，待補充後續處理');
+      if(String(care.next_review_date||'').trim())actions.push('原預定完整評值日期：'+care.next_review_date);
+      care.overall_plan=actions.join('\n');
+    }
+    keys.forEach(function(k){delete care[k];});
+    return true;
+  }
   function newForm(eventId){
     var existing=L.plans.find(function(p){return p.assessment_event_id===eventId;});
     if(existing)return openForm(existing.id);
-    L.editing={id:null,case_id:L.caseId,assessment_event_id:eventId,plan_date:today(),status:'draft',plan_content:{problems:[newProblem()],caregiver:{participation:'',collaboration:'',guidance:'',communication:'',feedback:'',need_transfer:'no',transfer_detail:'',next_review_date:'',notes:''},notes:''}};
+    L.editing={id:null,case_id:L.caseId,assessment_event_id:eventId,plan_date:today(),status:'draft',plan_content:{problems:[newProblem()],caregiver:{participation:'',collaboration:'',guidance_communication:'',feedback:'',overall_plan:'',notes:''}}};
     L.dirty=false;renderForm();
   }
   function openForm(id){
     var p=L.plans.find(function(x){return x.id===id;});if(!p)return;
-    L.caseId=p.case_id;L.editing=JSON.parse(JSON.stringify(p));L.dirty=false;renderForm();
+    L.caseId=p.case_id;L.editing=JSON.parse(JSON.stringify(p));L.dirty=normalizeCaregiver(L.editing)&&L.editing.status==='draft';renderForm();
   }
   function issueValue(p){
     if(p.problem_source==='custom')return '__custom__';
