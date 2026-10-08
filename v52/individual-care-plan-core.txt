@@ -328,11 +328,15 @@
     var goals=goalsInPlan(plan),related=plansFor(plan.case_id).filter(function(p){
       return planRootId(p)===planRootId(plan);
     });
+    var fullReviews=L.reviews.filter(function(r){return r.plan_id===plan.id && r.review_type==='periodic';});
+    var lastFullDate=fullReviews.map(function(r){return r.review_date;}).sort().reverse()[0]||plan.plan_date;
+    var dueDate=dueFromMonths(lastFullDate,3);
     var relatedIds=related.map(function(p){return p.id;});
     var history=L.reviews.filter(function(x){return relatedIds.includes(x.plan_id);}).slice()
       .sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});
     var controls='<div class="icp-card"><h3>目前計畫的照顧目標追蹤</h3>'+
       '<div class="icp-muted">'+h(planVersionLabel(plan))+'｜本期目標共 '+goals.length+' 項</div>'+
+      '<div class="icp-muted">下次完整評值預定：'+fmt(dueDate)+(dueDate<today()?'（已逾期）':'')+'</div>'+
       '<div class="icp-actions" style="margin-top:10px"><button class="btn primary" id="icpReviewPeriodic">＋定期完整評值</button><button class="btn" id="icpReviewInterim">＋臨時評值</button></div></div>';
     if(L.reviewing&&L.reviewing.planId===plan.id){
       var editing=L.reviewing;
