@@ -120,6 +120,10 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       }
       eval(eventTrackingCode);
 
+      const carePlanRes=await fetch('v52/individual-care-plan-core.txt?v=phase1-20261008',{cache:'no-store'});
+      if(!carePlanRes.ok) throw new Error('照顧計畫模組載入失敗（'+carePlanRes.status+'）');
+      eval(await carePlanRes.text());
+
       if(state.profile) renderNav();
 
       if(state.profile && state.page==='dashboard') renderDashboard();
@@ -129,6 +133,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       else if(state.profile && state.page==='overtime') navigate('overtime');
       else if(state.profile && state.page==='events') navigate('events');
       else if(state.profile && state.page==='assessments') navigate('assessments');
+      else if(state.profile && state.page==='individualCarePlans') navigate('individualCarePlans');
     }catch(err){
       console.error('系統功能模組載入失敗',err);
       if(state.profile) toast('系統功能模組載入失敗，請重新整理頁面。','error');
