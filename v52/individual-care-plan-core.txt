@@ -248,25 +248,159 @@
     $('icpSearch').onchange=function(e){L.search=e.target.value.trim();renderList();};
     $('icpStatus').onchange=function(e){L.filter=e.target.value;renderList();};
   }
+
   function renderCase(){
     var c=caseBy(L.caseId);if(!c)return renderList();
-    var ps=plansFor(c.id),evs=eventFor(c),latest=evs[0],matching=latest&&ps.find(function(p){return p.assessment_event_id===latest.id;});
-    var actions=evs.filter(function(e){return !ps.some(function(p){return p.assessment_event_id===e.id;});});
-    var current=ps[0],readOnly='<div class="icp-note">第二階段將加入獨立目標評值、臨時評值與歷史修訂版本。目前已完成的計畫採唯讀保護。</div>';
+    var ps=plansFor(c.id),evs=eventFor(c),effective=effectivePlan(c.id),draft=ps.find(function(p){return p.status==='draft';});
+    var eligible=evs.filter(function(e){return !ps.some(function(p){return p.assessment_event_id===e.id && !p.root_plan_id;});});
+    var current=effective||draft;
+    var html='<div class="icp-tab"><button data-icp-tab="current" class="'+(L.tab==='current'?'active':'')+'">目前計畫</button><button data-icp-tab="review" class="'+(L.tab==='review'?'active':'')+'">追蹤評值</button><button data-icp-tab="history" class="'+(L.tab==='history'?'active':'')+'">歷史紀錄</button></div>';
+    if(L.tab==='review'){
+      html+=renderReviewTab(effective);
+    }else if(L.tab==='history'){
+      html+='<div class="icp-card"><h3>計畫版本紀錄</h3>'+
+        '<div class="icp-table-shell"><table class="icp-table"><thead><tr><th>計畫日期</th><th>版本與類型</th><th>評估日期</th><th>狀態</th><th>更正／修訂原因</th><th></th></tr></thead><tbody>'+
+        (ps.length?ps.map(function(p){return '<tr><td>'+fmt(p.plan_date)+'</td><td>'+h(planVersionLabel(p))+'</td><td>'+fmt(p.assessment_date)+'</td><td>'+(p.status==='draft'?'草稿':'已完成')+'</td><td>'+h(p.revision_reason||'—')+'</td><td><button class="btn sm" data-icp-open="'+h(p.id)+'">'+(p.status==='draft'?'繼續填寫':'查看')+'</button></td></tr>';}).join(''):'<tr><td colspan="6">目前沒有計畫版本</td></tr>')+
+        '</tbody></table></div></div>';
+    }else{
+      html+='<div class="icp-card"><h3>目前有效計畫</h3>'+
+        (effective?'<p>'+fmt(effective.plan_date)+'｜'+h(planVersionLabel(effective))+'｜已完成</p>'+
+          '<div class="icp-actions" style="justify-content:flex-start"><button class="btn primary" data-icp-open="'+h(effective.id)+'">查看目前計畫</button>'+
+          '<button class="btn" id="icpCorrect">更正文字</button><button class="btn" id="icpRevise">修訂計畫</button></div>':
+          '<p class="icp-muted">目前尚無完成的照顧計畫。</p>')+'</div>';
+      if(draft){
+        html+='<div class="icp-card"><h3>尚未完成的草稿</h3><p>'+h(draft.revision_type?planVersionLabel(draft):'初次照顧計畫')+'</p><button class="btn primary" data-icp-open="'+h(draft.id)+'">繼續編輯草稿</button></div>';
+      }
+      if(effective){
+        html+='<div class="icp-card"><h3>目前照顧問題與目標</h3>'+
+          goalsInPlan(effective).map(function(x){
+            var r=latestGoalReview(effective,x.goal.id);
+            return '<div style="margin-bottom:12px"><strong>'+h(x.problem.title)+'｜'+h(x.goal.title)+'</strong><div class="icp-muted">預計評值：'+fmt(x.goal.review_date)+'｜'+(r?'最近評值：'+reviewResultLabel(r.result)+'（'+fmt(r.review_date)+'）':'尚未評值')+'</div></div>';
+          }).join('')+'</div>';
+      }
+      if(eligible.length){
+        html+='<div class="icp-card"><h3>依已完成評估建立新一期計畫</h3>'+
+          '<div class="icp-toolbar"><select id="icpEventPick">'+eligible.map(function(e){return '<option value="'+h(e.id)+'">'+fmt(e.planned_date)+'｜'+h(eventName(e))+'</option>';}).join('')+'</select><button id="icpCreate" class="btn primary">＋建立照顧計畫</button></div></div>';
+      }
+    }
     shell(c.case_name+'｜計畫擬定','負責督導：'+staffName(c.supervisor_id),
-      '<button class="btn" id="icpBack">← 返回列表</button>',
-      '<div class="icp-tab"><button data-icp-tab="current" class="'+(L.tab==='current'?'active':'')+'">目前計畫</button><button data-icp-tab="review" class="'+(L.tab==='review'?'active':'')+'">追蹤評值</button><button data-icp-tab="history" class="'+(L.tab==='history'?'active':'')+'">歷史紀錄</button></div>'+
-      (L.tab==='review'?'<div class="icp-card"><h3>追蹤評值</h3>'+readOnly+'</div>':
-       L.tab==='history'?'<div class="icp-card"><h3>歷次計畫</h3><div class="icp-table-shell"><table class="icp-table"><thead><tr><th>日期</th><th>類型</th><th>評估日期</th><th>狀態</th><th></th></tr></thead><tbody>'+
-         ps.map(function(p){return '<tr><td>'+fmt(p.plan_date)+'</td><td>'+h(planName(p))+'</td><td>'+fmt(p.assessment_date)+'</td><td>'+h(p.status==='draft'?'草稿':'已完成')+'</td><td><button class="btn sm" data-icp-open="'+h(p.id)+'">查看</button></td></tr>';}).join('')+'</tbody></table></div></div>':
-       '<div class="icp-card"><h3>本次評估與計畫</h3><div class="icp-muted">最近完成評估：'+(latest?fmt(latest.planned_date)+'｜'+h(eventName(latest)):'尚無完成評估')+'</div>'+
-         (current?'<p>最新計畫：'+fmt(current.plan_date)+'｜'+h(current.status==='draft'?'草稿':'已完成')+'</p><button class="btn primary" data-icp-open="'+h(current.id)+'">'+(current.status==='draft'?'繼續編輯草稿':'查看照顧計畫')+'</button>':'<p>尚未建立照顧計畫。</p>')+
-         (actions.length?'<div style="margin-top:12px"><label>選擇對應的已完成評估</label><select id="icpEventPick">'+actions.map(function(e){return '<option value="'+h(e.id)+'">'+fmt(e.planned_date)+'｜'+h(eventName(e))+'</option>';}).join('')+'</select> <button id="icpCreate" class="btn primary">＋建立照顧計畫</button></div>':'<p class="icp-muted">目前沒有可建立新計畫的已完成評估。</p>')+'</div>'+
-         (current&&current.status==='completed'?'<div class="icp-card"><h3>本期照顧問題與目標</h3>'+((current.plan_content&&current.plan_content.problems)||[]).map(function(p,i){return '<div style="margin-bottom:9px"><strong>'+(i+1)+'. '+h(p.title)+'</strong><div class="icp-muted">'+(p.goals||[]).map(function(g){return h(g.title);}).join('、')+'</div></div>';}).join('')+'</div>':'')));
-    $('icpBack').onclick=renderList;
-    document.querySelectorAll('[data-icp-tab]').forEach(function(el){el.onclick=function(){L.tab=el.dataset.icpTab;renderCase();};});
+      '<button class="btn" id="icpBack">← 返回列表</button>',html);
+    $('icpBack').onclick=function(){L.reviewing=null;renderList();};
+    document.querySelectorAll('[data-icp-tab]').forEach(function(el){el.onclick=function(){L.tab=el.dataset.icpTab;L.reviewing=null;renderCase();};});
     document.querySelectorAll('[data-icp-open]').forEach(function(el){el.onclick=function(e){e.stopPropagation();openForm(el.dataset.icpOpen);};});
     if($('icpCreate'))$('icpCreate').onclick=function(){newForm($('icpEventPick').value);};
+    if($('icpCorrect'))$('icpCorrect').onclick=function(){beginRevision(effective,'correction');};
+    if($('icpRevise'))$('icpRevise').onclick=function(){beginRevision(effective,'revision');};
+    bindReviewTab(effective);
+  }
+  function beginRevision(previous,kind){
+    if(!previous||previous.status!=='completed')return;
+    var open=plansFor(previous.case_id).find(function(x){return x.root_plan_id&&x.status==='draft';});
+    if(open){toast('此個案已有未完成的更正／修訂草稿，請先完成該草稿。','error');openForm(open.id);return;}
+    var promptText=kind==='correction'?'請簡述文字更正原因（例如：修正問題說明錯字）':'請簡述修訂原因（例如：個案狀況變化或服務項目調整）';
+    var reason=window.prompt(promptText,'');
+    if(reason===null)return;
+    if(!String(reason).trim()){toast('請填寫更正／修訂原因','error');return;}
+    var copy=JSON.parse(JSON.stringify(previous.plan_content||{}));
+    L.editing={
+      id:null,root_plan_id:planRootId(previous),previous_version_id:previous.id,
+      revision_type:kind,revision_reason:String(reason).trim(),version_no:Number(previous.version_no||1)+1,
+      case_id:previous.case_id,assessment_event_id:previous.assessment_event_id,
+      plan_date:previous.plan_date,status:'draft',plan_content:copy,
+      responsible_staff_id:previous.responsible_staff_id,assessment_snapshot:previous.assessment_snapshot
+    };
+    normalizeCaregiver(L.editing);
+    L.dirty=false;
+    renderForm();
+  }
+  function reviewOptions(items,selected){return items.map(function(p){return '<option value="'+p[0]+'"'+(selected===p[0]?' selected':'')+'>'+p[1]+'</option>';}).join('');}
+  function startReview(plan,type){
+    if(!plan)return;
+    var goals=activeGoals(plan);if(!goals.length){toast('目前沒有需要追蹤的有效照顧目標','error');return;}
+    var values={};goals.forEach(function(x){values[x.goal.id]={result:'',comments:'',disposition:'maintain'};});
+    L.reviewing={planId:plan.id,type:type,review_date:today(),goalId:goals[0].goal.id,values:values};
+    L.tab='review';renderCase();
+  }
+  function renderReviewTab(plan){
+    if(!plan)return '<div class="icp-card">請先完成照顧計畫，才能進行照顧目標追蹤評值。</div>';
+    var goals=goalsInPlan(plan),items=L.reviews.filter(function(x){return x.plan_id===plan.id;});
+    var history=items.slice().sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});
+    var controls='<div class="icp-card"><h3>目前計畫的照顧目標追蹤</h3>'+
+      '<div class="icp-muted">'+h(planVersionLabel(plan))+'｜本期目標共 '+goals.length+' 項</div>'+
+      '<div class="icp-actions" style="margin-top:10px"><button class="btn primary" id="icpReviewPeriodic">＋定期完整評值</button><button class="btn" id="icpReviewInterim">＋臨時評值</button></div></div>';
+    if(L.reviewing&&L.reviewing.planId===plan.id){
+      var editing=L.reviewing;
+      var candidates=activeGoals(plan);
+      var selected=editing.type==='interim'?candidates.filter(function(x){return x.goal.id===editing.goalId;}):candidates;
+      controls+='<div class="icp-card"><h3>'+(editing.type==='periodic'?'定期完整評值':'臨時評值')+'</h3>'+
+        '<div class="icp-cols">'+field('評值日期 *',editing.review_date,'type="date" id="icpReviewDate"')+
+        (editing.type==='interim'?'<div class="icp-field"><label>選擇照顧目標</label><select id="icpReviewGoal">'+
+          candidates.map(function(x){return '<option value="'+h(x.goal.id)+'"'+(editing.goalId===x.goal.id?' selected':'')+'>'+h(x.problem.title+'｜'+x.goal.title)+'</option>';}).join('')+'</select></div>':
+          '<div class="icp-muted">本次需完成全部 '+selected.length+' 項有效目標的評值，才能送出。</div>')+'</div>'+
+        selected.map(function(x){
+          var g=x.goal,v=editing.values[g.id]||{result:'',comments:'',disposition:'maintain'};
+          return '<div class="icp-goal" data-review-goal="'+h(g.id)+'"><h3>'+h(x.problem.title)+'</h3><p>'+h(g.title)+'</p>'+
+            '<div class="icp-muted">評值標準：'+h(g.criteria)+'</div>'+
+            '<div class="icp-cols"><div class="icp-field"><label>目標達成情形 *</label><select data-review-field="result">'+
+              reviewOptions([['','請選擇'],['achieved','達成'],['partial','部分達成'],['unmet','未達成'],['unable','無法評值']],v.result)+
+            '</select></div><div class="icp-field"><label>後續處置 *</label><select data-review-field="disposition">'+
+              reviewOptions([['maintain','維持'],['adjust','調整'],['end','結束']],v.disposition)+
+            '</select></div></div>'+
+            area('評值說明'+(['partial','unmet','unable'].includes(v.result)?' *':''),v.comments,'data-review-field="comments"','例如：說明本次評值依據、未達成原因及下一步處理。')+'</div>';
+        }).join('')+
+        '<div class="icp-actions"><button id="icpReviewCancel" class="btn">取消</button><button id="icpReviewSave" class="btn primary">送出評值</button></div></div>';
+    }
+    controls+='<div class="icp-card"><h3>歷次評值紀錄</h3>'+
+      (history.length?history.map(function(r){
+        var x=goals.find(function(t){return t.goal.id===r.goal_id;});
+        return '<div class="icp-goal"><div><strong>'+fmt(r.review_date)+'｜'+h(reviewTypeLabel(r.review_type))+'</strong></div>'+
+          '<div>'+h(x?x.problem.title+'｜'+x.goal.title:'歷史目標')+'</div>'+
+          '<div class="icp-muted">結果：'+h(reviewResultLabel(r.result))+'｜處置：'+h(dispositionLabel(r.disposition))+'</div>'+
+          (r.comments?'<p style="white-space:pre-wrap">'+h(r.comments)+'</p>':'')+'</div>';
+      }).join(''):'<p class="icp-muted">尚無追蹤評值紀錄。</p>')+'</div>';
+    return controls;
+  }
+  function bindReviewTab(plan){
+    if(!plan||L.tab!=='review')return;
+    if($('icpReviewPeriodic'))$('icpReviewPeriodic').onclick=function(){startReview(plan,'periodic');};
+    if($('icpReviewInterim'))$('icpReviewInterim').onclick=function(){startReview(plan,'interim');};
+    var editing=L.reviewing;if(!editing||editing.planId!==plan.id)return;
+    if($('icpReviewDate'))$('icpReviewDate').onchange=function(){editing.review_date=this.value;};
+    if($('icpReviewGoal'))$('icpReviewGoal').onchange=function(){editing.goalId=this.value;renderCase();};
+    document.querySelectorAll('[data-review-goal]').forEach(function(block){
+      var goalId=block.dataset.reviewGoal;
+      block.querySelectorAll('[data-review-field]').forEach(function(el){
+        var handler=function(){editing.values[goalId][el.dataset.reviewField]=el.value;};
+        el.addEventListener('input',handler);el.addEventListener('change',handler);
+      });
+    });
+    $('icpReviewCancel').onclick=function(){L.reviewing=null;renderCase();};
+    $('icpReviewSave').onclick=function(){saveReviews(plan);};
+  }
+  async function saveReviews(plan){
+    var editing=L.reviewing;if(!editing||editing.planId!==plan.id)return;
+    var all=activeGoals(plan),targets=editing.type==='interim'?all.filter(function(x){return x.goal.id===editing.goalId;}):all;
+    if(!editing.review_date||!targets.length){toast('請選擇評值日期及照顧目標','error');return;}
+    if(editing.review_date<plan.plan_date){toast('評值日期不能早於計畫日期','error');return;}
+    var batch=uid(),rows=[];
+    for(var i=0;i<targets.length;i++){
+      var x=targets[i],v=editing.values[x.goal.id];
+      if(!v||!v.result){toast('請完成所有照顧目標的評值結果','error');return;}
+      if(['partial','unmet','unable'].includes(v.result)&&!String(v.comments||'').trim()){
+        toast('部分達成、未達成或無法評值時，需填寫原因與後續說明','error');return;
+      }
+      rows.push({plan_id:plan.id,case_id:plan.case_id,problem_id:String(x.problem.id),goal_id:String(x.goal.id),
+        batch_id:batch,review_type:editing.type,review_date:editing.review_date,result:v.result,
+        comments:String(v.comments||'').trim(),disposition:v.disposition||'maintain'});
+    }
+    showLoading(true);
+    try{
+      var response=await db.from('individual_care_plan_reviews').insert(rows).select();
+      if(response.error)throw response.error;
+      L.reviews=(response.data||[]).concat(L.reviews);
+      L.reviewing=null;toast('追蹤評值已完成','success');renderCase();
+    }catch(e){console.error(e);toast('追蹤評值儲存失敗：'+(e.message||e),'error');}
+    finally{showLoading(false);}
   }
   function newProblem(){return {id:uid(),problem_source:'official',category:'',title:'',rationale:'',goals:[newGoal()]};}
   function newGoal(){return {id:uid(),title:'',criteria:'',review_months:3,review_date:'',measures:[newMeasure()]};}
