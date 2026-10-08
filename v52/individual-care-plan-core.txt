@@ -141,7 +141,7 @@
     if(measureMode(measure)==='non_service')return '例如：向家屬說明浴室防滑及移位安全注意事項，持續追蹤改善情形。';
     return measureSuggestion(problem,measure)||'例如：依核定服務範圍及個案能力提供必要協助，留意安全並回報異常。';
   }
-  var L={cases:[],events:[],summaries:[],plans:[],services:[],staff:[],owner:'mine',filter:'all',search:'',sort:'name',caseId:null,tab:'current',editing:null,dirty:false,loaded:false};
+  var L={cases:[],events:[],summaries:[],plans:[],services:[],staff:[],reviews:[],reviewing:null,owner:'mine',filter:'all',search:'',sort:'name',caseId:null,tab:'current',editing:null,dirty:false,loaded:false};
   var currentModule={section:'每天工作',id:'individualCarePlans',icon:'📝',label:'計畫擬定',crumb:'照顧問題、目標及措施',ready:true,features:['照顧問題','照顧目標','執行策略','評估連動']};
   if(!modules.some(function(m){return m.id==='individualCarePlans';})){
     var idx=modules.findIndex(function(m){return m.id==='assessments';});
@@ -163,14 +163,41 @@
   }
   function caseBy(id){return L.cases.find(function(c){return c.id===id;});}
   function eventFor(c){return L.events.filter(function(x){return x.case_id===c.id;}).sort(function(a,b){return String(b.planned_date).localeCompare(String(a.planned_date));});}
-  function plansFor(id){return L.plans.filter(function(x){return x.case_id===id;}).sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});}
+  function plansFor(id){return L.plans.filter(function(x){return x.case_id===id;}).sort(function(a,b){
+    var date=String(b.assessment_date||'').localeCompare(String(a.assessment_date||''));
+    return date||Number(b.version_no||1)-Number(a.version_no||1)||String(b.created_at).localeCompare(String(a.created_at));
+  });}
+  function effectivePlan(id){return plansFor(id).find(function(p){return p.status==='completed';})||null;}
+  function planRootId(p){return p.root_plan_id||p.id;}
+  function planVersionLabel(p){
+    return '第 '+(p.version_no||1)+' 版'+(p.revision_type==='correction'?'（文字更正）':p.revision_type==='revision'?'（修訂）':'（原始計畫）');
+  }
+  function goalsInPlan(plan){
+    if(!plan)return [];
+    return ((plan.plan_content||{}).problems||[]).flatMap(function(problem){
+      return (problem.goals||[]).map(function(goal){return {problem:problem,goal:goal};});
+    });
+  }
+  function latestGoalReview(plan,goalId){
+    return L.reviews.find(function(r){return r.plan_id===plan.id&&r.goal_id===String(goalId);});
+  }
+  function activeGoals(plan){
+    return goalsInPlan(plan).filter(function(x){
+      var last=latestGoalReview(plan,x.goal.id);
+      return !last||last.disposition!=='end';
+    });
+  }
+  function reviewResultLabel(v){return ({achieved:'達成',partial:'部分達成',unmet:'未達成',unable:'無法評值'})[v]||'尚未評值';}
+  function dispositionLabel(v){return ({maintain:'維持',adjust:'調整',end:'結束'})[v]||v||'—';}
+  function reviewTypeLabel(v){return v==='periodic'?'定期完整評值':'臨時評值';}
   function summaryFor(id){return L.summaries.find(function(s){return s.assessment_event_id===id;});}
   function staffName(id){return (L.staff.find(function(s){return s.id===id;})||{}).display_name||'尚未指派';}
   function eventName(e){return ({opening:'開案評估',periodic:'定期再評估',condition_change:'狀況變化評估',specific_problem:'特定問題評估'})[e.assessment_type]||e.assessment_type;}
   function planName(p){return ({opening:'初次擬定',periodic:'定期重擬',change:'狀況變化'})[p.plan_type]||'照顧計畫';}
   function fmt(d){return d?rocDate(d+'T00:00:00'):'—';}
   function status(c){
-    var ev=eventFor(c)[0],ps=plansFor(c.id),same=ev?ps.find(function(p){return p.assessment_event_id===ev.id;}):null,latest=ps[0];
+    var ev=eventFor(c)[0],ps=plansFor(c.id),same=ev?ps.find(function(p){return p.assessment_event_id===ev.id && !p.root_plan_id;}):null,latest=ps[0];
+    if(ps.some(function(p){return p.root_plan_id && p.status==='draft';}))return '修訂草稿';
     if(same&&same.status==='draft')return '草稿';
     if(ev&&!same)return '待擬定';
     if(latest&&latest.status==='completed')return '執行中';
@@ -184,12 +211,14 @@
       db.from('assessment_event_summaries').select('assessment_event_id,key_findings,care_recommendations,completed_at').not('completed_at','is',null),
       db.from('individual_care_plans').select('*').order('created_at',{ascending:false}),
       db.from('staff_users').select('id,display_name,role').eq('is_active',true),
-      db.from('case_approved_services').select('id,case_id,care_plan_id,service_group,service_code,service_name,approved_quantity,valid_from,valid_to').eq('is_current',true).order('service_code')
+      db.from('case_approved_services').select('id,case_id,care_plan_id,service_group,service_code,service_name,approved_quantity,valid_from,valid_to').eq('is_current',true).order('service_code'),
+      db.from('individual_care_plan_reviews').select('*').order('created_at',{ascending:false})
     ]);
     for(var i=0;i<rs.length;i++)if(rs[i].error)throw rs[i].error;
     L.cases=rs[0].data||[];L.events=rs[1].data||[];L.summaries=rs[2].data||[];L.plans=rs[3].data||[];
     L.staff=rs[4].error?(state.caseStaff||[]):(rs[4].data||[]);
     L.services=rs[5].data||[];
+    L.reviews=rs[6].data||[];
     L.loaded=true;
   }
   function shell(title,sub,buttons,body){
@@ -198,10 +227,10 @@
   function renderList(){
     L.caseId=null;L.editing=null;L.dirty=false;
     var all=L.cases.filter(function(c){return L.owner!=='mine'||state.profile.role!=='supervisor'||c.supervisor_id===state.profile.id;});
-    var counts={waiting:all.filter(function(c){return status(c)==='待擬定';}).length,draft:all.filter(function(c){return status(c)==='草稿';}).length,done:all.filter(function(c){return status(c)==='執行中';}).length,no_assessment:all.filter(function(c){return status(c)==='尚無完成評估';}).length};
-    var rows=all.filter(function(c){return (!L.search||c.case_name.includes(L.search)||String(c.case_no||'').includes(L.search))&&(L.filter==='all'||({waiting:'待擬定',draft:'草稿',done:'執行中',no_assessment:'尚無完成評估'})[L.filter]===status(c));});
+    var counts={waiting:all.filter(function(c){return status(c)==='待擬定';}).length,draft:all.filter(function(c){return ['草稿','修訂草稿'].includes(status(c));}).length,done:all.filter(function(c){return status(c)==='執行中';}).length,no_assessment:all.filter(function(c){return status(c)==='尚無完成評估';}).length};
+    var rows=all.filter(function(c){return (!L.search||c.case_name.includes(L.search)||String(c.case_no||'').includes(L.search))&&(L.filter==='all'||(L.filter==='draft'?['草稿','修訂草稿'].includes(status(c)) : ({waiting:'待擬定',done:'執行中',no_assessment:'尚無完成評估'})[L.filter]===status(c)));});
     rows.sort(function(a,b){return L.sort==='status'?status(a).localeCompare(status(b),'zh-Hant'):a.case_name.localeCompare(b.case_name,'zh-Hant');});
-    shell('📝 計畫擬定','依個案集中管理本期計畫；完整評值與版本管理將於下一階段加入。',
+    shell('📝 計畫擬定','依個案管理照顧計畫、計畫版本及個別照顧目標評值。',
       '<button id="icpReload" class="btn">↻ 重新整理</button>',
       '<section class="icp-grid">'+[
         ['waiting','待擬定',counts.waiting],['draft','草稿',counts.draft],['done','執行中',counts.done],['no_assessment','尚無完成評估',counts.no_assessment]
