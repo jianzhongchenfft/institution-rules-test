@@ -271,6 +271,15 @@
     return b>a?b-a:0;
   }
 
+  // 換休使用更正的分鐘數需與一般換休一致：午休12:00～13:00不扣抵。
+  function pcCompLeaveChargeMinutes(start,end){
+    const duration=pcMinutesBetween(start,end);
+    if(duration<=0||!start||!end)return 0;
+    const [sh,sm]=start.split(':').map(Number),[eh,em]=end.split(':').map(Number);
+    const a=sh*60+sm,b=eh*60+em===0?1440:eh*60+em;
+    return Math.max(0,duration-Math.max(0,Math.min(b,780)-Math.max(a,720)));
+  }
+
   function pcCrossesMidnight(start,end){
     if(!start||!end)return false;
     const [sh,sm]=start.split(':').map(Number),[eh,em]=end.split(':').map(Number);
@@ -366,9 +375,9 @@
       if(showError)toast('跨午夜換休使用更正請自行分成兩筆','warn');
       return null;
     }
-    const mins=pcMinutesBetween(start,end);
+    const mins=pcCompLeaveChargeMinutes(start,end);
     if(mins<=0||mins%30!==0){
-      if(box)box.textContent='換休使用更正須以30分鐘為單位，且結束時間必須晚於開始時間。';
+      if(box)box.textContent=pcMinutesBetween(start,end)>0?'所選時段只有12:00～13:00午休，沒有可扣抵時數。':'換休使用更正須以30分鐘為單位，且結束時間必須晚於開始時間。';
       return null;
     }
     const {data,error}=await db.rpc('preview_payroll_comp_leave_used_typed',{
@@ -383,7 +392,7 @@
     const row=Array.isArray(data)?data[0]:data;
     if(!row)return null;
     if(direction>0){
-      if(box)box.innerHTML=`自動計算：<strong>${escapeHTML(pcDuration(row.correction_minutes))}</strong>｜所選類型可扣抵 <strong>${escapeHTML(pcDuration(row.available_minutes))}</strong>`;
+      if(box)box.innerHTML=`自動計算：<strong>${escapeHTML(pcDuration(row.correction_minutes))}</strong>${pcMinutesBetween(start,end)>row.correction_minutes?'（已扣除12:00～13:00午休）':''}｜所選類型可扣抵 <strong>${escapeHTML(pcDuration(row.available_minutes))}</strong>`;
     }else{
       if(box)box.innerHTML=`將整筆還原：<strong>${escapeHTML(row.related_source_label||'既有換休使用紀錄')}</strong>｜${escapeHTML(pcDuration(row.correction_minutes))}`;
     }
@@ -488,7 +497,7 @@
               <div class="field"><label>結束時間 *</label><div class="ot-time-pair"><select id="pcUsedEndHour">${pcHourOptions()}</select><select id="pcUsedEndMinute">${pcThirtyMinuteOptions()}</select></div></div>
             </div>
             <div id="pcUsedCalc" class="ot-calc" style="margin-top:8px">請填寫實際使用日期與起訖時間，系統會自動計算時數並檢查換休帳本。</div>
-            <div class="help" style="margin-top:6px">換休使用以30分鐘為單位，每筆僅能選擇一種換休類型；減少認列必須完整對應一筆既有換休使用。若只修正部分時數，請先整筆減少，再補登正確時段。</div>
+            <div class="help" style="margin-top:6px">換休使用以30分鐘為單位，12:00～13:00午休不扣抵；每筆僅能選擇一種換休類型。減少認列須完整對應原紀錄。若只修正部分時數，請先整筆減少，再補登正確時段。</div>
           </div>
           <div class="field full"><label>更正原因 *</label><textarea id="pcReason" placeholder="例如：薪資結算後發現22:00～22:30加班漏列"></textarea></div>
         </div>`,
