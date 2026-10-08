@@ -152,9 +152,49 @@
     document.querySelectorAll('[data-icp-open]').forEach(function(el){el.onclick=function(e){e.stopPropagation();openForm(el.dataset.icpOpen);};});
     if($('icpCreate'))$('icpCreate').onclick=function(){newForm($('icpEventPick').value);};
   }
-  function newProblem(){return {id:uid(),category:CATS[0],title:'',rationale:'',goals:[newGoal()]};}
-  function newGoal(){return {id:uid(),title:'',criteria:'',review_date:'',measures:[newMeasure()]};}
-  function newMeasure(){return {id:uid(),text:'',executor:'居服員',measure_type:'service',service_code:''};}
+  function newProblem(){return {id:uid(),problem_source:'official',category:'',title:'',rationale:'',goals:[newGoal()]};}
+  function newGoal(){return {id:uid(),title:'',criteria:'',review_months:3,review_date:'',measures:[newMeasure()]};}
+  function newMeasure(){return {id:uid(),text:'',executor:'居服員',measure_type:'',service_code:'',proposed_service:''};}
+  function positiveMonths(x){var v=Number(x);return Number.isInteger(v)&&v>=1&&v<=120?v:0;}
+  function monthsFor(goal,planDate){
+    var v=positiveMonths(goal.review_months);if(v)return v;
+    if(goal.review_months!==undefined&&goal.review_months!==null&&String(goal.review_months)!=='')return 0;
+    // Older drafts used an actual date: preserve the approximate cycle instead of discarding it.
+    if(goal.review_date&&planDate){
+      var a=String(planDate).split('-').map(Number),b=String(goal.review_date).split('-').map(Number);
+      if(a.length===3&&b.length===3){
+        var diff=(b[0]-a[0])*12+(b[1]-a[1]);
+        if(diff>=1&&diff<=120)return diff;
+      }
+    }
+    return 3;
+  }
+  function dueFromMonths(date,months){
+    var m=positiveMonths(months),p=String(date||'').split('-').map(Number);
+    if(!m||p.length!==3||p.some(function(x){return !Number.isInteger(x);}))return '';
+    var first=new Date(Date.UTC(p[0],p[1]-1+m,1));
+    var yy=first.getUTCFullYear(),mm=first.getUTCMonth();
+    var day=Math.min(p[2],new Date(Date.UTC(yy,mm+1,0)).getUTCDate());
+    return String(yy).padStart(4,'0')+'-'+String(mm+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  }
+  function syncReviewDates(plan){
+    (plan.plan_content.problems||[]).forEach(function(p){
+      (p.goals||[]).forEach(function(g){
+        var m=monthsFor(g,plan.plan_date);
+        if(m){g.review_months=m;g.review_date=dueFromMonths(plan.plan_date,m);}
+        else g.review_date='';
+      });
+    });
+  }
+  function updateDueLabels(){
+    if(!L.editing)return;
+    document.querySelectorAll('[data-icp-due]').forEach(function(el){
+      var ids=el.dataset.icpDue.split('.');
+      var g=L.editing.plan_content.problems[Number(ids[0])].goals[Number(ids[1])];
+      var d=dueFromMonths(L.editing.plan_date,monthsFor(g,L.editing.plan_date));
+      el.textContent=d?'預計評值日：'+fmt(d):'請輸入有效的月份（1～120）';
+    });
+  }
   function serviceForCase(caseId){
     return L.services.filter(function(s){
       return s.case_id===caseId && ['B','G'].includes(s.service_group)
@@ -182,7 +222,7 @@
     var fresh=JSON.parse(JSON.stringify((old.plan_content&&old.plan_content.problems)||[]));
     fresh.forEach(function(p){p.origin_problem_id=p.id;p.id=uid();(p.goals||[]).forEach(function(g){g.origin_goal_id=g.id;g.id=uid();(g.measures||[]).forEach(function(m){m.id=uid();});});});
     if(!confirm('帶入前次計畫將取代目前編輯中的照顧問題，確定繼續嗎？'))return;
-    L.editing.plan_content.problems=fresh;L.dirty=true;renderForm(true);
+    L.editing.plan_content.problems=fresh;syncReviewDates(L.editing);L.dirty=true;renderForm(true);
   }
   function newForm(eventId){
     var existing=L.plans.find(function(p){return p.assessment_event_id===eventId;});
@@ -194,39 +234,87 @@
     var p=L.plans.find(function(x){return x.id===id;});if(!p)return;
     L.caseId=p.case_id;L.editing=JSON.parse(JSON.stringify(p));L.dirty=false;renderForm();
   }
-  function selectOptions(){return '<option value="">選擇公版34項照顧問題</option>'+RAW.map(function(x,i){return '<option value="'+h(x[1])+'">'+(i+1)+'. '+h(x[1])+'</option>';}).join('');}
+  function issueValue(p){
+    if(p.problem_source==='custom')return '__custom__';
+    if(CATS.includes(p.category)&&p.category===p.title)return p.category;
+    return p.category||p.title?'__custom__':'';
+  }
+  function selectOptions(selected){
+    return '<option value="">請選擇照顧問題</option>'+
+      RAW.map(function(x,i){return '<option value="'+h(x[1])+'"'+(selected===x[1]?' selected':'')+'>'+(i+1)+'. '+h(x[1])+'</option>';}).join('')+
+      '<option value="__custom__"'+(selected==='__custom__'?' selected':'')+'>＋ 自訂照顧問題</option>';
+  }
+  function measureChoice(m){
+    var mode=measureMode(m);
+    return mode==='service'?'service:'+String(m.service_code||''):mode;
+  }
+  function serviceChoiceOptions(m,caseId,locked,plan){
+    var selected=measureChoice(m),rows=serviceForCase(caseId);
+    var result='<option value="">請選擇服務項目／措施類型</option>';
+    result+='<optgroup label="個管師已核定服務">';
+    if(selected.indexOf('service:')===0&&!rows.some(function(x){return 'service:'+x.service_code===selected;})){
+      var code=String(m.service_code||'');
+      var original=(((plan||{}).plan_content||{}).approved_services_snapshot||[]).find(function(x){return x.code===code;});
+      result+='<option value="'+h(selected)+'" selected '+(locked?'':'disabled')+'>原計畫：'+h(code+(original?'｜'+original.name:''))+'（目前非有效核定項目）</option>';
+    }
+    if(rows.length){
+      rows.forEach(function(x){var value='service:'+x.service_code;result+='<option value="'+h(value)+'"'+(selected===value?' selected':'')+'>'+h(x.service_code+'｜'+(x.service_name||'')+(x.approved_quantity==null?'':'｜核定'+x.approved_quantity+'支'))+'</option>';});
+    }else result+='<option value="" disabled>目前無有效的BA／GA核定服務</option>';
+    result+='</optgroup><optgroup label="其他照顧安排">'+
+      '<option value="non_service"'+(selected==='non_service'?' selected':'')+'>其他照顧支持措施（不涉及提供核定服務）</option>'+
+      '<option value="pending"'+(selected==='pending'?' selected':'')+'>建議新增／調整服務（待與A單位討論，尚未核定）</option>'+
+      '</optgroup>';
+    return result;
+  }
   function renderProblem(p,i,locked){
-    return '<div class="icp-problem"><div class="icp-actions"><strong style="margin-right:auto">照顧問題 '+(i+1)+'</strong>'+(!locked?'<button class="btn sm" data-action="removeProblem" data-i="'+i+'">刪除問題</button>':'')+'</div>'+
-      (!locked?'<div class="icp-field"><label>選擇公版照顧問題（可自行修改下方個別化問題名稱）</label><select data-template="'+i+'">'+selectOptions()+'</select></div>':'')+
-      '<div class="icp-cols"><div class="icp-field"><label>公版照顧問題分類 *</label><select data-path="problems.'+i+'.category" '+(locked?'disabled':'')+'>'+(!CATS.includes(p.category)?'<option value="'+h(p.category)+'" selected>原自訂分類：'+h(p.category)+'</option>':'')+opts(CATS,p.category)+'</select></div>'+
-      field('問題名稱 *',p.title,'data-path="problems.'+i+'.title" '+(locked?'disabled':''))+'</div>'+
+    var selected=issueValue(p),title=p.title||'';
+    return '<div class="icp-problem">'+
+      '<div class="icp-actions"><strong style="margin-right:auto">照顧問題 '+(i+1)+'</strong>'+
+      (!locked?'<button type="button" class="btn sm" data-action="removeProblem" data-i="'+i+'">刪除問題</button>':'')+'</div>'+
+      '<div class="icp-field"><label>照顧問題 *</label><select data-issue="'+i+'" '+(locked?'disabled':'')+'>'+selectOptions(selected)+'</select></div>'+
+      (selected==='__custom__'
+        ?field('自訂照顧問題名稱 *',title,'data-path="problems.'+i+'.title" '+(locked?'disabled':'')+' placeholder="請輸入照顧問題名稱"')
+        :'')+
       area('問題說明及評估依據 *',p.rationale,'data-path="problems.'+i+'.rationale" '+(locked?'disabled':''))+
-      (!locked?'<button class="btn sm" data-action="assessmentFindings" data-i="'+i+'">帶入本次評估發現</button>':'')+
-      (!locked&&SUGGEST[p.title]?'<div class="icp-actions"><button class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
-      (p.goals||[]).map(function(g,j){return '<div class="icp-goal"><div class="icp-actions"><strong style="margin-right:auto">照顧目標 '+(j+1)+'</strong>'+(!locked?'<button class="btn sm" data-action="removeGoal" data-i="'+i+'" data-j="'+j+'">刪除目標</button>':'')+'</div>'+
-        area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''))+
-        '<div class="icp-cols">'+area('評值標準 *',g.criteria,'data-path="problems.'+i+'.goals.'+j+'.criteria" '+(locked?'disabled':''))+
-        field('預定評值日期',g.review_date,'type="date" data-path="problems.'+i+'.goals.'+j+'.review_date" '+(locked?'disabled':''))+'</div>'+
-        '<label>執行策略／照顧措施 *</label>'+
-        (g.measures||[]).map(function(m,k){
-          var base='problems.'+i+'.goals.'+j+'.measures.'+k,mode=measureMode(m);
-          return '<div class="icp-measure">'+area('措施內容',m.text,'data-path="'+base+'.text" '+(locked?'disabled':''))+
-            field('執行者',m.executor,'data-path="'+base+'.executor" '+(locked?'disabled':''))+
-            (!locked?'<button type="button" class="btn sm" data-action="removeMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">刪除</button>':'<span></span>')+
-            '<div class="icp-field" style="grid-column:1/-1"><label>措施類型 *</label><select data-path="'+base+'.measure_type" '+(locked?'disabled':'')+'>'+
-            [['service','已核定服務執行措施'],['non_service','非服務措施（提醒、溝通、轉介等）'],['pending','待A單位確認／待異動（僅可存草稿）']].map(function(item){
-              return '<option value="'+item[0]+'"'+(mode===item[0]?' selected':'')+'>'+item[1]+'</option>';
-            }).join('')+'</select></div>'+
-            (mode==='service'
-              ?'<div class="icp-field" style="grid-column:1/-1"><label>連結個管師目前核定服務項目 *</label><select data-path="'+base+'.service_code" '+(locked?'disabled':'')+'>'+approvedServiceOptions(m.service_code,p.case_id||L.caseId)+'</select><div class="icp-muted">僅列出目前核定、有效的BA／GA服務項目；措施不得超出核定內容及支數。</div></div>'
-              :mode==='pending'
-                ?'<div class="icp-field" style="grid-column:1/-1"><label>待確認／待異動服務項目（選填）</label><input data-path="'+base+'.service_code" value="'+h(m.service_code||'')+'" '+(locked?'disabled':'')+' placeholder="例如：希望新增BA07"><div class="icp-note">本項尚未核定，僅可儲存草稿，不得完成為可執行的計畫。</div></div>'
-                :'<div class="icp-muted" style="grid-column:1/-1">本措施僅限提醒、照顧指導、聯繫或轉介，不得用來登錄未核定的實際服務。</div>')+
+      (!locked?'<button type="button" class="btn sm" data-action="assessmentFindings" data-i="'+i+'">帶入本次評估發現</button>':'')+
+      (!locked&&SUGGEST[p.title]?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
+      (p.goals||[]).map(function(g,j){
+        var months=monthsFor(g,L.editing.plan_date),due=dueFromMonths(L.editing.plan_date,months);
+        return '<div class="icp-goal"><div class="icp-actions"><strong style="margin-right:auto">照顧目標 '+(j+1)+'</strong>'+
+          (!locked?'<button type="button" class="btn sm" data-action="removeGoal" data-i="'+i+'" data-j="'+j+'">刪除目標</button>':'')+'</div>'+
+          area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''))+
+          '<div class="icp-cols">'+area('評值標準 *',g.criteria,'data-path="problems.'+i+'.goals.'+j+'.criteria" '+(locked?'disabled':''))+
+          '<div class="icp-field"><label>預定評值時間 *</label><div style="display:flex;align-items:center;gap:8px">'+
+          '<input style="max-width:110px" type="number" min="1" max="120" step="1" data-path="problems.'+i+'.goals.'+j+'.review_months" value="'+h(g.review_months!==undefined?g.review_months:months)+'" '+(locked?'disabled':'')+'><span>個月後</span></div>'+
+          '<div class="icp-muted" data-icp-due="'+i+'.'+j+'">'+(due?'預計評值日：'+fmt(due):'請輸入有效的月份（1～120）')+'</div></div></div>'+
+          '<div style="margin-top:10px"><strong>執行策略／照顧措施 *</strong></div>'+
+          (g.measures||[]).map(function(m,k){
+            var base='problems.'+i+'.goals.'+j+'.measures.'+k,mode=measureMode(m);
+            return '<div class="icp-measure" style="display:block">'+
+              '<div class="icp-actions"><strong style="margin-right:auto">措施 '+(k+1)+'</strong>'+
+              (!locked?'<button type="button" class="btn sm" data-action="removeMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">刪除措施</button>':'')+'</div>'+
+              '<div class="icp-field"><label>服務項目／措施類型 *</label><select data-measure-choice="'+i+'.'+j+'.'+k+'" '+(locked?'disabled':'')+'>'+serviceChoiceOptions(m,L.editing.case_id,locked,L.editing)+'</select></div>'+
+              (mode==='pending'
+                ?field('擬新增／調整服務項目 *',m.proposed_service||m.service_code||'','data-path="'+base+'.proposed_service" '+(locked?'disabled':'')+' placeholder="例如：建議新增BA07協助沐浴及洗頭"')
+                :'')+
+              area(mode==='pending'?'建議調整內容及與A單位協調事項 *':'具體執行策略／照顧措施 *',m.text,'data-path="'+base+'.text" '+(locked?'disabled':''))+
+              (mode==='non_service'||mode==='pending'
+                ?field('負責執行／協調人員 *',m.executor||'督導','data-path="'+base+'.executor" '+(locked?'disabled':''))
+                :'')+
+              (mode==='pending'
+                ?'<div class="icp-note">尚未核定｜僅記錄建議與後續協調，不能作為居服員提供服務的依據。待A單位核定後，再修訂計畫。</div>'
+                :mode==='service'
+                  ?'<div class="icp-muted">依照此個案已核定項目執行，不得超過核定服務範圍或支數。</div>'
+                  :mode==='non_service'
+                    ?'<div class="icp-muted">例如關懷、提醒、家屬協助或轉介，不得以此欄位安排未核定的長照服務。</div>'
+                    :'')+
             '</div>';
-        }).join('')+
-        (!locked?'<div class="icp-actions"><button class="btn sm" data-action="addMeasure" data-i="'+i+'" data-j="'+j+'">＋新增措施</button>'+(SUGGEST[p.title]?'<button class="btn sm" data-action="suggestMeasure" data-i="'+i+'" data-j="'+j+'">＋帶入建議措施</button>':'')+'</div>':'')+
-        '</div>';}).join('')+
-      (!locked?'<button class="btn sm" data-action="addGoal" data-i="'+i+'">＋新增照顧目標</button>':'')+'</div>';
+          }).join('')+
+          (!locked?'<div class="icp-actions"><button type="button" class="btn sm" data-action="addMeasure" data-i="'+i+'" data-j="'+j+'">＋新增措施</button>'+
+            (SUGGEST[p.title]?'<button type="button" class="btn sm" data-action="suggestMeasure" data-i="'+i+'" data-j="'+j+'">＋帶入建議措施</button>':'')+'</div>':'')+
+        '</div>';
+      }).join('')+
+      (!locked?'<button type="button" class="btn sm" data-action="addGoal" data-i="'+i+'">＋新增照顧目標</button>':'')+'</div>';
   }
   function renderForm(keepScroll){
     var originalScroll=keepScroll?window.scrollY:0;
@@ -269,8 +357,31 @@
     $('icpFormBack').onclick=function(){if(leaveOK()){L.editing=null;L.dirty=false;renderCase();}};
     if(locked){window.scrollTo(0,originalScroll);return;}
     document.querySelectorAll('[data-path]').forEach(function(el){el.addEventListener('input',onField);el.addEventListener('change',onField);});
-    document.querySelectorAll('[data-header]').forEach(function(el){el.addEventListener('input',function(){p[el.dataset.header]=el.value;L.dirty=true;});});
-    document.querySelectorAll('[data-template]').forEach(function(el){el.onchange=function(){var x=RAW.find(function(y){return y[1]===el.value;});if(!x)return;var item=body.problems[Number(el.dataset.template)];item.category=x[0];item.title=x[1];L.dirty=true;renderForm(true);};});
+    document.querySelectorAll('[data-header]').forEach(function(el){el.addEventListener('input',function(){p[el.dataset.header]=el.value;L.dirty=true;updateDueLabels();});});
+    document.querySelectorAll('[data-issue]').forEach(function(el){
+      el.onchange=function(){
+        var x=body.problems[Number(el.dataset.issue)],v=el.value;
+        if(v==='__custom__'){
+          var previousTitle=x.title||'';
+          x.problem_source='custom';x.category='其他問題';
+          x.title=CATS.includes(previousTitle)?'':previousTitle;
+        }else{
+          x.problem_source='official';x.category=v;x.title=v;
+        }
+        L.dirty=true;renderForm(true);
+      };
+    });
+    document.querySelectorAll('[data-measure-choice]').forEach(function(el){
+      el.onchange=function(){
+        var parts=el.dataset.measureChoice.split('.').map(Number);
+        var m=body.problems[parts[0]].goals[parts[1]].measures[parts[2]],v=el.value;
+        if(v.indexOf('service:')===0){m.measure_type='service';m.service_code=v.slice(8);m.proposed_service='';m.executor='居服員';}
+        else if(v==='pending'){m.measure_type='pending';m.service_code='';m.proposed_service=m.proposed_service||'';m.executor='督導';}
+        else if(v==='non_service'){m.measure_type='non_service';m.service_code='';m.proposed_service='';m.executor='督導';}
+        else{m.measure_type='';m.service_code='';m.proposed_service='';}
+        L.dirty=true;renderForm(true);
+      };
+    });
     document.querySelectorAll('[data-action]').forEach(function(el){el.onclick=function(){handle(el);};});
     if($('icpShowNotes'))$('icpShowNotes').onclick=function(){var target=$('icpNotes');if(!target){return;}target.innerHTML=area('補充備註',care.notes,'data-path="caregiver.notes"');target.querySelector('textarea').addEventListener('input',onField);$('icpShowNotes').style.display='none';};
     $('icpSaveDraft').onclick=function(){save(false);};
@@ -282,10 +393,8 @@
     var segments=path.split('.'),obj=L.editing.plan_content;
     for(var i=0;i<segments.length-1;i++)obj=obj[segments[i]];
     obj[segments[segments.length-1]]=e.target.value;L.dirty=true;
-    if(path.endsWith('.measure_type')){
-      if(e.target.value!=='service')obj.service_code='';
-      renderForm(true);
-    }else if(path==='caregiver.need_transfer')renderForm(true);
+    if(path.endsWith('.review_months'))updateDueLabels();
+    if(path==='caregiver.need_transfer')renderForm(true);
   }
   function handle(btn){
     var a=btn.dataset.action,i=Number(btn.dataset.i),j=Number(btn.dataset.j),k=Number(btn.dataset.k);
@@ -325,18 +434,20 @@
     if(!problems.length)return '請至少新增一項照顧問題';
     for(var i=0;i<problems.length;i++){
       var x=problems[i];
-      if(!String(x.category||'').trim()||!String(x.title||'').trim()||!String(x.rationale||'').trim())return '請完成照顧問題 '+(i+1)+' 的分類、名稱及評估依據';
+      if(!String(x.category||'').trim()||!String(x.title||'').trim()||!String(x.rationale||'').trim())return '請完成照顧問題 '+(i+1)+' 的名稱及評估依據';
       if(!x.goals||!x.goals.length)return '照顧問題 '+(i+1)+' 需要至少一個照顧目標';
       for(var j=0;j<x.goals.length;j++){
         var g=x.goals[j];
         if(!String(g.title||'').trim()||!String(g.criteria||'').trim())return '照顧問題 '+(i+1)+' 的目標 '+(j+1)+' 尚未完成目標及評值標準';
+        if(!positiveMonths(monthsFor(g,p.plan_date)))return '照顧問題 '+(i+1)+' 的目標 '+(j+1)+' 請輸入有效評值月份（1～120）';
         if(!g.measures||!g.measures.length||g.measures.some(function(m){return !String(m.text||'').trim()||!String(m.executor||'').trim();}))return '照顧問題 '+(i+1)+' 的目標 '+(j+1)+' 尚未完成執行措施及執行者';
         for(var k=0;k<g.measures.length;k++){
           var m=g.measures[k],mode=measureMode(m);
-          if(mode==='pending')return '有措施仍待A單位確認或辦理異動，請先儲存草稿';
+          if(mode==='pending'&&!String(m.proposed_service||m.service_code||'').trim())
+            return '照顧問題 '+(i+1)+' 的措施 '+(k+1)+' 請填寫擬新增或調整的服務項目';
           if(mode==='service'&&!serviceForCase(p.case_id).some(function(s){return s.service_code===m.service_code;}))
             return '照顧問題 '+(i+1)+' 的目標 '+(j+1)+' 有措施未連結有效的核定BA／GA服務項目';
-          if(mode!=='service'&&mode!=='non_service')return '請確認每項措施的類型';
+          if(!['service','non_service','pending'].includes(mode))return '請選擇每項措施的服務項目／措施類型';
         }
       }
     }
@@ -346,6 +457,16 @@
   async function save(finish){
     var p=L.editing;if(!p||p.status==='completed')return;
     if(finish){var err=validate(p);if(err){toast(err,'error');return;}}
+    syncReviewDates(p);
+    // Older pending drafts could store proposals in service_code: keep the proposal, but never treat as approved service.
+    (p.plan_content.problems||[]).forEach(function(pr){
+      (pr.goals||[]).forEach(function(g){(g.measures||[]).forEach(function(m){
+        if(measureMode(m)==='pending'){
+          m.proposed_service=m.proposed_service||m.service_code||'';
+          m.service_code='';
+        }
+      });});
+    });
     showLoading(true);
     try{
       var data={case_id:p.case_id,assessment_event_id:p.assessment_event_id,plan_date:p.plan_date,plan_content:p.plan_content,status:finish?'completed':'draft'};
@@ -361,8 +482,10 @@
       var raw=String(e.message||e);
       var reason=raw.includes('CARE_PLAN_SERVICE_NOT_APPROVED')
         ?'所選服務不在本案目前有效的BA／GA核定項目內，請重新確認個管師核定內容'
-        :raw.includes('CARE_PLAN_PENDING_A_UNIT_CONFIRMATION')
-          ?'仍有待A單位確認／待異動的措施，請先儲存草稿'
+        :raw.includes('CARE_PLAN_PENDING_DETAIL_REQUIRED')
+          ?'待與A單位討論的項目必須填寫擬新增／調整的服務'
+          :raw.includes('CARE_PLAN_PENDING_CANNOT_LINK_CODE')
+            ?'待協調服務不能填入已核定服務碼'
           :raw.includes('CARE_PLAN_NON_SERVICE_CANNOT_LINK_CODE')
             ?'非服務措施不能連結服務碼，請檢查措施類型'
             :raw;
