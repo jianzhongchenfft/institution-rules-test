@@ -323,8 +323,12 @@
   }
   function renderReviewTab(plan){
     if(!plan)return '<div class="icp-card">請先完成照顧計畫，才能進行照顧目標追蹤評值。</div>';
-    var goals=goalsInPlan(plan),items=L.reviews.filter(function(x){return x.plan_id===plan.id;});
-    var history=items.slice().sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});
+    var goals=goalsInPlan(plan),related=plansFor(plan.case_id).filter(function(p){
+      return planRootId(p)===planRootId(plan);
+    });
+    var relatedIds=related.map(function(p){return p.id;});
+    var history=L.reviews.filter(function(x){return relatedIds.includes(x.plan_id);}).slice()
+      .sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});
     var controls='<div class="icp-card"><h3>目前計畫的照顧目標追蹤</h3>'+
       '<div class="icp-muted">'+h(planVersionLabel(plan))+'｜本期目標共 '+goals.length+' 項</div>'+
       '<div class="icp-actions" style="margin-top:10px"><button class="btn primary" id="icpReviewPeriodic">＋定期完整評值</button><button class="btn" id="icpReviewInterim">＋臨時評值</button></div></div>';
@@ -353,7 +357,8 @@
     controls+='<div class="icp-card"><h3>歷次評值紀錄</h3>'+
       (history.length?history.map(function(r){
         var x=goals.find(function(t){return t.goal.id===r.goal_id;});
-        return '<div class="icp-goal"><div><strong>'+fmt(r.review_date)+'｜'+h(reviewTypeLabel(r.review_type))+'</strong></div>'+
+        var sourceVersion=related.find(function(p){return p.id===r.plan_id;});
+        return '<div class="icp-goal"><div><strong>'+fmt(r.review_date)+'｜'+h(reviewTypeLabel(r.review_type))+'</strong><span class="icp-muted">　'+h(sourceVersion?planVersionLabel(sourceVersion):'歷史版本')+'</span></div>'+
           '<div>'+h(x?x.problem.title+'｜'+x.goal.title:'歷史目標')+'</div>'+
           '<div class="icp-muted">結果：'+h(reviewResultLabel(r.result))+'｜處置：'+h(dispositionLabel(r.disposition))+'</div>'+
           (r.comments?'<p style="white-space:pre-wrap">'+h(r.comments)+'</p>':'')+'</div>';
