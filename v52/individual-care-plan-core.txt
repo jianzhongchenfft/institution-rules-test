@@ -349,15 +349,15 @@
       (selected==='__custom__'
         ?field('自訂照顧問題名稱 *',title,'data-path="problems.'+i+'.title" '+(locked?'disabled':'')+' placeholder="請輸入照顧問題名稱"')
         :'')+
-      area('問題說明及評估依據 *',p.rationale,'data-path="problems.'+i+'.rationale" '+(locked?'disabled':''))+
+      area('問題說明及評估依據 *',p.rationale,'data-path="problems.'+i+'.rationale" '+(locked?'disabled':''),'例如：個案因下肢無力，無法自行完成沐浴，需由他人提供必要協助。')+
       (!locked?'<button type="button" class="btn sm" data-action="assessmentFindings" data-i="'+i+'">帶入本次評估發現</button>':'')+
-      (!locked&&SUGGEST[p.title]?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
+      (!locked&&goalSuggestions(p.title).length?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
       (p.goals||[]).map(function(g,j){
         var months=monthsFor(g,L.editing.plan_date),due=dueFromMonths(L.editing.plan_date,months);
         return '<div class="icp-goal"><div class="icp-actions"><strong style="margin-right:auto">照顧目標 '+(j+1)+'</strong>'+
           (!locked?'<button type="button" class="btn sm" data-action="removeGoal" data-i="'+i+'" data-j="'+j+'">刪除目標</button>':'')+'</div>'+
-          area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''))+
-          '<div class="icp-cols">'+area('評值標準 *',g.criteria,'data-path="problems.'+i+'.goals.'+j+'.criteria" '+(locked?'disabled':''))+
+          area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''),'例如：維持個案身體清潔與沐浴安全。')+
+          '<div class="icp-cols">'+area('評值標準 *',g.criteria,'data-path="problems.'+i+'.goals.'+j+'.criteria" '+(locked?'disabled':''),'例如：個案在適當協助下能安全完成沐浴，並維持身體清潔。')+
           '<div class="icp-field"><label>預定評值時間 *</label><div style="display:flex;align-items:center;gap:8px">'+
           '<input style="max-width:110px" type="number" min="1" max="120" step="1" data-path="problems.'+i+'.goals.'+j+'.review_months" value="'+h(g.review_months!==undefined?g.review_months:months)+'" '+(locked?'disabled':'')+'><span>個月後</span></div>'+
           '<div class="icp-muted" data-icp-due="'+i+'.'+j+'">'+(due?'預計評值日：'+fmt(due):'請輸入有效的月份（1～120）')+'</div></div></div>'+
@@ -371,7 +371,8 @@
               (mode==='pending'
                 ?field('擬新增／調整服務項目 *',m.proposed_service||m.service_code||'','data-path="'+base+'.proposed_service" '+(locked?'disabled':'')+' placeholder="例如：建議新增BA07協助沐浴及洗頭"')
                 :'')+
-              area(mode==='pending'?'建議調整內容及與A單位協調事項 *':'具體執行策略／照顧措施 *',m.text,'data-path="'+base+'.text" '+(locked?'disabled':''))+
+              area(mode==='pending'?'建議調整內容及與A單位協調事項 *':'具體執行策略／照顧措施 *',m.text,'data-path="'+base+'.text" '+(locked?'disabled':''),measurePlaceholder(p.title,m))+
+              (!locked&&measureSuggestion(p.title,m)?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestMeasure" data-i="'+i+'" data-j="'+j+'" data-k="'+k+'">＋帶入對應措施建議</button></div>':'')+
               (mode==='non_service'||mode==='pending'
                 ?field('負責執行／協調人員 *',m.executor||'督導','data-path="'+base+'.executor" '+(locked?'disabled':''))
                 :'')+
@@ -384,8 +385,7 @@
                     :'')+
             '</div>';
           }).join('')+
-          (!locked?'<div class="icp-actions"><button type="button" class="btn sm" data-action="addMeasure" data-i="'+i+'" data-j="'+j+'">＋新增措施</button>'+
-            (SUGGEST[p.title]?'<button type="button" class="btn sm" data-action="suggestMeasure" data-i="'+i+'" data-j="'+j+'">＋帶入建議措施</button>':'')+'</div>':'')+
+          (!locked?'<div class="icp-actions"><button type="button" class="btn sm" data-action="addMeasure" data-i="'+i+'" data-j="'+j+'">＋新增措施</button></div>':'')+
         '</div>';
       }).join('')+
       (!locked?'<button type="button" class="btn sm" data-action="addGoal" data-i="'+i+'">＋新增照顧目標</button>':'')+'</div>';
