@@ -162,9 +162,10 @@
   function renderProblem(p,i,locked){
     return '<div class="icp-problem"><div class="icp-actions"><strong style="margin-right:auto">照顧問題 '+(i+1)+'</strong>'+(!locked?'<button class="btn sm" data-action="removeProblem" data-i="'+i+'">刪除問題</button>':'')+'</div>'+
       (!locked?'<div class="icp-field"><label>從預設問題選擇</label><select data-template="'+i+'">'+selectOptions()+'</select></div>':'')+
-      '<div class="icp-cols">'+field('問題分類 *',p.category,'data-path="problems.'+i+'.category" '+(locked?'disabled':''))+
+      '<div class="icp-cols"><div class="icp-field"><label>問題分類 *</label><select data-path="problems.'+i+'.category" '+(locked?'disabled':'')+'>'+opts(CATS,p.category)+'</select></div>'+
       field('問題名稱 *',p.title,'data-path="problems.'+i+'.title" '+(locked?'disabled':''))+'</div>'+
       area('問題說明及評估依據 *',p.rationale,'data-path="problems.'+i+'.rationale" '+(locked?'disabled':''))+
+      (!locked?'<button class="btn sm" data-action="assessmentFindings" data-i="'+i+'">帶入本次評估發現</button>':'')+
       (!locked&&SUGGEST[p.title]?'<div class="icp-actions"><button class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
       (p.goals||[]).map(function(g,j){return '<div class="icp-goal"><div class="icp-actions"><strong style="margin-right:auto">照顧目標 '+(j+1)+'</strong>'+(!locked?'<button class="btn sm" data-action="removeGoal" data-i="'+i+'" data-j="'+j+'">刪除目標</button>':'')+'</div>'+
         area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''))+
@@ -210,7 +211,7 @@
       '<div class="icp-field"><label>是否需轉介其他資源</label><select data-path="caregiver.need_transfer" '+(locked?'disabled':'')+'><option value="no" '+(care.need_transfer!=='yes'?'selected':'')+'>否</option><option value="yes" '+(care.need_transfer==='yes'?'selected':'')+'>是</option></select></div>'+
       (care.need_transfer==='yes'?area('轉介或後續處理內容',care.transfer_detail,'data-path="caregiver.transfer_detail" '+(locked?'disabled':'')):'')+
       field('下次預定完整評值日期',care.next_review_date,'type="date" data-path="caregiver.next_review_date" '+(locked?'disabled':''))+
-      (!locked?'<button class="btn sm" id="icpShowNotes">＋補充備註</button>':'')+
+      (!locked&&!care.notes?'<button class="btn sm" id="icpShowNotes">＋補充備註</button>':'')+
       (locked||care.notes?area('補充備註',care.notes,'data-path="caregiver.notes" '+(locked?'disabled':'')):'<div id="icpNotes"></div>')+'</div>'+
       (locked?'<div class="icp-note">此計畫已完成，第一階段先採唯讀保護；正式修訂與追蹤評值將在第二階段加入。</div>':
       '<div class="icp-footer"><span class="icp-muted" style="margin-right:auto">'+(L.dirty?'尚有未儲存變更':'可儲存草稿後再繼續')+'</span><button id="icpSaveDraft" class="btn">儲存草稿</button><button id="icpComplete" class="btn primary">完成計畫</button></div>'));
@@ -236,6 +237,12 @@
     var a=btn.dataset.action,i=Number(btn.dataset.i),j=Number(btn.dataset.j),k=Number(btn.dataset.k);
     var list=L.editing.plan_content.problems,prob=list[i],goal=prob&&prob.goals[j];
     if(a==='copyPrevious')return copyPrevious();
+    if(a==='assessmentFindings'){
+      var summary=summaryFor(L.editing.assessment_event_id);
+      var source=String(summary&&summary.key_findings||'').trim();
+      if(!source){toast('本次整體評估沒有可帶入的主要發現','error');return;}
+      if(!prob.rationale||confirm('確定以本次評估主要發現取代原問題說明？'))prob.rationale=source;
+    }
     if(a==='addProblem')list.push(newProblem());
     if(a==='removeProblem'&&confirm('確定刪除此照顧問題及其目標？'))list.splice(i,1);
     if(a==='addGoal')prob.goals.push(newGoal());
