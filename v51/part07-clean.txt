@@ -120,7 +120,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       }
       eval(eventTrackingCode);
 
-      const carePlanRes=await fetch('v52/individual-care-plan-core.txt?v=oneclick-edit-required-overall-20261008',{cache:'no-store'});
+      const carePlanRes=await fetch('v52/individual-care-plan-core.txt?v=review-description-required-20261008',{cache:'no-store'});
       if(!carePlanRes.ok) throw new Error('照顧計畫模組載入失敗（'+carePlanRes.status+'）');
       eval(await carePlanRes.text());
 
