@@ -151,6 +151,16 @@
     return endMin>startMin ? endMin-startMin : 0;
   }
 
+  // 換休只計工作時間，12:00～13:00午休不扣抵；加班取得不變。
+  function compLeaveChargeMinutes(start,end){
+    const s=overtimeNormalizeTime(start),e=overtimeNormalizeTime(end);
+    if(!overtimeValid24h(s)||!overtimeValid24h(e))return 0;
+    const toMin=value=>{const [h,m]=value.split(':').map(Number);return h*60+m;};
+    const a=toMin(s),b=toMin(e);
+    if(b<=a)return 0;
+    return Math.max(0,b-a-Math.max(0,Math.min(b,780)-Math.max(a,720)));
+  }
+
   function overtimeCrossesMidnight(start,end){
     const s=overtimeNormalizeTime(start),e=overtimeNormalizeTime(end);
     if(!overtimeValid24h(s) || !overtimeValid24h(e)) return false;
@@ -1058,15 +1068,12 @@
     return `
       <div class="form-grid">
         <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
-        <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
         <div class="field"><label>換休日期 *</label><input id="clDate" type="date" value="${escapeHTML(today)}"></div>
         <div class="field"><label>換休類型 *</label><select id="clLeaveType"><option value="ordinary" ${existing?.leave_type!=='holiday_visit'?'selected':''}>一般加班換休</option><option value="holiday_visit" ${existing?.leave_type==='holiday_visit'?'selected':''}>假日家訪換休</option></select></div>
         <div class="field"><label>所選類型可用</label><input id="clBalanceValue" class="ot-readonly" value="${escapeHTML(overtimeDurationLabel(existing?.leave_type==='holiday_visit'?sourceAvailable.holidayVisit:sourceAvailable.ordinary))}" disabled></div>
-        <div class="field"><label>一般加班換休可用</label><input id="clOrdinaryBalanceValue" class="ot-readonly" value="${escapeHTML(overtimeDurationLabel(sourceAvailable.ordinary))}" disabled></div>
-        <div class="field"><label>假日家訪換休可用</label><input id="clHolidayBalanceValue" class="ot-readonly" value="${escapeHTML(overtimeDurationLabel(sourceAvailable.holidayVisit))}" disabled></div>
         <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="clStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="clStartMinute"><option value="00" ${startParts.minute==='00'?'selected':''}>00</option><option value="30" ${startParts.minute==='30'?'selected':''}>30</option></select></div></div>
         <div class="field"><label>結束時間 *</label><div class="ot-time-pair"><select id="clEndHour">${overtimeTimeOptions(23,endParts.hour,'時')}</select><select id="clEndMinute"><option value="00" ${endParts.minute==='00'?'selected':''}>00</option><option value="30" ${endParts.minute==='30'?'selected':''}>30</option></select></div></div>
-        <div class="field full"><label>使用換休時數</label><div id="clDurationHelp" class="ot-calc">系統將依開始與結束時間自動計算</div></div>
+        <div class="field full"><label>使用換休時數</label><div id="clDurationHelp" class="ot-calc">系統依起訖時間計算，12:00～13:00午休不計入換休</div></div>
         <div class="field full"><label>預計扣抵來源</label><div id="clAllocationHelp" class="ot-rule-highlight" style="margin-top:0">每筆換休僅扣所選類型；若時數不足，請拆成另一筆換休申請。</div><div class="ot-detail" style="margin-top:6px">只計入目前已實際取得，且在所選換休日仍有效的額度；未來尚未取得的加班／換休不會提前計入。</div></div>
         <div class="field full"><label>換休事由 *</label><textarea id="clReason" placeholder="請簡要說明本次換休原因">${escapeHTML(existing?.reason||'')}</textarea></div>
         <div class="field full"><label>備註</label><textarea id="clNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
@@ -1082,7 +1089,9 @@
     const updateDuration=()=>{
       const start=overtimeSelectedTime('clStart');
       const end=overtimeSelectedTime('clEnd');
-      const minutes=overtimeMinutesBetween(start,end);
+      const clockMinutes=overtimeMinutesBetween(start,end);
+      const minutes=compLeaveChargeMinutes(start,end);
+      const breakMinutes=Math.max(0,clockMinutes-minutes);
       const valid=overtimeValid24h(start)&&overtimeValid24h(end);
       const leaveDate=$('clDate')?.value||isoDate(new Date());
       const sourceAvailable=compLeaveSourceAvailability(state.profile?.id,leaveDate,existing?.id||null);
@@ -1091,14 +1100,12 @@
       const typeLabel=leaveType==='holiday_visit'?'假日家訪換休':'一般加班換休';
       const shortage=Math.max(0,minutes-selectedAvailable);
       if($('clBalanceValue')) $('clBalanceValue').value=overtimeDurationLabel(selectedAvailable);
-      if($('clOrdinaryBalanceValue')) $('clOrdinaryBalanceValue').value=overtimeDurationLabel(sourceAvailable.ordinary);
-      if($('clHolidayBalanceValue')) $('clHolidayBalanceValue').value=overtimeDurationLabel(sourceAvailable.holidayVisit);
       if($('clDurationHelp')){
         $('clDurationHelp').textContent=!valid
           ? '請選擇完整的開始與結束時間'
           : minutes
-            ? `${minutes}分鐘（${overtimeDurationLabel(minutes)}）；${typeLabel}可用 ${overtimeDurationLabel(selectedAvailable)}`
-            : '結束時間須晚於開始時間';
+            ? `實際扣抵 ${overtimeDurationLabel(minutes)}${breakMinutes>0?`（已扣除午休 ${overtimeDurationLabel(breakMinutes)}）`:''}；${typeLabel}可用 ${overtimeDurationLabel(selectedAvailable)}`
+            : clockMinutes>0?'所選時段只有12:00～13:00午休，沒有可扣抵的換休時數':'結束時間須晚於開始時間';
       }
       if($('clAllocationHelp')){
         $('clAllocationHelp').textContent=(!valid||minutes<=0)
@@ -1120,7 +1127,8 @@
     const leaveDate=$('clDate').value;
     const start=overtimeSelectedTime('clStart');
     const end=overtimeSelectedTime('clEnd');
-    const minutes=overtimeMinutesBetween(start,end);
+    const clockMinutes=overtimeMinutesBetween(start,end);
+    const minutes=compLeaveChargeMinutes(start,end);
     const reason=$('clReason').value.trim();
     const notes=$('clNotes').value.trim();
     const sourceAvailable=compLeaveSourceAvailability(state.profile?.id,leaveDate,existing?.id||null);
@@ -1130,7 +1138,7 @@
     if(!leaveDate){toast('請選擇換休日期','warn');return false;}
     if(!overtimeValid24h(start)||!overtimeValid24h(end)){toast('請選擇完整的開始及結束時間','warn');return false;}
     if(!['00','30'].includes(String(start).slice(3,5)) || !['00','30'].includes(String(end).slice(3,5))){toast('換休時間請以30分鐘為間隔','warn');return false;}
-    if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
+    if(minutes<=0){toast(clockMinutes>0?'12:00～13:00午休時段不計換休，請調整起訖時間':'結束時間須晚於開始時間','warn');return false;}
     if(!reason){toast('請填寫換休事由','warn');return false;}
     if(status==='pending' && minutes>selectedAvailable){
       toast(`所選換休類型目前可用 ${overtimeDurationLabel(selectedAvailable)}，不足 ${overtimeDurationLabel(minutes-selectedAvailable)}；請另選另一種類型提出第二筆申請`,'warn');
