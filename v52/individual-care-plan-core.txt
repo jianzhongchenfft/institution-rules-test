@@ -154,7 +154,12 @@
 
   function usable(){return !!state.profile&&ROLES.includes(state.profile.role);}
   function h(s){return escapeHTML(String(s==null?'':s));}
-  function uid(){return window.crypto&&crypto.randomUUID?crypto.randomUUID():'id-'+Date.now()+'-'+Math.random().toString(36).slice(2);}
+  function uid(){
+    if(window.crypto&&window.crypto.randomUUID)return window.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+      var r=Math.floor(Math.random()*16);return (c==='x'?r:(r&3|8)).toString(16);
+    });
+  }
   function today(){return isoDate(new Date());}
   function field(label,value,attr){return '<div class="icp-field"><label>'+h(label)+'</label><input '+(attr||'')+' value="'+h(value||'')+'"></div>';}
   // Placeholder text is only a hint; it is never saved as a field value.
@@ -297,14 +302,11 @@
     if(!previous||previous.status!=='completed')return;
     var open=plansFor(previous.case_id).find(function(x){return x.root_plan_id&&x.status==='draft';});
     if(open){toast('此個案已有未完成的更正／修訂草稿，請先完成該草稿。','error');openForm(open.id);return;}
-    var promptText=kind==='correction'?'請簡述文字更正原因（例如：修正問題說明錯字）':'請簡述修訂原因（例如：個案狀況變化或服務項目調整）';
-    var reason=window.prompt(promptText,'');
-    if(reason===null)return;
-    if(!String(reason).trim()){toast('請填寫更正／修訂原因','error');return;}
+    // Keep the whole workflow on the full-page editor; reason is entered there.
     var copy=JSON.parse(JSON.stringify(previous.plan_content||{}));
     L.editing={
       id:null,root_plan_id:planRootId(previous),previous_version_id:previous.id,
-      revision_type:kind,revision_reason:String(reason).trim(),version_no:Number(previous.version_no||1)+1,
+      revision_type:kind,revision_reason:'',version_no:Number(previous.version_no||1)+1,
       case_id:previous.case_id,assessment_event_id:previous.assessment_event_id,
       plan_date:previous.plan_date,status:'draft',plan_content:copy,
       responsible_staff_id:previous.responsible_staff_id,assessment_snapshot:previous.assessment_snapshot
