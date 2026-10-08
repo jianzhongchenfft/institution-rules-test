@@ -221,7 +221,7 @@
               ?'<div class="icp-field" style="grid-column:1/-1"><label>連結個管師目前核定服務項目 *</label><select data-path="'+base+'.service_code" '+(locked?'disabled':'')+'>'+approvedServiceOptions(m.service_code,p.case_id||L.caseId)+'</select><div class="icp-muted">僅列出目前核定、有效的BA／GA服務項目；措施不得超出核定內容及支數。</div></div>'
               :mode==='pending'
                 ?'<div class="icp-field" style="grid-column:1/-1"><label>待確認／待異動服務項目（選填）</label><input data-path="'+base+'.service_code" value="'+h(m.service_code||'')+'" '+(locked?'disabled':'')+' placeholder="例如：希望新增BA07"><div class="icp-note">本項尚未核定，僅可儲存草稿，不得完成為可執行的計畫。</div></div>'
-                :'<div class="icp-muted" style="grid-column:1/-1">本措施僅限提醒、照顧指導、聯繫或轉介，不代表新增或提供核定外的服務。</div>')+
+                :'<div class="icp-muted" style="grid-column:1/-1">本措施僅限提醒、照顧指導、聯繫或轉介，不得用來登錄未核定的實際服務。</div>')+
             '</div>';
         }).join('')+
         (!locked?'<div class="icp-actions"><button class="btn sm" data-action="addMeasure" data-i="'+i+'" data-j="'+j+'">＋新增措施</button>'+(SUGGEST[p.title]?'<button class="btn sm" data-action="suggestMeasure" data-i="'+i+'" data-j="'+j+'">＋帶入建議措施</button>':'')+'</div>':'')+
@@ -267,7 +267,7 @@
       (locked?'<div class="icp-note">此計畫已完成，第一階段先採唯讀保護；正式修訂與追蹤評值將在第二階段加入。</div>':
       '<div class="icp-footer"><span class="icp-muted" style="margin-right:auto">'+(L.dirty?'尚有未儲存變更':'可儲存草稿後再繼續')+'</span><button id="icpSaveDraft" class="btn">儲存草稿</button><button id="icpComplete" class="btn primary">完成計畫</button></div>'));
     $('icpFormBack').onclick=function(){if(leaveOK()){L.editing=null;L.dirty=false;renderCase();}};
-    if(locked)return;
+    if(locked){window.scrollTo(0,originalScroll);return;}
     document.querySelectorAll('[data-path]').forEach(function(el){el.addEventListener('input',onField);el.addEventListener('change',onField);});
     document.querySelectorAll('[data-header]').forEach(function(el){el.addEventListener('input',function(){p[el.dataset.header]=el.value;L.dirty=true;});});
     document.querySelectorAll('[data-template]').forEach(function(el){el.onchange=function(){var x=RAW.find(function(y){return y[1]===el.value;});if(!x)return;var item=body.problems[Number(el.dataset.template)];item.category=x[0];item.title=x[1];L.dirty=true;renderForm(true);};});
@@ -356,7 +356,18 @@
       L.dirty=false;
       toast(finish?'照顧計畫已完成':'草稿已儲存','success');
       L.editing=null;renderCase();
-    }catch(e){console.error(e);toast('儲存照顧計畫失敗：'+(e.message||e),'error');}
+    }catch(e){
+      console.error(e);
+      var raw=String(e.message||e);
+      var reason=raw.includes('CARE_PLAN_SERVICE_NOT_APPROVED')
+        ?'所選服務不在本案目前有效的BA／GA核定項目內，請重新確認個管師核定內容'
+        :raw.includes('CARE_PLAN_PENDING_A_UNIT_CONFIRMATION')
+          ?'仍有待A單位確認／待異動的措施，請先儲存草稿'
+          :raw.includes('CARE_PLAN_NON_SERVICE_CANNOT_LINK_CODE')
+            ?'非服務措施不能連結服務碼，請檢查措施類型'
+            :raw;
+      toast('儲存照顧計畫失敗：'+reason,'error');
+    }
     finally{showLoading(false);}
   }
   function leaveOK(){return !L.dirty||confirm('目前有尚未儲存的變更，確定離開嗎？');}
