@@ -248,13 +248,15 @@
     return String(c?.source_label||'').includes('假日家訪');
   }
 
-  function compLeaveSourceBreakdown(staffId,asOfDate=null){
-    const fallback=isoDate(new Date());
-    const rawDate=String(asOfDate||fallback);
-    const asOf=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:fallback;
+  function compLeaveSourceBreakdown(staffId,usageDate=null){
+    const currentDate=isoDate(new Date());
+    const rawDate=String(usageDate||currentDate);
+    const leaveDate=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:currentDate;
+    const earnedCutoff=leaveDate<currentDate?leaveDate:currentDate;
     const credits=(state.compLeaveCredits||[])
       .filter(x=>String(x.staff_id)===String(staffId))
-      .filter(x=>String(x.earned_date||'')<=asOf&&(!x.expires_on||String(x.expires_on)>=asOf));
+      .filter(x=>String(x.earned_date||'')<=earnedCutoff)
+      .filter(x=>!x.expires_on||String(x.expires_on)>=leaveDate);
     const ordinary=credits.filter(x=>!compLeaveIsHolidayVisitCredit(x)).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
     const holidayVisit=credits.filter(compLeaveIsHolidayVisitCredit).reduce((s,x)=>s+(Number(x.remaining_minutes)||0),0);
     return {ordinary,holidayVisit,total:ordinary+holidayVisit};
@@ -1079,7 +1081,7 @@
         <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="clStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="clStartMinute"><option value="00" ${startParts.minute==='00'?'selected':''}>00</option><option value="30" ${startParts.minute==='30'?'selected':''}>30</option></select></div></div>
         <div class="field"><label>結束時間 *</label><div class="ot-time-pair"><select id="clEndHour">${overtimeTimeOptions(23,endParts.hour,'時')}</select><select id="clEndMinute"><option value="00" ${endParts.minute==='00'?'selected':''}>00</option><option value="30" ${endParts.minute==='30'?'selected':''}>30</option></select></div></div>
         <div class="field full"><label>使用換休時數</label><div id="clDurationHelp" class="ot-calc">系統將依開始與結束時間自動計算</div></div>
-        <div class="field full"><label>預計扣抵來源</label><div id="clAllocationHelp" class="ot-rule-highlight" style="margin-top:0">系統會優先使用有到期日的一般加班換休，再使用無到期日的假日家訪換休。</div><div class="ot-detail" style="margin-top:6px">此處為送出前預覽；實際核准時仍以當下可用額度與系統扣抵順序為準。</div></div>
+        <div class="field full"><label>預計扣抵來源</label><div id="clAllocationHelp" class="ot-rule-highlight" style="margin-top:0">系統會優先使用有到期日的一般加班換休，再使用無到期日的假日家訪換休。</div><div class="ot-detail" style="margin-top:6px">只計入目前已實際取得，且在所選換休日仍有效的額度；未來尚未取得的加班／換休不會提前計入。</div></div>
         <div class="field full"><label>換休事由 *</label><textarea id="clReason" placeholder="請簡要說明本次換休原因">${escapeHTML(existing?.reason||'')}</textarea></div>
         <div class="field full"><label>備註</label><textarea id="clNotes" placeholder="選填">${escapeHTML(existing?.notes||'')}</textarea></div>
       </div>`;
@@ -1151,7 +1153,7 @@
     if(minutes<=0){toast('結束時間須晚於開始時間','warn');return false;}
     if(!reason){toast('請填寫換休事由','warn');return false;}
     if(status==='pending' && minutes>sourceAvailable.total){
-      toast(`所選日期目前合計可用換休僅 ${overtimeDurationLabel(sourceAvailable.total)}，請調整換休起訖時間`,'warn');
+      toast(`目前已取得且在所選換休日仍有效的換休僅 ${overtimeDurationLabel(sourceAvailable.total)}；未來尚未取得的額度不可提前使用`,'warn');
       return false;
     }
 
