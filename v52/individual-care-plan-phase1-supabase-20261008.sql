@@ -1,7 +1,7 @@
--- Individual care plans PHASE 1 / test, 2026-10-08
+-- Individual care plans / canonical TEST schema 2026-10-08
 -- This stores INSTITUTION-OWN individual care plans, separate from care_plans (A-unit plans).
 -- Prerequisite: private.can_manage_cases() and private.can_edit_assessment_case(uuid) from assessment module.
--- Apply only after confirming the destination project's assessment baseline is current.
+-- One full schema definition, replacing earlier incremental SQL patches. Apply only after confirming the destination project's assessment baseline is current.
 
 begin;
 
@@ -121,14 +121,78 @@ begin
            or jsonb_array_length(v_goal->'measures')=0 then
           raise exception 'CARE_PLAN_GOAL_INCOMPLETE';
         end if;
+        -- 每項目標的相對評值月份：獨立保存月份及依計畫日期算出的日期。
+        if coalesce(v_goal->>'review_months','') !~ '^[1-9][0-9]{0,2}$' then
+          raise exception 'CARE_PLAN_REVIEW_MONTHS_INVALID';
+        end if;
+        if (v_goal->>'review_months')::integer > 120 then
+          raise exception 'CARE_PLAN_REVIEW_MONTHS_INVALID';
+        end if;
+        if coalesce(v_goal->>'review_date','') <>
+          ((new.plan_date + make_interval(months => (v_goal->>'review_months')::integer))::date)::text then
+          raise exception 'CARE_PLAN_REVIEW_DATE_MISMATCH';
+        end if;
         for v_measure in select value from jsonb_array_elements(v_goal->'measures') loop
           if nullif(btrim(coalesce(v_measure->>'text','')),'') is null
             or nullif(btrim(coalesce(v_measure->>'executor','')),'') is null then
             raise exception 'CARE_PLAN_MEASURE_INCOMPLETE';
           end if;
+          -- 核定服務執行須連結個案目前有效的 BA／GA 項目；督導可跨個案編輯。
+          if coalesce(v_measure->>'measure_type','service') = 'service' then
+            if nullif(btrim(coalesce(v_measure->>'service_code','')),'') is null
+              or not exists (
+                select 1 from public.case_approved_services s
+                where s.case_id = new.case_id
+                  and s.is_current = true
+                  and s.service_group in ('B','G')
+                  and s.service_code ~ '^(BA|GA)[0-9]'
+                  and s.service_code = v_measure->>'service_code'
+                  and (s.approved_quantity is null or s.approved_quantity > 0)
+                  and (s.valid_from is null or s.valid_from <= current_date)
+                  and (s.valid_to is null or s.valid_to >= current_date)
+              ) then
+              raise exception 'CARE_PLAN_SERVICE_NOT_APPROVED: %', coalesce(v_measure->>'service_code','未選擇');
+            end if;
+          elsif v_measure->>'measure_type' = 'non_service' then
+            if nullif(btrim(coalesce(v_measure->>'service_code','')),'') is not null then
+              raise exception 'CARE_PLAN_NON_SERVICE_CANNOT_LINK_CODE';
+            end if;
+          elsif v_measure->>'measure_type' = 'pending' then
+            -- 建議事項可寫入正式計畫，但不可當作核定可執行服務。
+            if nullif(btrim(coalesce(v_measure->>'proposed_service','')),'') is null then
+              raise exception 'CARE_PLAN_PENDING_DETAIL_REQUIRED';
+            end if;
+            if nullif(btrim(coalesce(v_measure->>'service_code','')),'') is not null then
+              raise exception 'CARE_PLAN_PENDING_CANNOT_LINK_CODE';
+            end if;
+          else
+            raise exception 'CARE_PLAN_MEASURE_TYPE_INVALID';
+          end if;
         end loop;
       end loop;
     end loop;
+    new.plan_content := jsonb_set(
+      new.plan_content, '{approved_services_snapshot}',
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id',s.id,
+          'code',s.service_code,
+          'name',s.service_name,
+          'group',s.service_group,
+          'approved_quantity',s.approved_quantity,
+          'care_plan_id',s.care_plan_id,
+          'valid_from',s.valid_from,
+          'valid_to',s.valid_to
+        ) order by s.service_code)
+        from public.case_approved_services s
+        where s.case_id=new.case_id and s.is_current=true
+          and s.service_group in ('B','G')
+          and s.service_code ~ '^(BA|GA)[0-9]'
+          and (s.approved_quantity is null or s.approved_quantity > 0)
+          and (s.valid_from is null or s.valid_from <= current_date)
+          and (s.valid_to is null or s.valid_to >= current_date)
+      ), '[]'::jsonb), true
+    );
     new.completed_at := now();
     new.completed_by_staff_id := v_staff_id;
   else
