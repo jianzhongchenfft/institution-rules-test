@@ -82,9 +82,7 @@ begin
         raise exception 'CARE_PLAN_REVISION_OUTDATED';
       end if;
       new.version_no := v_prev.version_no + 1;
-      if nullif(btrim(coalesce(new.revision_reason,'')),'') is null then
-        raise exception 'CARE_PLAN_REVISION_REASON_REQUIRED';
-      end if;
+
     end if;
     new.created_by := auth.uid();
     new.completed_at := null;
@@ -101,9 +99,7 @@ begin
       raise exception 'CARE_PLAN_SOURCE_IMMUTABLE';
     end if;
     if new.root_plan_id is not null then
-      if nullif(btrim(coalesce(new.revision_reason,'')),'') is null then
-        raise exception 'CARE_PLAN_REVISION_REASON_REQUIRED';
-      end if;
+
       select * into v_prev from public.individual_care_plans
         where id=new.previous_version_id and status='completed';
       if not found then raise exception 'CARE_PLAN_PREVIOUS_VERSION_INVALID'; end if;
@@ -139,6 +135,11 @@ begin
   end if;
 
   if new.status='completed' then
+    -- Overall clinical judgment and follow-up is required for formal completion.
+    -- Placeholder text is not submitted and therefore cannot satisfy this requirement.
+    if nullif(btrim(coalesce(new.plan_content->'caregiver'->>'overall_plan','')),'') is null then
+      raise exception 'CARE_PLAN_OVERALL_PLAN_REQUIRED';
+    end if;
     if new.revision_type='correction' and new.root_plan_id is not null then
       -- A correction may fix wording only. Changes of goals, services, dates, or structural IDs are revisions.
       if new.plan_date is distinct from v_prev.plan_date
@@ -255,7 +256,6 @@ begin
   return new;
 end $function$
 ;
-
 create table public.individual_care_plan_reviews(
  id uuid primary key default gen_random_uuid(),
  plan_id uuid not null references public.individual_care_plans(id),
