@@ -416,14 +416,12 @@
       '<div class="icp-card"><h3>三、主要照顧者共同執行</h3>'+
       '<div class="icp-field"><label>參與情形</label><select data-path="caregiver.participation" '+(locked?'disabled':'')+'>'+
       ['','有主要照顧者參與','無主要照顧者','其他支持者參與'].map(function(x){return '<option value="'+h(x)+'" '+(x===(care.participation||'')?'selected':'')+'>'+(x||'請選擇')+'</option>';}).join('')+'</select></div>'+
-      area('共同執行事項',care.collaboration,'data-path="caregiver.collaboration" '+(locked?'disabled':''))+
-      area('照顧技巧指導或說明',care.guidance,'data-path="caregiver.guidance" '+(locked?'disabled':''))+
-      area('溝通方式與說明',care.communication,'data-path="caregiver.communication" '+(locked?'disabled':''))+
-      area('服務對象／照顧者意見',care.feedback,'data-path="caregiver.feedback" '+(locked?'disabled':''))+'</div>'+
+      area('共同執行事項',care.collaboration,'data-path="caregiver.collaboration" '+(locked?'disabled':''),'例如：案女於非服務時段協助備餐及陪同回診，居服員依核定服務提供日常照顧。')+
+      area('照顧指導與溝通情形',care.guidance_communication,'data-path="caregiver.guidance_communication" '+(locked?'disabled':''),'例如：已向案女說明沐浴安全及防滑注意事項，案女表示了解，將評估改善浴室環境。')+
+      area('服務對象／照顧者意見',care.feedback,'data-path="caregiver.feedback" '+(locked?'disabled':''),'例如：個案希望維持目前居服員與服務時段，家屬表示可配合後續觀察。')+'</div>'+
       '<div class="icp-card"><h3>四、整體判斷與後續安排</h3>'+
-      '<div class="icp-field"><label>是否需轉介其他資源</label><select data-path="caregiver.need_transfer" '+(locked?'disabled':'')+'><option value="no" '+(care.need_transfer!=='yes'?'selected':'')+'>否</option><option value="yes" '+(care.need_transfer==='yes'?'selected':'')+'>是</option></select></div>'+
-      (care.need_transfer==='yes'?area('轉介或後續處理內容',care.transfer_detail,'data-path="caregiver.transfer_detail" '+(locked?'disabled':'')):'')+
-      field('下次預定完整評值日期',care.next_review_date,'type="date" data-path="caregiver.next_review_date" '+(locked?'disabled':''))+
+      area('整體判斷與後續安排',care.overall_plan,'data-path="caregiver.overall_plan" '+(locked?'disabled':''),'例如：目前照顧目標與服務安排尚符合需求，建議維持；另因洗澡需求增加，將聯繫A單位協助評估BA07調整，待核定後再安排服務。')+
+      '<div class="icp-muted">下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div>'+
       (!locked&&!care.notes?'<button class="btn sm" id="icpShowNotes">＋補充備註</button>':'')+
       (locked||care.notes?area('補充備註',care.notes,'data-path="caregiver.notes" '+(locked?'disabled':'')):'<div id="icpNotes"></div>')+'</div>'+
       (locked?'<div class="icp-note">此計畫已完成，第一階段先採唯讀保護；正式修訂與追蹤評值將在第二階段加入。</div>':
@@ -468,7 +466,6 @@
     for(var i=0;i<segments.length-1;i++)obj=obj[segments[i]];
     obj[segments[segments.length-1]]=e.target.value;L.dirty=true;
     if(path.endsWith('.review_months'))updateDueLabels();
-    if(path==='caregiver.need_transfer')renderForm(true);
   }
   function handle(btn){
     var a=btn.dataset.action,i=Number(btn.dataset.i),j=Number(btn.dataset.j),k=Number(btn.dataset.k);
@@ -486,19 +483,19 @@
     if(a==='removeGoal'&&confirm('確定刪除此照顧目標？'))prob.goals.splice(j,1);
     if(a==='addMeasure')goal.measures.push(newMeasure());
     if(a==='removeMeasure')goal.measures.splice(k,1);
-    if(a==='suggestGoal'&&SUGGEST[prob.title]){
-      SUGGEST[prob.title].goals.forEach(function(text){
+    if(a==='suggestGoal'&&goalSuggestions(prob.title).length){
+      goalSuggestions(prob.title).forEach(function(text){
         if(prob.goals.some(function(x){return x.title===text;}))return;
         var g=prob.goals.find(function(x){return !String(x.title||'').trim();});
         if(!g){g=newGoal();prob.goals.push(g);}g.title=text;
       });
     }
-    if(a==='suggestMeasure'&&SUGGEST[prob.title]){
-      SUGGEST[prob.title].measures.forEach(function(text){
-        if(goal.measures.some(function(x){return x.text===text;}))return;
-        var m=goal.measures.find(function(x){return !String(x.text||'').trim();});
-        if(!m){m=newMeasure();goal.measures.push(m);}m.text=text;
-      });
+    if(a==='suggestMeasure'){
+      var suggestion=measureSuggestion(prob.title,goal.measures[k]);
+      if(!suggestion){toast('此照顧問題與服務項目目前沒有適用的建議措施，請自行填寫。','error');return;}
+      var current=goal.measures[k];
+      if(!String(current.text||'').trim()||confirm('此措施已有填寫內容，確定改為建議文字嗎？'))current.text=suggestion;
+      else return;
     }
     L.dirty=true;renderForm(true);
   }
@@ -525,7 +522,6 @@
         }
       }
     }
-    if(p.plan_content.caregiver.need_transfer==='yes'&&!String(p.plan_content.caregiver.transfer_detail||'').trim())return '請填寫轉介或後續處理內容';
     return '';
   }
   async function save(finish){
