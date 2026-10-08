@@ -95,7 +95,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       ];
       let attendanceV2Code='';
       for(const path of attendanceV2Files){
-        const res=await fetch(`${path}?v=comp-leave-type-v1-20261008`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=comp-leave-lunch-v2-20261008`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         attendanceV2Code+='\n'+await res.text();
       }
