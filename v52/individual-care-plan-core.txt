@@ -112,6 +112,30 @@
   function measureSuggestion(problem,measure){
     return measureMode(measure)==='service' ? ((MEASURE_SUGGESTIONS[problem]||{})[measure.service_code]||'') : '';
   }
+  // Examples follow the selected problem when available, but never populate actual assessment findings.
+  function issueExample(problem){
+    var samples={
+      '洗澡問題':'例如：個案因下肢無力，無法獨立完成沐浴，需他人提供必要協助。',
+      '跌倒風險':'例如：個案近期步態不穩，室內移動時有跌倒風險，需留意地面與動線安全。',
+      '備餐問題':'例如：個案無法久站備餐，日常餐食取得需他人協助。',
+      '處理家務問題':'例如：個案因活動耐力下降，無法自行維持主要活動區域清潔。',
+      '進食問題':'例如：個案進食時需要協助，應留意進食姿勢與嗆咳情形。',
+      '照顧負荷過重':'例如：主要照顧者長時間提供照顧，近期表示缺乏休息時間。'
+    };
+    return samples[problem]||'例如：描述本次評估發現的具體困難、個案能力與需要協助的原因。';
+  }
+  function goalExample(problem){
+    var goal=goalSuggestions(problem)[0];
+    return goal?'例如：'+goal+'。':'例如：依個案目前能力與需求，設定可觀察且能追蹤的照顧目標。';
+  }
+  function criteriaExample(problem){
+    var samples={
+      '洗澡問題':'例如：個案能在居服員適當協助下安全完成沐浴，並維持身體清潔。',
+      '跌倒風險':'例如：追蹤期間未發生跌倒事件，且服務時能配合基本防跌提醒。',
+      '備餐問題':'例如：服務期間能按計畫取得餐食，並維持規律用餐情形。'
+    };
+    return samples[problem]||'例如：以實際服務紀錄、個案完成情形或家屬回饋確認目標達成情形。';
+  }
   function measurePlaceholder(problem,measure){
     if(measureMode(measure)==='pending')return '例如：已向A單位反映個案需要新增沐浴服務，請個管師協助評估；核定前不提供該項服務。';
     if(measureMode(measure)==='non_service')return '例如：向家屬說明浴室防滑及移位安全注意事項，持續追蹤改善情形。';
@@ -256,6 +280,8 @@
       var d=dueFromMonths(L.editing.plan_date,monthsFor(g,L.editing.plan_date));
       el.textContent=d?'預計評值日：'+fmt(d):'請輸入有效的月份（1～120）';
     });
+    var quarterly=document.querySelector('[data-icp-quarterly]');
+    if(quarterly)quarterly.textContent='下次定期完整評值：'+fmt(dueFromMonths(L.editing.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）';
   }
   function serviceForCase(caseId){
     return L.services.filter(function(s){
@@ -349,15 +375,15 @@
       (selected==='__custom__'
         ?field('自訂照顧問題名稱 *',title,'data-path="problems.'+i+'.title" '+(locked?'disabled':'')+' placeholder="請輸入照顧問題名稱"')
         :'')+
-      area('問題說明及評估依據 *',p.rationale,'data-path="problems.'+i+'.rationale" '+(locked?'disabled':''),'例如：個案因下肢無力，無法自行完成沐浴，需由他人提供必要協助。')+
+      area('問題說明及評估依據 *',p.rationale,'data-path="problems.'+i+'.rationale" '+(locked?'disabled':''),issueExample(p.title))+
       (!locked?'<button type="button" class="btn sm" data-action="assessmentFindings" data-i="'+i+'">帶入本次評估發現</button>':'')+
       (!locked&&goalSuggestions(p.title).length?'<div class="icp-actions"><button type="button" class="btn sm" data-action="suggestGoal" data-i="'+i+'">＋帶入建議目標</button></div>':'')+
       (p.goals||[]).map(function(g,j){
         var months=monthsFor(g,L.editing.plan_date),due=dueFromMonths(L.editing.plan_date,months);
         return '<div class="icp-goal"><div class="icp-actions"><strong style="margin-right:auto">照顧目標 '+(j+1)+'</strong>'+
           (!locked?'<button type="button" class="btn sm" data-action="removeGoal" data-i="'+i+'" data-j="'+j+'">刪除目標</button>':'')+'</div>'+
-          area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''),'例如：維持個案身體清潔與沐浴安全。')+
-          '<div class="icp-cols">'+area('評值標準 *',g.criteria,'data-path="problems.'+i+'.goals.'+j+'.criteria" '+(locked?'disabled':''),'例如：個案在適當協助下能安全完成沐浴，並維持身體清潔。')+
+          area('照顧目標 *',g.title,'data-path="problems.'+i+'.goals.'+j+'.title" '+(locked?'disabled':''),goalExample(p.title))+
+          '<div class="icp-cols">'+area('評值標準 *',g.criteria,'data-path="problems.'+i+'.goals.'+j+'.criteria" '+(locked?'disabled':''),criteriaExample(p.title))+
           '<div class="icp-field"><label>預定評值時間 *</label><div style="display:flex;align-items:center;gap:8px">'+
           '<input style="max-width:110px" type="number" min="1" max="120" step="1" data-path="problems.'+i+'.goals.'+j+'.review_months" value="'+h(g.review_months!==undefined?g.review_months:months)+'" '+(locked?'disabled':'')+'><span>個月後</span></div>'+
           '<div class="icp-muted" data-icp-due="'+i+'.'+j+'">'+(due?'預計評值日：'+fmt(due):'請輸入有效的月份（1～120）')+'</div></div></div>'+
@@ -421,7 +447,7 @@
       area('服務對象／照顧者意見',care.feedback,'data-path="caregiver.feedback" '+(locked?'disabled':''),'例如：個案希望維持目前居服員與服務時段，家屬表示可配合後續觀察。')+'</div>'+
       '<div class="icp-card"><h3>四、整體判斷與後續安排</h3>'+
       area('整體判斷與後續安排',care.overall_plan,'data-path="caregiver.overall_plan" '+(locked?'disabled':''),'例如：目前照顧目標與服務安排尚符合需求，建議維持；另因洗澡需求增加，將聯繫A單位協助評估BA07調整，待核定後再安排服務。')+
-      '<div class="icp-muted">下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div>'+
+      '<div class="icp-muted" data-icp-quarterly>下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div>'+
       (!locked&&!care.notes?'<button class="btn sm" id="icpShowNotes">＋補充備註</button>':'')+
       (locked||care.notes?area('補充備註',care.notes,'data-path="caregiver.notes" '+(locked?'disabled':'')):'<div id="icpNotes"></div>')+'</div>'+
       (locked?'<div class="icp-note">此計畫已完成，第一階段先採唯讀保護；正式修訂與追蹤評值將在第二階段加入。</div>':
@@ -455,7 +481,7 @@
       };
     });
     document.querySelectorAll('[data-action]').forEach(function(el){el.onclick=function(){handle(el);};});
-    if($('icpShowNotes'))$('icpShowNotes').onclick=function(){var target=$('icpNotes');if(!target){return;}target.innerHTML=area('補充備註',care.notes,'data-path="caregiver.notes"');target.querySelector('textarea').addEventListener('input',onField);$('icpShowNotes').style.display='none';};
+    if($('icpShowNotes'))$('icpShowNotes').onclick=function(){var target=$('icpNotes');if(!target){return;}target.innerHTML=area('補充備註',care.notes,'data-path="caregiver.notes"','例如：其他需要留意的特殊安排、家屬回饋或後續追蹤提醒。');target.querySelector('textarea').addEventListener('input',onField);$('icpShowNotes').style.display='none';};
     $('icpSaveDraft').onclick=function(){save(false);};
     $('icpComplete').onclick=function(){save(true);};
     window.scrollTo(0,originalScroll);
