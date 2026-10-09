@@ -13,11 +13,17 @@
   const readSummary=id=>{const r=notified(id);return {total:r.length,read:r.filter(x=>x.read_at).length};};
   const status=m=>m.closed_at?'closed':!related(m.id).length?'notice':related(m.id).every(x=>x.is_done)?'ready':'working';
   const labels={closed:'已結案',notice:'一般訊息',ready:'待結案',working:'處理中'};
+  // 同事件的多個分工只計為一件；顯示範圍則保留所有未結案相關案件。
+  const hasAssignedToMe=(m,id)=>!m.closed_at&&related(m.id).some(t=>t.assignee_staff_id===id);
+  const hasUnfinishedForMe=(m,id)=>!m.closed_at&&related(m.id).some(t=>t.assignee_staff_id===id&&!t.is_done);
+  const hasMyAssignments=(m,id)=>!m.closed_at&&m.created_by_staff_id===id&&related(m.id).length>0;
+  const awaitsMyClosure=(m,id)=>hasMyAssignments(m,id)&&related(m.id).every(t=>t.is_done);
   const style=document.createElement('style');
   style.id='team-messages-style';
   style.textContent='.tm-wrap{max-width:1060px;margin:0 auto}.tm-head{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:16px}.tm-head h1{font-size:23px;margin:0 0 6px}.tm-head p,.tm-muted{color:#6b7280;font-size:12px;margin:0}.tm-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tm-tab{border:1px solid #e7d9d3;padding:9px 13px;background:#fff;border-radius:9px;cursor:pointer;font-weight:700}.tm-tab.active{background:#fff2eb;color:#b9654f;border-color:#dc9479}.tm-list,.tm-tasks{display:grid;gap:12px}.tm-card,.tm-task{background:#fff;border:1px solid #f0ded7;border-radius:13px;padding:16px}.tm-line{display:flex;align-items:center;justify-content:space-between;gap:10px}.tm-line-start{display:flex;align-items:start;justify-content:space-between;gap:10px}.tm-desc{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;margin:10px 0}.tm-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.tm-pill{border-radius:999px;padding:4px 10px;font-size:12px;font-weight:750;white-space:nowrap;background:#f1f5f9;color:#475569}.tm-pill.ready{background:#fff3d5;color:#885a03}.tm-pill.closed{background:#e9f7ec;color:#267448}.tm-pill.working{background:#fff1ec;color:#a45d49}.tm-field{display:grid;gap:6px;margin:14px 0}.tm-field label{font-weight:700;font-size:13px}.tm-field textarea,.tm-field select{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:9px;padding:10px;font:inherit;background:#fff}.tm-field textarea{resize:vertical;min-height:76px;line-height:1.65}.tm-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}.tm-checkbox{display:flex;align-items:center;gap:7px}.tm-checkbox input{width:17px;height:17px;accent-color:#dc9479}.tm-note{background:#faf8f7;padding:11px;border-radius:9px;white-space:pre-wrap;overflow-wrap:anywhere}.tm-empty{padding:38px 14px;text-align:center;color:#6b7280;border:1px dashed #e9d8d0;border-radius:12px}.tm-form-row{padding:12px;background:#faf8f7;border:1px solid #f0ded7;border-radius:11px;margin:9px 0}.tm-grid{display:grid;grid-template-columns:1fr 210px;gap:10px}.tm-help{font-size:12px;color:#6b7280;line-height:1.6}.tm-summary{border-radius:12px;padding:14px;background:#fff7f3;border:1px solid #f0ded7;margin-top:16px}@media(max-width:720px){.tm-head{flex-direction:column}.tm-grid{grid-template-columns:1fr}}';
   style.textContent+='.tm-card.tm-unread{border-left:4px solid #d94848;background:#fffaf8}.tm-card.tm-unread .tm-desc{font-weight:750}.tm-card.tm-read{border-left:4px solid #b5cec1}.tm-read-mark{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#b42318}.tm-recipient-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.tm-recipient-item{border:1px solid #e5e7eb;border-radius:9px;padding:10px 12px;font-size:13px;background:#f8fafc;display:flex;justify-content:space-between;gap:8px;align-items:center}.tm-recipient-item.unread{background:#fff4f4;border-color:#ffd4d4;font-weight:750}.tm-recipient-item.read{background:#effaf3;color:#267448}.tm-nav-count{margin-left:auto;min-width:22px;height:22px;border-radius:999px;background:#d92d20;color:white;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;font-size:12px;font-weight:850;line-height:1;box-sizing:border-box}.tm-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px;background:#faf8f7;border:1px solid #f0ded7;border-radius:10px}.tm-option{display:flex;align-items:center;gap:8px;font-size:14px}.tm-option input{width:17px;height:17px;accent-color:#dc9479}.tm-read-self{display:flex;gap:8px;align-items:center;font-weight:750;margin:14px 0 0}.tm-read-self input{width:18px;height:18px;accent-color:#dc9479}@media(max-width:600px){.tm-recipient-grid,.tm-options{grid-template-columns:1fr}}';
   style.textContent+='.tm-create-head{margin-bottom:7px}.tm-new-card{padding-top:9px}.tm-new-card>.tm-field:first-child{margin-top:2px}';
+  style.textContent+='.tm-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;box-sizing:border-box;margin-left:5px;padding:0 5px;border-radius:999px;background:#d77b57;color:#fff;font-size:12px;font-weight:800;vertical-align:middle}.tm-card.tm-focus-pending{border:1px solid #eaa28b;border-left:5px solid #d86549;background:#fff4ef}.tm-card.tm-focus-close{border:1px solid #e9b38f;border-left:5px solid #cb7749;background:#fff7f0}.tm-card.tm-focus-pending .tm-desc,.tm-card.tm-focus-close .tm-desc{font-weight:750}.tm-action-tag{display:inline-flex;align-items:center;color:#b45335;background:#fce6d8;border-radius:6px;font-weight:800;padding:2px 7px;font-size:12px;white-space:nowrap}';
   document.head.appendChild(style);
   const root=()=>document.getElementById('tm-root');
   const shell=html=>{$('content').innerHTML='<div id="tm-root" class="tm-wrap">'+html+'</div>';};
@@ -52,32 +58,39 @@
     finally{M.busy=false;}
   }
   function card(m){
-    const t=related(m.id),done=t.filter(x=>x.is_done).length,st=status(m);
-    const me=readRecord(m.id),r=readSummary(m.id);
+    const tasks=related(m.id),done=tasks.filter(t=>t.is_done).length,st=status(m);
+    const me=readRecord(m.id),r=readSummary(m.id),myId=state.profile.id;
     const readClass=me?(me.read_at?'tm-read':'tm-unread'):'';
-    return '<article class="tm-card '+readClass+'"><div class="tm-line"><span class="tm-muted">建立者：'+H(name(m.created_by_staff_id))+'｜'+H(date(m.created_at))+'</span><span class="tm-pill '+st+'">'+labels[st]+'</span></div>'+
-      '<div class="tm-desc tm-preview">'+H(m.description)+'</div><div class="tm-line"><span class="tm-muted">閱讀 '+r.read+'／'+r.total+' 人｜'+(t.length?'分工完成 '+done+'／'+t.length:'無分工事項')+'</span>'+
+    const needsAction=M.tab==='mine'&&hasUnfinishedForMe(m,myId);
+    const needsClosure=M.tab==='assigned'&&awaitsMyClosure(m,myId);
+    const attentionClass=needsAction?'tm-focus-pending':needsClosure?'tm-focus-close':'';
+    const attentionLabel=needsAction?'待我辦理':needsClosure?'待我結案':'';
+    return '<article class="tm-card '+readClass+' '+attentionClass+'"><div class="tm-line"><span class="tm-muted">建立者：'+H(name(m.created_by_staff_id))+'｜'+H(date(m.created_at))+'</span><span class="tm-pill '+st+'">'+labels[st]+'</span></div>'+
+      '<div class="tm-desc tm-preview">'+H(m.description)+'</div><div class="tm-line"><span class="tm-muted">閱讀 '+r.read+'／'+r.total+' 人｜'+(tasks.length?'分工完成 '+done+'／'+tasks.length:'無分工事項')+'</span>'+
+      (attentionLabel?'<span class="tm-action-tag">'+attentionLabel+'</span>':'')+
       (me&&!me.read_at?'<span class="tm-read-mark">● 未閱讀</span>':me?'<span class="tm-muted">✓ 已閱讀</span>':'')+
       '<button class="btn sm" data-open="'+m.id+'">查看內容</button></div></article>';
   }
   function listing(){
     M.detailId=null;
     const mine=state.profile.id;
+    const pendingCount=M.messages.filter(m=>hasUnfinishedForMe(m,mine)).length;
+    const closeCount=M.messages.filter(m=>awaitsMyClosure(m,mine)).length;
     const selected=M.messages.filter(m=>{
       if(M.tab==='unread')return readRecord(m.id)?.read_at===null;
       if(M.tab==='all')return true;
-      if(M.tab==='mine')return !m.closed_at&&(
-        related(m.id).some(t=>t.assignee_staff_id===mine&&!t.is_done)||
-        (m.created_by_staff_id===mine&&status(m)==='ready')
-      );
-      if(M.tab==='assigned')return !m.closed_at&&
-        m.created_by_staff_id===mine&&related(m.id).length>0;
+      if(M.tab==='mine')return hasAssignedToMe(m,mine);
+      if(M.tab==='assigned')return hasMyAssignments(m,mine);
       if(M.tab==='closed')return !!m.closed_at;
       return false;
     });
     shell('<div class="tm-head"><div><h1>訊息交辦</h1><p>消息集中管理，交辦只保留最新辦理進度。</p></div>'+
       '<button class="btn primary" id="tm-new">＋ 新增訊息</button></div><div class="tm-tabs">'+
-      [['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案']].map(v=>'<button class="tm-tab '+(M.tab===v[0]?'active':'')+'" data-tab="'+v[0]+'">'+v[1]+'</button>').join('')+
+      [['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案']].map(v=>{
+        const count=v[0]==='mine'?pendingCount:v[0]==='assigned'?closeCount:null;
+        return '<button class="tm-tab '+(M.tab===v[0]?'active':'')+'" data-tab="'+v[0]+'">'+v[1]+
+          (count===null?'':' <span class="tm-tab-count">'+count+'</span>')+'</button>';
+      }).join('')+
       '<button class="btn sm" id="tm-refresh">重新整理</button></div><div class="tm-list">'+
       (selected.length?selected.map(card).join(''):empty('沒有符合條件的訊息'))+'</div>');
     root().querySelector('#tm-new').onclick=createForm;
