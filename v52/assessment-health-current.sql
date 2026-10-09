@@ -1,29 +1,8 @@
--- CURRENT RUNTIME DEFINITION — 評估管理／健康與用藥
--- 2026-10-02
--- 現行測試版定義；健康現況、身體健康10項與用藥均由單一 health_medication 工具管理。
--- 舊版歷史可由 Git 紀錄與備份分支追溯，主分支只保留此現行定義。
-
-alter table public.assessment_health_records
-  add column if not exists baseline_confirmed_at timestamptz,
-  add column if not exists change_confirmed_at timestamptz,
-  add column if not exists status_confirmed_at timestamptz;
-
--- 合併舊「身體與健康狀況評估」工具到 health_medication。
--- 只有舊兩張表都完成時，合併後才維持完成；只完成其中一張則回到進行中。
-update public.assessment_event_forms hm
-set status=case
-      when hm.status='completed' and hs.status='completed' then 'completed'
-      when hm.status in ('completed','in_progress') or hs.status in ('completed','in_progress') then 'in_progress'
-      else hm.status
-    end,
-    updated_at=now()
-from public.assessment_event_forms hs
-where hm.assessment_event_id=hs.assessment_event_id
-  and hm.form_code='health_medication'
-  and hs.form_code='health_status';
-
-delete from public.assessment_event_forms
-where form_code='health_status';
+-- CURRENT TEST RUNTIME DEFINITION — 健康與用藥評估
+-- 開案初始評估：條件式健康現況、用藥有／無／無法確認
+-- 後續追蹤評估：本期新增事件、前次固定用藥沿用與異動
+-- 此檔記錄現行資料庫函式，不包含已執行的一次性歷史資料遷移。
+-- 僅限測試環境；正式環境需另行審核部署。
 
 CREATE OR REPLACE FUNCTION public.save_assessment_health(p_event_id uuid, p_medical_info jsonb, p_medication_checks jsonb, p_health_items jsonb, p_health_notes jsonb, p_finalize boolean DEFAULT false, p_copied_from_id uuid DEFAULT NULL::uuid, p_section text DEFAULT 'all'::text)
  RETURNS assessment_health_records
@@ -59,7 +38,7 @@ begin
   if v_event.id is null then raise exception 'ASSESSMENT_EVENT_NOT_FOUND'; end if;
 
   select * into v_case from public.care_cases where id=v_event.case_id;
-  if v_case.id is null or not private.can_edit_case(v_case.supervisor_id) then
+  if v_case.id is null or not private.can_edit_assessment_case(v_case.id) then
     raise exception 'ASSESSMENT_EDIT_FORBIDDEN';
   end if;
 
@@ -109,15 +88,104 @@ begin
   end loop;
 
   if p_finalize and p_section in ('baseline','all') and v_event.assessment_type='opening' then
-    if coalesce((p_medical_info->>'opening_no_fixed_medications')::boolean,false)=false
+    if coalesce(p_medical_info->>'baseline_conditions_status','') not in ('yes','no','unknown')
+       or coalesce(p_medical_info->>'baseline_treatments_status','') not in ('yes','no','unknown') then
+      raise exception 'OPENING_HEALTH_STATUS_REQUIRED';
+    end if;
+    if p_medical_info->>'baseline_conditions_status'='yes'
+       and nullif(btrim(coalesce(p_medical_info->>'baseline_important_conditions','')),'') is null then
+      raise exception 'OPENING_CONDITIONS_DETAIL_REQUIRED';
+    end if;
+    if p_medical_info->>'baseline_treatments_status'='yes'
+       and nullif(btrim(coalesce(p_medical_info->>'baseline_ongoing_treatments','')),'') is null then
+      raise exception 'OPENING_TREATMENTS_DETAIL_REQUIRED';
+    end if;
+    if p_medical_info->>'baseline_conditions_status'='unknown'
+       and nullif(btrim(coalesce(p_medical_info->>'baseline_conditions_unknown_note','')),'') is null then
+      raise exception 'OPENING_CONDITIONS_UNKNOWN_REASON_REQUIRED';
+    end if;
+    if p_medical_info->>'baseline_treatments_status'='unknown'
+       and nullif(btrim(coalesce(p_medical_info->>'baseline_treatments_unknown_note','')),'') is null then
+      raise exception 'OPENING_TREATMENTS_UNKNOWN_REASON_REQUIRED';
+    end if;
+    if coalesce(p_medical_info->>'regular_followup','') not in ('yes','no','not_needed','unknown') then
+      raise exception 'OPENING_RETURN_VISIT_STATUS_REQUIRED';
+    end if;
+    if p_medical_info->>'regular_followup' in ('no','unknown')
+       and nullif(btrim(coalesce(p_medical_info->>'regular_followup_reason','')),'') is null then
+      raise exception 'OPENING_RETURN_VISIT_REASON_REQUIRED';
+    end if;
+
+    if coalesce(p_medical_info->>'opening_fixed_status','') not in ('yes','no','unknown')
+       or coalesce(p_medical_info->>'opening_temporary_status','') not in ('yes','no','unknown') then
+      raise exception 'OPENING_MEDICATION_CATEGORY_STATUS_REQUIRED';
+    end if;
+    if p_medical_info->>'opening_fixed_status'='yes'
        and jsonb_array_length(coalesce(p_medical_info->'fixed_medication_base_entries','[]'::jsonb))=0 then
       raise exception 'OPENING_MEDICATION_BASELINE_UNCONFIRMED';
     end if;
-
-    if coalesce((p_medical_info->>'opening_no_temporary_medications')::boolean,false)=false
+    if p_medical_info->>'opening_temporary_status'='yes'
        and jsonb_array_length(coalesce(p_medical_info->'opening_temporary_medications','[]'::jsonb))=0 then
       raise exception 'OPENING_TEMPORARY_MEDICATIONS_UNCONFIRMED';
     end if;
+    if p_medical_info->>'opening_fixed_status' in ('no','unknown')
+       and jsonb_array_length(coalesce(p_medical_info->'fixed_medication_base_entries','[]'::jsonb))>0 then
+      raise exception 'OPENING_FIXED_MEDICATION_STATUS_CONFLICT';
+    end if;
+    if p_medical_info->>'opening_temporary_status' in ('no','unknown')
+       and jsonb_array_length(coalesce(p_medical_info->'opening_temporary_medications','[]'::jsonb))>0 then
+      raise exception 'OPENING_TEMP_MEDICATION_STATUS_CONFLICT';
+    end if;
+    if p_medical_info->>'opening_fixed_status'='unknown'
+       and nullif(btrim(coalesce(p_medical_info->>'opening_fixed_unknown_note','')),'') is null then
+      raise exception 'OPENING_FIXED_UNKNOWN_REASON_REQUIRED';
+    end if;
+    if p_medical_info->>'opening_temporary_status'='unknown'
+       and nullif(btrim(coalesce(p_medical_info->>'opening_temporary_unknown_note','')),'') is null then
+      raise exception 'OPENING_TEMP_UNKNOWN_REASON_REQUIRED';
+    end if;
+    if p_medical_info->>'medication_use_status'='using'
+       and p_medical_info->>'opening_fixed_status'='no'
+       and p_medical_info->>'opening_temporary_status'='no' then
+      raise exception 'OPENING_USING_WITHOUT_MEDICATION';
+    end if;
+    if p_medical_info->>'medication_use_status'='none'
+       and (p_medical_info->>'opening_fixed_status'<>'no'
+            or p_medical_info->>'opening_temporary_status'<>'no') then
+      raise exception 'OPENING_NONE_STATUS_CONFLICT';
+    end if;
+  end if;
+
+  if p_medical_info ? 'medication_use_status'
+     and nullif(btrim(p_medical_info->>'medication_use_status'),'') is not null
+     and p_medical_info->>'medication_use_status' not in ('using','none','unknown') then
+    raise exception 'INVALID_MEDICATION_USE_STATUS';
+  end if;
+
+  if p_finalize and p_section='all' then
+    if coalesce(p_medical_info->>'medication_use_status','') not in ('using','none','unknown') then
+      raise exception 'MEDICATION_USE_STATUS_REQUIRED';
+    end if;
+    if p_medical_info->>'medication_use_status'='unknown'
+       and nullif(btrim(coalesce(p_medical_info->>'medication_use_note','')),'') is null then
+      raise exception 'MEDICATION_USE_REASON_REQUIRED';
+    end if;
+  end if;
+
+  if p_finalize and p_section='all'
+     and p_medical_info->>'medication_use_status'='none' then
+    if jsonb_array_length(coalesce(p_medical_info->'fixed_medication_entries','[]'::jsonb))>0 then
+      raise exception 'MEDICATION_STATUS_CONFLICT_FIXED_ENTRIES';
+    end if;
+    if v_event.assessment_type='opening'
+       and jsonb_array_length(coalesce(p_medical_info->'opening_temporary_medications','[]'::jsonb))>0 then
+      raise exception 'MEDICATION_STATUS_CONFLICT_TEMPORARY_ENTRIES';
+    end if;
+  end if;
+
+  if p_medical_info ? 'unvisited_health_changes'
+     and jsonb_typeof(p_medical_info->'unvisited_health_changes')<>'array' then
+    raise exception 'INVALID_UNVISITED_HEALTH_CHANGES';
   end if;
 
   if p_medical_info ? 'healthcare_events'
@@ -301,18 +369,13 @@ begin
   end if;
 
   if nullif(btrim(p_medical_info->>'regular_followup'),'') is not null
-     and p_medical_info->>'regular_followup' not in ('yes','no') then
+     and p_medical_info->>'regular_followup' not in ('yes','no','not_needed','unknown') then
     raise exception 'INVALID_REGULAR_FOLLOWUP';
   end if;
 
   if nullif(btrim(p_medical_info->>'medication_regular'),'') is not null
      and p_medical_info->>'medication_regular' not in ('yes','no') then
     raise exception 'INVALID_MEDICATION_REGULAR';
-  end if;
-
-  if nullif(btrim(p_medical_info->>'side_effect'),'') is not null
-     and p_medical_info->>'side_effect' not in ('none','present') then
-    raise exception 'INVALID_SIDE_EFFECT';
   end if;
 
   if nullif(btrim(p_medical_info->>'care_impact'),'') is not null
@@ -537,34 +600,12 @@ begin
   where assessment_event_id=p_event_id
     and form_code='health_medication';
 
-  update public.assessment_events
-  set status=case
-      when p_finalize and p_section='all' and not exists(
-        select 1 from public.assessment_event_forms f
-        where f.assessment_event_id=p_event_id
-          and f.status not in ('completed','unable','not_applicable')
-      ) then 'forms_completed'
-      when status='pending' then 'in_progress'
-      else status
-    end,
-    started_at=coalesce(started_at,now()),
-    forms_completed_at=case
-      when p_finalize and p_section='all' and not exists(
-        select 1 from public.assessment_event_forms f
-        where f.assessment_event_id=p_event_id
-          and f.status not in ('completed','unable','not_applicable')
-      ) then coalesce(forms_completed_at,now())
-      else forms_completed_at
-    end,
-    updated_by=(select auth.uid()),
-    updated_at=now()
-  where id=p_event_id;
+  perform private.sync_assessment_event_progress(p_event_id);
 
   return v_record;
 end;
-$function$;
+$function$
+;
 
-
-revoke all on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid,text) from public;
-revoke all on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid,text) from anon;
-grant execute on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid,text) to authenticated;
+revoke all on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,jsonb,boolean,uuid,text) from public, anon;
+grant execute on function public.save_assessment_health(uuid,jsonb,jsonb,jsonb,boolean,uuid,text) to authenticated;
