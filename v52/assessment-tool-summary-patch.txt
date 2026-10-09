@@ -161,11 +161,17 @@
     catch(_){return {findings:v||'',recommendations:v||''};}
   };
   async function load(eventId,code,record){
-    const {data,error}=await db.from(TABLE).select('*').eq('assessment_event_id',eventId).eq('tool_code',code).maybeSingle();
-    if(error)throw error;
-    const src=source(code,record),gen=generate(code,src),hash=fingerprint(src);
+    const [summaryRes,toolRes]=await Promise.all([
+      db.from(TABLE).select('*').eq('assessment_event_id',eventId).eq('tool_code',code).maybeSingle(),
+      db.from(TOOL_TABLE[code]).select('*').eq('assessment_event_id',eventId).maybeSingle()
+    ]);
+    if(summaryRes.error)throw summaryRes.error;
+    if(toolRes.error)throw toolRes.error;
+    const data=summaryRes.data;
+    const saved=source(code,toolRes.data),src=source(code,record);
+    const gen=generate(code,src),hash=fingerprint(src);
     const state={
-      eventId,code,savedSource:src,source:src,
+      eventId,code,savedSource:saved,source:src,
       findings:data?.findings??gen.findings,
       recommendations:data?.recommendations??gen.recommendations,
       sig:data?hashes(data.source_signature):{findings:hash,recommendations:hash},
@@ -264,12 +270,19 @@
     if(error)throw error;s.exists=true;s.generated=true;s.edited=false;
   }
   async function saveAfterTool(eventId,code,record,caseId){
-    let s=get(eventId,code,record);
+    const s=get(eventId,code,record);
     if(!s)throw new Error('本項評估總結尚未載入，請重新開啟表單');
-    const normalizedSource=source(code,record);
-    if(!s.exists&&!s.edited){const g=generate(code,normalizedSource),h=fingerprint(normalizedSource);
-      s.findings=g.findings;s.recommendations=g.recommendations;s.sig={findings:h,recommendations:h};}
-    await persist(s,caseId);s.savedSource=normalizedSource;
+    const {data,error}=await db.from(TOOL_TABLE[code]).select('*').eq('assessment_event_id',eventId).maybeSingle();
+    if(error)throw error;
+    if(!data)throw new Error('原始評估紀錄尚未成功儲存');
+    const saved=source(code,data),h=fingerprint(saved);
+    if(!s.exists){
+      if(!s.edited){const g=generate(code,saved);s.findings=g.findings;s.recommendations=g.recommendations;}
+      // 首次完成表單即視為確認目前原始資料，避免資料庫正規化造成誤提醒。
+      s.sig={findings:h,recommendations:h};
+    }
+    await persist(s,caseId);
+    s.savedSource=saved;
   }
   async function trackOverall(eventId,caseId,findings,recommendations,signature){
     const payload={assessment_event_id:eventId,case_id:caseId,tool_code:'overall',
