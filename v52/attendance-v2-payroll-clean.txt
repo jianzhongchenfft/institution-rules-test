@@ -31,7 +31,7 @@
     if(!btn) return;
 
     const canClose=payrollSelectedMonthClosed();
-    const buttonText=canClose?'✓ 確認本月已結算':'本月尚未結束，暫不可結算';
+    const buttonText=canClose?'結算本月加班費':'本月尚未結束，暫不可結算';
     const buttonTitle=canClose?'確認薪資資料後進行月結':'僅能結算已完整結束的月份；當月請於次月1日起辦理結算。';
 
     btn.disabled=!canClose;
@@ -111,9 +111,10 @@
       try{
         const {error}=await db.rpc('undo_payroll_month_settlement',{p_settlement_month:selected});
         if(error)throw error;
-        await loadOvertimeRows();
+        // 沿用既有加班模組的重新載入流程，避免跨模組直接呼叫內部函式。
         state.overtimeView='payroll';
-        renderOvertimePage();
+        navigate('overtime');
+        state.overtimeView='payroll';
         toast('已撤銷月結，該月份恢復未結算','success');
       }catch(err){
         console.error('撤銷月結失敗',err);
