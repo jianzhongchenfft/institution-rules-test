@@ -515,7 +515,7 @@ function additionalTaskPanel(message){
 }
 function historyPanel(m){
  const rows=reports(m.id);
- return '<div class="tm-section"><h3>事件回報歷程（'+rows.length+'）</h3></div>'+
+ return '<div class="tm-section"><h3>事件回報歷程（'+rows.length+'）</h3>'+(!m.closed_at&&!S.composeOpen?'<button class="btn sm" type="button" data-compose-open>＋ 新增回報</button>':'')+'</div>'+
  '<div class="tm-events">'+(rows.length?rows.map(r=>{
   const canceled=!!r.voided_at,system=!!r.is_system;
   const canEdit=!system&&!canceled&&r.staff_id===me();
@@ -535,7 +535,7 @@ function historyPanel(m){
       ' 於 '+h(stamp(r.voided_at))+' 作廢</p>':'')+'</section>';
  }).join(''):empty('目前還沒有回報紀錄'))+'</div>'+
  (m.closed_at?'<p class="tm-muted" style="margin-top:12px">已結案，不再新增回報；原輸入者仍可修正或作廢人工回報。</p>':
-  (!S.composeOpen?'<div class="tm-report-add"><button class="btn sm" type="button" id="tm-compose-open">＋ 新增回報</button></div>':
+  (!S.composeOpen?'<div class="tm-report-add"><button class="btn sm" type="button" id="tm-compose-open" data-compose-open>＋ 新增回報</button></div>':
   '<div class="tm-compose"><div class="tm-field" style="margin:0 0 10px">'+
   '<textarea id="tm-compose" rows="1" maxlength="2000" placeholder="例如：已聯繫案主，對方表示同意。"></textarea></div>'+
   '<div class="tm-actions"><button class="btn primary" id="tm-send">送出回報</button>'+
@@ -673,12 +673,13 @@ function detail(id){
    person.addEventListener('change',sync);sync();
   }
  }
- root().querySelector('#tm-compose-open')?.addEventListener('click',()=>{
+ const openReportComposer=()=>{
   if(dirty()){toast('請先處理其他未儲存的內容','error');return;}
   S.taskAction=null;S.managingTask=null;S.addingTask=false;S.editing=null;
   S.composeOpen=true;detail(id);
   root().querySelector('#tm-compose')?.focus();
- });
+ };
+ root().querySelectorAll('[data-compose-open]').forEach(btn=>btn.addEventListener('click',openReportComposer));
  root().querySelector('#tm-compose-cancel')?.addEventListener('click',()=>{
   if(root().querySelector('#tm-compose')?.value.trim()&&!confirm('回報尚未送出，確定取消？'))return;
   S.composeOpen=false;detail(id);
