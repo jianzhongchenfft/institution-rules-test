@@ -61,6 +61,8 @@
       if(temporary.some(x=>!isCompleteOpeningTemporaryMedication(x))){
         return toast('短期／臨時用藥請至少填寫藥物名稱／用法','warn');
       }
+      if(medicationUsage==='using'&&noFixed&&noTemporary)
+        return toast('目前選擇有使用藥物，請至少登錄固定用藥或短期／臨時用藥','warn');
     }
 
     const medicalInfoForSave={...local.medicalInfo};
