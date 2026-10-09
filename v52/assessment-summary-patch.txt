@@ -683,7 +683,7 @@
     showLoading(true);
     try{
       const s=local.summary;
-      const {error}=await db.rpc('save_assessment_event_summary_v2',{
+      const {error}=await db.rpc('save_assessment_event_summary',{
         p_event_id:row.id,
         p_overall_status:s.overall_status||null,
         p_key_findings:String(s.key_findings||'').trim()||null,
