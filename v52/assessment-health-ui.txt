@@ -359,7 +359,6 @@
     const mode=healthSectionMode(row);
     const title=sectionTitle('combined',row);
     const events=safeArray(local.medicalInfo.healthcare_events);
-    const noEvents=local.medicalInfo.no_healthcare_events===true;
     const openingNoFixed=local.medicalInfo.opening_no_fixed_medications===true;
     const openingNoTemporary=local.medicalInfo.opening_no_temporary_medications===true;
     const openingTemporaryMedications=safeArray(local.medicalInfo.opening_temporary_medications);
@@ -419,7 +418,7 @@
                 接案時無固定用藥
               </label>
             </div>
-            <div id="openingFixedMedicationWrap" style="${openingNoFixed?'display:none':''}">
+            <div id="openingFixedMedicationWrap" style="${openingNoFixed||medUsage==='unknown'?'display:none':''}">
               <div class="health-event-list">
                 ${(local.fixedMedicationBaseEntries.length
                   ?local.fixedMedicationBaseEntries
@@ -440,7 +439,7 @@
                 接案時無短期／臨時用藥
               </label>
             </div>
-            <div id="openingTemporaryMedicationWrap" style="${openingNoTemporary?'display:none':''}">
+            <div id="openingTemporaryMedicationWrap" style="${openingNoTemporary||medUsage==='unknown'?'display:none':''}">
               <div class="health-event-list">
                 ${(openingTemporaryMedications.length?openingTemporaryMedications:[newOpeningTemporaryMedication()]).map(renderOpeningTemporaryMedication).join('')}
               </div>
