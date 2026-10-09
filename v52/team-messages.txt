@@ -174,7 +174,7 @@ function listing(){
  root().querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;listing();});
  root().querySelectorAll('[data-open]').forEach(el=>{
   el.onclick=()=>detail(el.dataset.open);
-  el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();detail(el.dataset.open);}};
+  el.onkeydown=e=>{if(e.target!==el)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();detail(el.dataset.open);}};
  });
 }
 function assigned(){
