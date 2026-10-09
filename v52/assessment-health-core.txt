@@ -322,6 +322,12 @@
       local.medicalInfo.baseline_ongoing_treatments=currentCase?.ongoing_treatments||'';
     }
     local.medicalInfo.healthcare_events=safeArray(local.medicalInfo.healthcare_events).map(x=>({...safe(x)}));
+    local.medicalInfo.unvisited_health_changes=safeArray(local.medicalInfo.unvisited_health_changes).map(x=>({...safe(x)}));
+    if(!local.medicalInfo.unvisited_health_changes.length
+       &&local.medicalInfo.unvisited_health_change==='yes'
+       &&String(local.medicalInfo.unvisited_health_change_note||'').trim()){
+      local.medicalInfo.unvisited_health_changes=[{note:String(local.medicalInfo.unvisited_health_change_note).trim()}];
+    }
     local.medicalInfo.medication_changes=safeArray(local.medicalInfo.medication_changes).map((x,i)=>({
       id:x?.id||('legacy-med-'+i),
       action:x?.action||'',
@@ -380,6 +386,7 @@
         ||safeArray(local.medicalInfo.healthcare_events).length>0
         ||safeArray(local.medicalInfo.medication_changes).length>0
         ||safeArray(local.medicalInfo.medication_corrections).length>0
+        ||safeArray(local.medicalInfo.unvisited_health_changes).length>0
         ||!!local.medicalInfo.unvisited_health_change
         ||!!local.medicalInfo.care_impact;
 
@@ -444,9 +451,15 @@
     document.querySelectorAll('[data-health-event]').forEach(row=>{
       const item={};
       row.querySelectorAll('[data-health-event-field]').forEach(el=>item[el.dataset.healthEventField]=el.value);
-      if(Object.values(item).some(v=>String(v||'').trim()!==''))events.push(item);
+      events.push(item);
     });
     local.medicalInfo.healthcare_events=events;
+
+    const unvisited=[];
+    document.querySelectorAll('[data-unvisited-health]').forEach(rowEl=>{
+      unvisited.push({note:rowEl.querySelector('[data-unvisited-health-note]')?.value||''});
+    });
+    if(document.getElementById('healthUnvisitedSection'))local.medicalInfo.unvisited_health_changes=unvisited;
 
     const openingNoFixedEl=document.getElementById('openingNoFixedMedication');
     if(openingNoFixedEl){
@@ -490,7 +503,7 @@
         const target=entryById(rebuildFixedMedicationEntries(),item.medication_before_entry_id);
         if(target)item.medication_before=target.medication;
       }
-      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))medicationChanges.push(item);
+      medicationChanges.push(item);
     });
     local.medicalInfo.medication_changes=medicationChanges;
 
@@ -503,7 +516,7 @@
           ||entryById(rebuildFixedMedicationEntries(),item.target_entry_id);
         if(target)item.medication_before=target.medication;
       }
-      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))medicationCorrections.push(item);
+      medicationCorrections.push(item);
     });
     local.medicalInfo.medication_corrections=medicationCorrections;
 
