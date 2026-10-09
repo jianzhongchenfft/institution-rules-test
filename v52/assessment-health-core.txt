@@ -91,8 +91,13 @@
     .health-tag{font-size:9.5px;font-weight:900;padding:3px 7px;border-radius:999px;background:#f2f4f7;color:#667085}
     .health-tag.prev{background:#eff8ff;color:#175cd3}.health-tag.change{background:#fff1eb;color:#a45d49}
     .health-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:10px 11px}
+    .health-opening-options-four{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .health-opening-choice{margin-bottom:10px}
+    .health-opening-choice:last-child{margin-bottom:0}
+    .health-opening-choice .health-note{padding-top:2px}
     .health-option{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:11px;font-weight:800;cursor:pointer}
     .health-option.selected{border-color:#dc9479;background:#fff8f5}
+    .health-option:focus-within{outline:2px solid #dc9479;outline-offset:2px}
     .health-option input{width:auto}.health-score{margin-left:auto;color:#667085;font-size:9.5px}
     .health-note{padding:0 11px 11px}.health-note textarea{width:100%;box-sizing:border-box;min-height:60px}
     .health-actions{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding:11px 0;background:linear-gradient(to bottom,rgba(250,248,247,0),#faf8f7 24%)}
@@ -462,6 +467,7 @@
 
   function syncInputs(){
     document.querySelectorAll('[data-health-medical]').forEach(el=>{
+      if(el.type==='radio'&&!el.checked)return;
       local.medicalInfo[el.dataset.healthMedical]=el.type==='checkbox'?el.checked:el.value;
     });
 
