@@ -135,6 +135,7 @@ style.textContent = `
 .tm-tabs .tm-refresh{display:inline-flex;align-items:center;justify-content:center;flex:0 0 42px;width:42px;height:42px;padding:0;border:1px solid #e9dad4;border-radius:10px;background:#fff;color:#475569;font:inherit;cursor:pointer}
 .tm-tabs .tm-refresh:hover{background:#fff5ee}
 .tm-tabs .tm-refresh:focus-visible{outline:2px solid #d9795a;outline-offset:2px}
+.tm-report-quick{margin:0 0 10px}
 .tm-report-add{margin-top:12px}
 .tm-compose textarea{resize:none;min-height:42px;overflow-y:hidden;line-height:1.6}
 .tm-detail-right{display:flex;flex-direction:column;align-items:flex-end;gap:9px;min-width:0}
@@ -515,7 +516,7 @@ function additionalTaskPanel(message){
 }
 function historyPanel(m){
  const rows=reports(m.id);
- return '<div class="tm-section"><h3>事件回報歷程（'+rows.length+'）</h3>'+(!m.closed_at&&!S.composeOpen?'<button class="btn sm" type="button" data-compose-open>＋ 新增回報</button>':'')+'</div>'+
+ return '<div class="tm-section"><h3>事件回報歷程（'+rows.length+'）</h3></div>'+(!m.closed_at&&!S.composeOpen?'<div class="tm-report-quick"><button class="btn sm" type="button" data-compose-open>＋ 新增回報</button></div>':'')+
  '<div class="tm-events">'+(rows.length?rows.map(r=>{
   const canceled=!!r.voided_at,system=!!r.is_system;
   const canEdit=!system&&!canceled&&r.staff_id===me();
