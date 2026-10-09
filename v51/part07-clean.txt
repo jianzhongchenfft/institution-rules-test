@@ -125,7 +125,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       eval(await carePlanRes.text());
 
       // 簡易訊息交辦模組：在其他既有模組後載入，避免影響原有功能。
-      const teamMessageRes=await fetch('v52/team-messages.txt?v=hide-no-task-notice-v25-20261009',{cache:'no-store'});
+      const teamMessageRes=await fetch('v52/team-messages.txt?v=highlight-my-tasks-v26-20261009',{cache:'no-store'});
       if(!teamMessageRes.ok) throw new Error('訊息交辦模組載入失敗（'+teamMessageRes.status+'）');
       eval(await teamMessageRes.text());
 
