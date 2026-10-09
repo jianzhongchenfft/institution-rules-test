@@ -262,7 +262,10 @@ function dirty(){
 function detail(id){
  const m=S.messages.find(x=>x.id===id);if(!m){listing();return;}
  S.view='detail';S.id=id;
- const jobs=tasks(id),canClose=!m.closed_at&&jobs.length&&jobs.every(x=>x.is_done);
+ const jobs=tasks(id),remaining=jobs.filter(x=>!x.is_done).length;
+ const isOwner=m.created_by_staff_id===me();
+ const canClose=Boolean(!m.closed_at&&jobs.length&&isOwner);
+ const allFinished=Boolean(jobs.length&&remaining===0);
  html('<div class="tm-head"><div><h1>訊息詳情</h1><p>建立者：'+h(name(m.created_by_staff_id))+
  '｜'+h(stamp(m.created_at))+'</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
  '<section class="tm-card"><div class="tm-line"><strong>內容</strong>'+
@@ -270,9 +273,10 @@ function detail(id){
  '<div class="tm-description">'+h(m.description)+'</div>'+
  (m.closed_at?'<p class="tm-muted">結案時間：'+h(stamp(m.closed_at))+'</p>':'')+'</section>'+
  readPanel(id)+taskPanel(m)+historyPanel(m)+
- (canClose?'<div class="tm-summary"><strong>所有分工已完成，待建立者結案。</strong>'+
-  (m.created_by_staff_id===me()?'<div class="tm-actions"><button class="btn primary" id="tm-close">確認結案</button></div>':
-  '<p class="tm-muted">僅建立者可以結案。</p>')+'</div>':''));
+ (canClose?'<div class="tm-summary"><strong>'+
+   (allFinished?'所有分工已完成，可以結案。':'尚有 '+remaining+' 項分工未完成；建立者仍可直接結案。')+
+   '</strong><div class="tm-actions"><button class="btn primary" id="tm-close">確認結案</button></div></div>':
+   (!m.closed_at&&allFinished?'<div class="tm-summary"><strong>全部分工已完成，待建立者結案。</strong></div>':'')));
  root().querySelector('#tm-back').onclick=()=>{if(!dirty()||confirm('尚有未儲存的回報，確定返回？'))listing();};
  root().querySelector('#tm-read')?.addEventListener('change',()=>markRead(id));
  root().querySelectorAll('[data-done]').forEach(input=>input.onchange=()=>setDone(input));
@@ -339,11 +343,17 @@ async function saveReport(id,updateId){
 async function closeMessage(id){
  if(S.busy)return;
  if(dirty()){toast('請先處理未送出的回報','error');return;}
- if(!confirm('所有分工已完成，確定結案？'))return;
+ const message=S.messages.find(x=>x.id===id);
+ if(!message||message.closed_at||message.created_by_staff_id!==me())return;
+ const remaining=tasks(id).filter(x=>!x.is_done).length;
+ const prompt=remaining>0
+  ?'目前仍有 '+remaining+' 項分工未完成。結案後承辦人不能再勾選完成，也無法新增回報。確定仍要結案？'
+  :'所有分工均已完成，確定結案？';
+ if(!confirm(prompt))return;
  S.busy=true;
  try{
   const {data,error}=await db.from('team_messages').update({closed_at:new Date().toISOString()}).eq('id',id).select('id');
-  if(error)throw error;if(!data?.length)throw new Error('僅建立者可在全部完成後結案');
+  if(error)throw error;if(!data?.length)throw new Error('僅建立者能將尚未結案的交辦事件結案');
   await load();toast('已結案','success');detail(id);
  }catch(e){toast('結案失敗：'+(e.message||e),'error');}
  finally{S.busy=false;}
