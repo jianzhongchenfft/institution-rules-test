@@ -51,6 +51,8 @@ style.textContent+='.tm-tabs .tm-tab,.tm-tabs .tm-refresh{box-sizing:border-box;
 style.textContent+='.tm-detail-right{display:flex;flex-direction:column;align-items:flex-end;gap:9px;min-width:0}.tm-read-inline{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;min-height:20px;font-size:14px}.tm-reader-mini{font-size:14px;font-weight:800;white-space:nowrap;cursor:help}.tm-reader-mini.read{color:#267448}.tm-reader-mini.unread{color:#c53f3f}.tm-read-separator{color:#9ca3af;padding:0 2px}@media(max-width:600px){.tm-head{flex-wrap:wrap}.tm-detail-right{width:100%;align-items:flex-end}}.tm-message-content-actions{display:flex;align-items:center;gap:9px}.tm-message-editor{margin-top:10px}.tm-message-editor textarea{min-height:80px}.tm-message-editor .tm-check{margin:10px 0}.tm-message-editor .tm-actions{margin-top:10px}';
 style.textContent+='.tm-detail-navigation{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}.tm-detail-position{color:#6b7280;font-size:12px;font-weight:650;min-width:46px;text-align:center}.tm-detail-navigation .btn:disabled{opacity:.4;cursor:not-allowed}.tm-favorite{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid #e9dad4;border-radius:9px;background:#fff;color:#6b7280;cursor:pointer;padding:6px 9px;line-height:1.2;font:inherit;font-size:13px}.tm-favorite.active{color:#c17a14;background:#fff9e8;border-color:#e9c887}.tm-favorite svg{display:block}.tm-favorite:hover{border-color:#d29278}.tm-card .tm-favorite{flex-shrink:0}.tm-detail-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}';
 style.textContent+='.tm-tasks{display:block;gap:0;border:1px solid #f0ded7;background:#fff;border-radius:13px;overflow:hidden}.tm-tasks>.tm-task{padding:11px 14px;border:0;border-radius:0;background:transparent;gap:10px}.tm-tasks>.tm-task+.tm-task{border-top:1px solid #f0ded7}.tm-tasks>.tm-task.tm-task-cancelled{background:#f6f6f6}.tm-tasks>.tm-task>div:first-child{min-width:0;flex:1 1 300px}@media(max-width:700px){.tm-tasks>.tm-task{align-items:flex-start}.tm-tasks .tm-task-actions{justify-content:flex-start}}';
+
+style.textContent+='.tm-tabs .tm-tab.tm-tab-icon{display:inline-flex;align-items:center;justify-content:center;width:42px;min-width:42px;padding:0}.tm-tab-icon svg{display:block}.tm-event-combined{margin-top:13px;padding:14px}.tm-event-combined .tm-event-content{padding:0;border:0;background:transparent;border-radius:0}.tm-event-combined .tm-event-content .tm-description{margin:9px 0 0}.tm-event-combined .tm-section{padding-top:14px;margin:16px 0 9px;border-top:1px solid #f0ded7}.tm-event-combined .tm-tasks{border:0;border-radius:0;overflow:visible;background:transparent}.tm-event-combined .tm-tasks>.tm-task{padding:11px 0}.tm-event-combined .tm-tasks>.tm-task+.tm-task{border-top:1px solid #f0ded7}.tm-event-combined .tm-tasks>.tm-task.tm-task-cancelled{padding-left:9px;padding-right:9px}.tm-event-combined .tm-summary{margin-top:14px}.tm-event-combined .tm-add{margin-bottom:0}.tm-event-combined .tm-task-compose{min-width:0}@media(max-width:700px){.tm-event-combined{padding:12px}.tm-event-combined .tm-tasks>.tm-task{padding:11px 0}}';
 document.head.appendChild(style);
 
 // 「內容」與「交辦內容」預設單行；輸入換行或自動折行時即時增高，刪字也會縮回。
@@ -67,19 +69,17 @@ function autoGrow(field){
 function getTabRows(tab){
  const rows=S.messages.filter(m=>{
   if(tab==='unread')return !m.closed_at&&myRead(m.id)?.read_at===null;
-  if(tab==='all')return !m.closed_at;
+  if(tab==='all')return true;
   if(tab==='mine')return isMine(m);
   if(tab==='assigned')return delegated(m);
-  if(tab==='closed')return !!m.closed_at;
   if(tab==='favorites')return favorite(m.id);
   return false;
  });
  if(tab==='mine')rows.sort((a,b)=>Number(hasInstruction(b))-Number(hasInstruction(a))||Number(pending(b))-Number(pending(a)));
  if(tab==='assigned')rows.sort((a,b)=>Number(needsHelp(b))-Number(needsHelp(a))||Number(ready(b))-Number(ready(a)));
- if(tab==='closed')rows.sort((a,b)=>new Date(b.closed_at)-new Date(a.closed_at));
  return rows;
 }
-const tabNames={unread:'未閱讀',all:'全部訊息',mine:'我的待辦',assigned:'我的交辦',closed:'已結案',favorites:'我的最愛'};
+const tabNames={unread:'未閱讀',all:'全部訊息',mine:'我的待辦',assigned:'我的交辦',favorites:'我的最愛'};
 function browseNavigation(id){
  const tab=S.browseTab||S.tab,ids=S.browseIds.length?S.browseIds:getTabRows(tab).map(m=>m.id);
  const index=ids.indexOf(id),allowed=new Set(getTabRows(tab).map(m=>m.id));
@@ -152,16 +152,21 @@ function card(m){
   (tag?'<span class="tm-action">'+tag+'</span>':'')+'</div></article>';
 }
 function listing(){
+ if(S.tab==='closed')S.tab='all';
  S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;S.editingMessage=false;
  const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(needsCreatorAction).length;
  const rows=getTabRows(S.tab);
  S.browseTab=S.tab;S.browseIds=rows.map(m=>m.id);
- const tabs=[['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案'],['favorites','我的最愛']];
+ const tabs=[['unread','未閱讀'],['mine','我的待辦'],['assigned','我的交辦'],['all','全部訊息'],['favorites','我的最愛']];
  html('<div class="tm-head" style="justify-content:flex-end">'+
   '<button class="btn primary" id="tm-new">＋ 新增訊息</button></div>'+
   '<div class="tm-tabs">'+tabs.map(([id,label])=>{
    const n=id==='mine'?pendingCount:id==='assigned'?closeCount:null;
-   return '<button class="tm-tab '+(id===S.tab?'active':'')+'" data-tab="'+id+'">'+label+
+   const star=id==='favorites';
+   return '<button class="tm-tab '+(star?'tm-tab-icon ':'')+(id===S.tab?'active':'')+'" data-tab="'+id+'"'+
+    (star?' title="我的最愛" aria-label="我的最愛"':'')+'>'+
+    (star?'<svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="'+(id===S.tab?'currentColor':'none')+
+     '" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="m12 2 3.1 6.3 7 .9-5.1 4.9 1.2 7-6.2-3.3-6.2 3.3 1.2-7-5.1-4.9 7-.9Z"/></svg>':label)+
     (n===null?'':' <span class="tm-tab-count">'+n+'</span>')+'</button>';
   }).join('')+'<button class="tm-refresh" id="tm-refresh" type="button" title="重新整理" aria-label="重新整理">'+
   '<svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+
@@ -394,7 +399,7 @@ function historyPanel(m){
 function eventContentPanel(m){
  const canEdit=!m.closed_at&&m.created_by_staff_id===me();
  const editing=canEdit&&S.editingMessage;
- return '<section class="tm-card"><div class="tm-line">'+
+ return '<section class="tm-event-content"><div class="tm-line">'+
   '<div class="tm-message-content-actions"><strong>內容</strong>'+
   (canEdit&&!editing?'<button class="btn sm" type="button" id="tm-message-edit-open">編輯</button>':'')+'</div>'+
   '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
@@ -453,7 +458,7 @@ function detail(id){
  '<button class="btn sm" id="tm-prev" type="button"'+(browse.previous?'':' disabled')+'>‹ 上一則</button>'+
  '<span class="tm-detail-position">'+h(position)+'</span>'+
  '<button class="btn sm" id="tm-next" type="button"'+(browse.next?'':' disabled')+'>下一則 ›</button></div>'+
- eventContentPanel(m)+taskPanel(m)+additionalTaskPanel(m)+historyPanel(m)+
+ '<section class="tm-card tm-event-combined">'+eventContentPanel(m)+taskPanel(m)+additionalTaskPanel(m)+'</section>'+historyPanel(m)+
  (canClose?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-close">確認結案</button></div>':
   m.closed_at&&isOwner?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-reopen">重新開啟</button></div>':''));
  root().querySelector('#tm-back').onclick=()=>{if(!dirty()||confirm('尚有未儲存的內容，確定返回？'))listing();};
