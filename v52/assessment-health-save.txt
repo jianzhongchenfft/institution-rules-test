@@ -91,6 +91,8 @@
     delete medicalInfoForSave.diagnosis_change_note;
     delete medicalInfoForSave.side_effect;
     delete medicalInfoForSave.side_effect_note;
+    if(!['no','unknown'].includes(medicalInfoForSave.regular_followup))
+      medicalInfoForSave.regular_followup_reason='';
     if(mode==='baseline'){
       for(const [statusKey,textKey,noteKey] of [
         ['baseline_conditions_status','baseline_important_conditions','baseline_conditions_unknown_note'],
@@ -99,8 +101,6 @@
         if(medicalInfoForSave[statusKey]==='no')medicalInfoForSave[textKey]='';
         if(medicalInfoForSave[statusKey]!=='unknown')medicalInfoForSave[noteKey]='';
       }
-      if(!['no','unknown'].includes(medicalInfoForSave.regular_followup))
-        medicalInfoForSave.regular_followup_reason='';
       if(medicationUsage==='none'){
         medicalInfoForSave.opening_fixed_status='no';
         medicalInfoForSave.opening_temporary_status='no';
