@@ -682,12 +682,6 @@
             <textarea id="assessmentReasonNote" rows="3" placeholder="可補充本次評估的背景或要特別確認的事項">${escapeHTML(existing?.reason_note||'')}</textarea>
           </div>
           <div class="field full">
-            <label style="display:flex;align-items:center;gap:8px;font-weight:800">
-              <input id="assessmentWithVisit" type="checkbox" style="width:auto" ${existing?.combined_with_home_visit?'checked':''}>
-              本次評估預計與家訪同日進行
-            </label>
-          </div>
-          <div class="field full">
             <label>本次評估工具 *</label>
             <div style="font-size:10.5px;color:#667085;margin-bottom:8px">健康與用藥評估會依評估類型自動切換「開案初始版／後續追蹤版」，並在同一份表單內完成身體健康10項與用藥評估。</div>
             <div class="assessment-form-grid" id="assessmentFormGrid">
@@ -721,11 +715,6 @@
           if(!ok)return false;
         }
 
-        if(!$('assessmentWithVisit')?.checked){
-          const ok=window.confirm('本次評估未勾選「與家訪同日進行」，確定仍要繼續儲存嗎？');
-          if(!ok)return false;
-        }
-
         const selectedCodes=[...document.querySelectorAll('[data-assessment-form]')]
           .filter(x=>x.checked)
           .map(x=>x.dataset.assessmentForm);
@@ -741,7 +730,6 @@
             planned_date:plannedDate,
             reason_code:reasonCode,
             reason_note:$('assessmentReasonNote')?.value.trim()||null,
-            combined_with_home_visit:!!$('assessmentWithVisit')?.checked,
             problem_followup_date:['condition_change','specific_problem'].includes(type)
               ?($('assessmentProblemFollowupDate')?.value||null)
               :null,
@@ -835,7 +823,6 @@
             planned_date:plannedDate,
             reason_code:reasonCode,
             reason_note:$('assessmentReasonNote')?.value.trim()||null,
-            combined_with_home_visit:!!$('assessmentWithVisit')?.checked,
             problem_followup_date:['condition_change','specific_problem'].includes(type)
               ?($('assessmentProblemFollowupDate')?.value||null)
               :null,
@@ -1058,7 +1045,6 @@
         <div class="assessment-detail-cell"><label>評估類型</label><div>${escapeHTML(assessmentTypeLabel(row.assessment_type))}</div></div>
         <div class="assessment-detail-cell"><label>負責督導</label><div>${escapeHTML(assessmentStaffName(row.responsible_staff_id||c?.supervisor_id))}</div></div>
         <div class="assessment-detail-cell"><label>評估原因</label><div>${escapeHTML(assessmentReasonText(row))}</div></div>
-        <div class="assessment-detail-cell"><label>與家訪同日</label><div>${row.combined_with_home_visit?'是':'否'}</div></div>
         <div class="assessment-detail-cell"><label>表單進度</label><div>${p.done}／${p.total}</div></div>
         ${['condition_change','specific_problem'].includes(row.assessment_type)?'<div class="assessment-detail-cell"><label>問題追蹤日期</label><div>'+(row.problem_followup_date?rocDate(row.problem_followup_date+'T00:00:00'):'未設定')+'</div></div>':''}
         <div class="assessment-detail-cell"><label>完整評估週期</label><div>${
