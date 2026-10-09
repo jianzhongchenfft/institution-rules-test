@@ -704,13 +704,30 @@
     document.querySelectorAll('[data-health-medical]').forEach(el=>{
       const evt=el.tagName==='SELECT'||el.type==='checkbox'?'change':'input';
       el.addEventListener(evt,()=>{
-        syncInputs();
         const key=el.dataset.healthMedical;
+        if(mode==='baseline'&&['opening_fixed_status','opening_temporary_status'].includes(key)
+           &&el.value!=='yes'){
+          const count=key==='opening_fixed_status'
+            ?local.fixedMedicationBaseEntries.filter(x=>String(x.medication||'').trim()).length
+            :safeArray(local.medicalInfo.opening_temporary_medications).filter(x=>String(x.medication||'').trim()).length;
+          if(count&&!window.confirm('改為「無」或「無法確認」會清除本次已填寫的用藥清單，確定繼續嗎？')){
+            el.value=local.medicalInfo[key]||'yes';return;
+          }
+        }
+        if(mode==='baseline'&&key==='medication_use_status'&&el.value==='none'){
+          const hasMed=local.fixedMedicationBaseEntries.some(x=>String(x.medication||'').trim())
+            ||safeArray(local.medicalInfo.opening_temporary_medications).some(x=>String(x.medication||'').trim());
+          if(hasMed){
+            toast('目前有登錄藥物，請先調整固定用藥及短期／臨時用藥清單，再選擇目前無用藥。','warn');
+            el.value=local.medicalInfo.medication_use_status||'using';return;
+          }
+        }
+        syncInputs();
         if(key==='medication_use_status'&&mode==='baseline'&&local.medicalInfo.medication_use_status==='none'){
-          const fixed=local.fixedMedicationBaseEntries.length>0;
-          const temporary=safeArray(local.medicalInfo.opening_temporary_medications).length>0;
-          if(!fixed)local.medicalInfo.opening_no_fixed_medications=true;
-          if(!temporary)local.medicalInfo.opening_no_temporary_medications=true;
+          local.medicalInfo.opening_fixed_status='no';
+          local.medicalInfo.opening_temporary_status='no';
+          local.medicalInfo.opening_no_fixed_medications=true;
+          local.medicalInfo.opening_no_temporary_medications=true;
         }
         if(['baseline_conditions_status','baseline_treatments_status','regular_followup','medication_method','medication_use_status','opening_fixed_status','opening_temporary_status'].includes(key)){
           const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
@@ -718,23 +735,10 @@
       });
     });
 
-    $('openingNoFixedMedication')?.addEventListener('change',e=>{
-      local.medicalInfo.opening_no_fixed_medications=!!e.target.checked;
-      if(e.target.checked)local.fixedMedicationBaseEntries=[];
-      rebuildFixedMedicationEntries();
-      render();
-    });
-
-    document.querySelectorAll('[data-opening-fixed-med-field]').forEach(el=>{
-      el.addEventListener('input',()=>{
-        local.medicalInfo.opening_no_fixed_medications=false;
-        syncInputs();
-      });
-    });
-
     $('healthAddOpeningFixedMedication')?.addEventListener('click',()=>{
       const y=window.scrollY;
       syncInputs();
+      local.medicalInfo.opening_fixed_status='yes';
       local.medicalInfo.opening_no_fixed_medications=false;
       local.fixedMedicationBaseEntries=[
         ...local.fixedMedicationBaseEntries,
@@ -753,15 +757,10 @@
       render();
     }));
 
-    $('openingNoTemporaryMedication')?.addEventListener('change',e=>{
-      local.medicalInfo.opening_no_temporary_medications=!!e.target.checked;
-      if(e.target.checked)local.medicalInfo.opening_temporary_medications=[];
-      render();
-    });
-
     $('healthAddOpeningTemporaryMedication')?.addEventListener('click',()=>{
       const y=window.scrollY;
       syncInputs();
+      local.medicalInfo.opening_temporary_status='yes';
       local.medicalInfo.opening_no_temporary_medications=false;
       local.medicalInfo.opening_temporary_medications=[
         ...safeArray(local.medicalInfo.opening_temporary_medications),
