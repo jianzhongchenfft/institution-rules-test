@@ -25,6 +25,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       eval(await caseHtmlRes.text());
 
       const assessmentModuleFiles=[
+        'v52/assessment-tool-summary-patch.txt',
         'v52/assessment-patch.txt',
         'v52/assessment-adl-patch.txt',
         'v52/assessment-iadl-patch.txt',
