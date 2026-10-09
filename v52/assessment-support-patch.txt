@@ -247,6 +247,11 @@
     </div>`;
   }
 
+  function selectOptions(choices,selected,placeholder='請選擇'){
+    return `<option value="">${escapeHTML(placeholder)}</option>`
+      +choices.map(([value,label])=>`<option value="${escapeHTML(value)}" ${selected===value?'selected':''}>${escapeHTML(label)}</option>`).join('');
+  }
+
   function renderSummary(){
     const primary=local.household.primary_caregiver_status==='present'?(local.household.primary_caregiver_name||'有主要照顧者'):local.household.primary_caregiver_status==='none'?'無主要照顧者':'尚未填寫';
     return `<section class="support-summary">
@@ -274,7 +279,7 @@
     return `<section class="support-section">
       <div class="support-section-head"><div><strong>一、家庭與居住概況</strong><small>記錄會影響支持與照顧安排的家庭資訊。</small></div></div>
       <div class="support-grid">
-        <div class="support-field full support-choice-question"><label>居住安排 *</label>${renderChoiceOptions('data-support-household','living_arrangement',LIVING_OPTIONS,h.living_arrangement)}</div>
+        <div class="support-field"><label>居住安排 *</label><select data-support-household="living_arrangement">${selectOptions(LIVING_OPTIONS,h.living_arrangement)}</select></div>
         ${h.living_arrangement==='other'?`<div class="support-field"><label>其他居住安排</label><input data-support-household="living_other" value="${escapeHTML(h.living_other||'')}" placeholder="請說明"></div>`:''}
         <div class="support-field"><label>長照福利身分（個案主檔）</label><div class="support-readonly">${escapeHTML(welfareIdentity)}</div></div>
         <div class="support-field full support-choice-question"><label>近期是否有重大家庭變化 *</label>${renderChoiceOptions('data-support-household','family_change_status',[['no','無'],['yes','有']],h.family_change_status)}</div>
@@ -385,7 +390,7 @@
     return `<div class="support-row" data-support-need-row="${escapeHTML(item.id)}">
       <div class="support-row-head"><strong>需求／轉介 ${index+1}</strong><button type="button" class="btn sm" data-remove-support-need="${escapeHTML(item.id)}">移除</button></div>
       <div class="support-row-grid">
-        <div class="support-choice-detail wide"><label>需求類型</label>${renderChoiceOptions('data-support-need-row-field','type',RESOURCE_TYPES,item.type,item.id)}</div>
+        <div class="support-choice-detail wide"><label>需求類型</label><select data-support-need-row-field="type">${selectOptions(RESOURCE_TYPES,item.type,'請選擇需求類型')}</select></div>
         <input class="span2" data-support-need-row-field="need" value="${escapeHTML(item.need||'')}" placeholder="需求內容">
         <input class="span2" data-support-need-row-field="action" value="${escapeHTML(item.action||'')}" placeholder="預計處理／轉介方式">
         <div class="support-choice-detail wide"><label>處理狀態</label>${renderChoiceOptions('data-support-need-row-field','status',NEED_STATUS,item.status,item.id)}</div>
