@@ -440,6 +440,24 @@
     }
 
     rebuildFixedMedicationEntries();
+    if(mode==='baseline'){
+      for(const [statusKey,textKey] of [
+        ['baseline_conditions_status','baseline_important_conditions'],
+        ['baseline_treatments_status','baseline_ongoing_treatments']
+      ]){
+        if(!local.medicalInfo[statusKey]&&String(local.medicalInfo[textKey]||'').trim())
+          local.medicalInfo[statusKey]='yes';
+      }
+      if(!local.medicalInfo.opening_fixed_status){
+        if(local.medicalInfo.opening_no_fixed_medications===true)local.medicalInfo.opening_fixed_status='no';
+        else if(local.fixedMedicationBaseEntries.length)local.medicalInfo.opening_fixed_status='yes';
+      }
+      if(!local.medicalInfo.opening_temporary_status){
+        if(local.medicalInfo.opening_no_temporary_medications===true)local.medicalInfo.opening_temporary_status='no';
+        else if(local.medicalInfo.opening_temporary_medications.some(x=>String(x.medication||'').trim()))
+          local.medicalInfo.opening_temporary_status='yes';
+      }
+    }
   }
 
   function syncInputs(){
@@ -461,39 +479,38 @@
     });
     if(document.getElementById('healthUnvisitedSection'))local.medicalInfo.unvisited_health_changes=unvisited;
 
-    const openingNoFixedEl=document.getElementById('openingNoFixedMedication');
-    if(openingNoFixedEl){
-      local.medicalInfo.opening_no_fixed_medications=!!openingNoFixedEl.checked;
-      if(openingNoFixedEl.checked){
-        local.fixedMedicationBaseEntries=[];
-      }else{
-        const openingFixedMedications=[];
+    if(document.getElementById('healthOpeningFixedSection')){
+      const status=local.medicalInfo.opening_fixed_status;
+      if(status==='yes'){
+        const openingFixed=[];
         document.querySelectorAll('[data-opening-fixed-med]').forEach(rowEl=>{
           const id=rowEl.dataset.openingFixedMed||newOpeningFixedMedication().id;
           const existing=entryById(local.fixedMedicationBaseEntries,id);
           const medication=rowEl.querySelector('[data-opening-fixed-med-field="medication"]')?.value||'';
           if(String(medication).trim()){
-            openingFixedMedications.push(existing
-              ?{...existing,medication:String(medication).trim()}
-              :{
-                ...newOpeningFixedMedication(),
-                id,
-                medication:String(medication).trim()
-              });
+            openingFixed.push(existing?{...existing,medication:String(medication).trim()}:
+              {...newOpeningFixedMedication(),id,medication:String(medication).trim()});
           }
         });
-        local.fixedMedicationBaseEntries=openingFixedMedications;
-      }
+        local.fixedMedicationBaseEntries=openingFixed;
+      }else local.fixedMedicationBaseEntries=[];
+      local.medicalInfo.opening_no_fixed_medications=status==='no';
       rebuildFixedMedicationEntries();
     }
 
-    const openingTemporaryMedications=[];
-    document.querySelectorAll('[data-opening-temp-med]').forEach(rowEl=>{
-      const item={id:rowEl.dataset.openingTempMed||newOpeningTemporaryMedication().id};
-      rowEl.querySelectorAll('[data-opening-temp-med-field]').forEach(el=>item[el.dataset.openingTempMedField]=el.value);
-      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))openingTemporaryMedications.push(item);
-    });
-    local.medicalInfo.opening_temporary_medications=openingTemporaryMedications;
+    if(document.getElementById('healthOpeningTemporarySection')){
+      const status=local.medicalInfo.opening_temporary_status;
+      const openingTemporary=[];
+      if(status==='yes'){
+        document.querySelectorAll('[data-opening-temp-med]').forEach(rowEl=>{
+          const item={id:rowEl.dataset.openingTempMed||newOpeningTemporaryMedication().id};
+          rowEl.querySelectorAll('[data-opening-temp-med-field]').forEach(el=>item[el.dataset.openingTempMedField]=el.value);
+          if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))openingTemporary.push(item);
+        });
+      }
+      local.medicalInfo.opening_temporary_medications=openingTemporary;
+      local.medicalInfo.opening_no_temporary_medications=status==='no';
+    }
 
     const medicationChanges=[];
     document.querySelectorAll('[data-med-change]').forEach(rowEl=>{
