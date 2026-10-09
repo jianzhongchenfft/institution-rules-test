@@ -1,355 +1,356 @@
-// 訊息交辦：訊息、指定分工、最新進度及手動結案（測試版）
+// 訊息交辦 v3：獨立的事件回報歷程，分工僅供勾選完成。
 (function(){
-  'use strict';
-  if(window.teamMessagesModule)return;
-  const M={messages:[],tasks:[],recipients:[],staff:[],manualRecipients:new Set(),tab:'unread',detailId:null,busy:false};
-  const permitted=['admin','organization_manager','business_manager','supervisor'];
-  const H=v=>escapeHTML(String(v==null?'':v));
-  const name=id=>M.staff.find(x=>x.id===id)?.display_name||'原使用者';
-  const date=v=>v?new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
-  const related=id=>M.tasks.filter(x=>x.message_id===id).sort((a,b)=>a.sort_order-b.sort_order);
-  const notified=id=>M.recipients.filter(x=>x.message_id===id);
-  const readRecord=id=>notified(id).find(x=>x.staff_id===state.profile?.id);
-  const readSummary=id=>{const r=notified(id);return {total:r.length,read:r.filter(x=>x.read_at).length};};
-  const status=m=>m.closed_at?'closed':!related(m.id).length?'notice':related(m.id).every(x=>x.is_done)?'ready':'working';
-  const labels={closed:'已結案',notice:'一般訊息',ready:'待結案',working:'處理中'};
-  // 同事件的多個分工只計為一件；顯示範圍則保留所有未結案相關案件。
-  const hasAssignedToMe=(m,id)=>!m.closed_at&&related(m.id).some(t=>t.assignee_staff_id===id);
-  const hasUnfinishedForMe=(m,id)=>!m.closed_at&&related(m.id).some(t=>t.assignee_staff_id===id&&!t.is_done);
-  const hasMyAssignments=(m,id)=>!m.closed_at&&m.created_by_staff_id===id&&related(m.id).length>0;
-  const awaitsMyClosure=(m,id)=>hasMyAssignments(m,id)&&related(m.id).every(t=>t.is_done);
-  const style=document.createElement('style');
-  style.id='team-messages-style';
-  style.textContent='.tm-wrap{max-width:1060px;margin:0 auto}.tm-head{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:16px}.tm-head h1{font-size:23px;margin:0 0 6px}.tm-head p,.tm-muted{color:#6b7280;font-size:12px;margin:0}.tm-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tm-tab{border:1px solid #e7d9d3;padding:9px 13px;background:#fff;border-radius:9px;cursor:pointer;font-weight:700}.tm-tab.active{background:#fff2eb;color:#b9654f;border-color:#dc9479}.tm-list,.tm-tasks{display:grid;gap:12px}.tm-card,.tm-task{background:#fff;border:1px solid #f0ded7;border-radius:13px;padding:16px}.tm-line{display:flex;align-items:center;justify-content:space-between;gap:10px}.tm-line-start{display:flex;align-items:start;justify-content:space-between;gap:10px}.tm-desc{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;margin:10px 0}.tm-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.tm-pill{border-radius:999px;padding:4px 10px;font-size:12px;font-weight:750;white-space:nowrap;background:#f1f5f9;color:#475569}.tm-pill.ready{background:#fff3d5;color:#885a03}.tm-pill.closed{background:#e9f7ec;color:#267448}.tm-pill.working{background:#fff1ec;color:#a45d49}.tm-field{display:grid;gap:6px;margin:14px 0}.tm-field label{font-weight:700;font-size:13px}.tm-field textarea,.tm-field select{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:9px;padding:10px;font:inherit;background:#fff}.tm-field textarea{resize:vertical;min-height:76px;line-height:1.65}.tm-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}.tm-checkbox{display:flex;align-items:center;gap:7px}.tm-checkbox input{width:17px;height:17px;accent-color:#dc9479}.tm-note{background:#faf8f7;padding:11px;border-radius:9px;white-space:pre-wrap;overflow-wrap:anywhere}.tm-empty{padding:38px 14px;text-align:center;color:#6b7280;border:1px dashed #e9d8d0;border-radius:12px}.tm-form-row{padding:12px;background:#faf8f7;border:1px solid #f0ded7;border-radius:11px;margin:9px 0}.tm-grid{display:grid;grid-template-columns:210px minmax(0,1fr);gap:10px}.tm-help{font-size:12px;color:#6b7280;line-height:1.6}.tm-summary{border-radius:12px;padding:14px;background:#fff7f3;border:1px solid #f0ded7;margin-top:16px}@media(max-width:720px){.tm-head{flex-direction:column}.tm-grid{grid-template-columns:1fr}}';
-  style.textContent+='.tm-card.tm-unread{border-left:4px solid #d94848;background:#fffaf8}.tm-card.tm-unread .tm-desc{font-weight:750}.tm-card.tm-read{border-left:4px solid #b5cec1}.tm-read-mark{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#b42318}.tm-recipient-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.tm-recipient-item{border:1px solid #e5e7eb;border-radius:9px;padding:10px 12px;font-size:13px;background:#f8fafc;display:flex;justify-content:space-between;gap:8px;align-items:center}.tm-recipient-item.unread{background:#fff4f4;border-color:#ffd4d4;font-weight:750}.tm-recipient-item.read{background:#effaf3;color:#267448}.tm-nav-count{margin-left:auto;min-width:22px;height:22px;border-radius:999px;background:#d92d20;color:white;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;font-size:12px;font-weight:850;line-height:1;box-sizing:border-box}.tm-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px;background:#faf8f7;border:1px solid #f0ded7;border-radius:10px}.tm-option{display:flex;align-items:center;gap:8px;font-size:14px}.tm-option input{width:17px;height:17px;accent-color:#dc9479}.tm-read-self{display:flex;gap:8px;align-items:center;font-weight:750;margin:14px 0 0}.tm-read-self input{width:18px;height:18px;accent-color:#dc9479}@media(max-width:600px){.tm-recipient-grid,.tm-options{grid-template-columns:1fr}}';
-  style.textContent+='.tm-create-head{margin-bottom:7px}.tm-new-card{padding-top:9px}.tm-new-card>.tm-field:first-child{margin-top:2px}';
-  style.textContent+='.tm-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;box-sizing:border-box;margin-left:5px;padding:0 5px;border-radius:999px;background:#d77b57;color:#fff;font-size:12px;font-weight:800;vertical-align:middle}.tm-card.tm-focus-pending{border:1px solid #eaa28b;border-left:5px solid #d86549;background:#fff4ef}.tm-card.tm-focus-close{border:1px solid #e9b38f;border-left:5px solid #cb7749;background:#fff7f0}.tm-card.tm-focus-pending .tm-desc,.tm-card.tm-focus-close .tm-desc{font-weight:750}.tm-action-tag{display:inline-flex;align-items:center;color:#b45335;background:#fce6d8;border-radius:6px;font-weight:800;padding:2px 7px;font-size:12px;white-space:nowrap}';
-  style.textContent+='.tm-work-heading{margin-top:14px}.tm-work-add{display:flex;justify-content:flex-start;margin:10px 0 12px}';
-  // 精簡訊息卡：正常內容顯示兩行；長內容最多兩行並自動截斷。
-  style.textContent+='.tm-list{gap:8px}.tm-card.tm-compact{padding:10px 14px;cursor:pointer;transition:background-color .15s,border-color .15s,box-shadow .15s}.tm-card.tm-compact:hover{background:#fff8f3;border-color:#d99579;box-shadow:0 2px 8px rgba(180,115,85,.12)}.tm-card.tm-compact:focus-visible{outline:3px solid #d9795a;outline-offset:2px}.tm-card.tm-compact.tm-focus-pending:hover,.tm-card.tm-compact.tm-focus-close:hover{background:#ffece3}.tm-compact-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.tm-compact-meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;min-width:0;color:#6b7280;font-size:12px;line-height:1.45}.tm-compact-status{flex-shrink:0}.tm-compact-main{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px;min-width:0}.tm-card .tm-compact-desc{margin:0;flex:1;min-width:0;line-height:1.5;font-size:14px;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.tm-compact-main .tm-action-tag{flex-shrink:0}.tm-compact-read{font-weight:750;color:#b42318}@media(max-width:620px){.tm-card.tm-compact{padding:10px 11px}.tm-compact-head{align-items:flex-start}.tm-compact-meta{gap:2px 8px}.tm-compact-main{align-items:flex-start}.tm-compact-main .tm-action-tag{margin-top:1px}}';
-  document.head.appendChild(style);
-  const root=()=>document.getElementById('tm-root');
-  const shell=html=>{$('content').innerHTML='<div id="tm-root" class="tm-wrap">'+html+'</div>';};
-  const empty=text=>'<div class="tm-empty">'+H(text)+'</div>';
-  async function load(){
-    const [mr,sr]=await Promise.all([
-      db.from('team_messages').select('*').order('created_at',{ascending:false}).limit(300),
-      db.from('staff_users').select('id,display_name,role,is_active').eq('is_active',true).order('display_name')
-    ]);
-    if(mr.error)throw mr.error;if(sr.error)throw sr.error;
-    const messages=mr.data||[];
-    let tasks=[],recipients=[];
-    if(messages.length){
-      const ids=messages.map(x=>x.id);
-      const [tr,rr]=await Promise.all([
-        db.from('team_message_tasks').select('*').in('message_id',ids).order('sort_order',{ascending:true}).limit(2000),
-        db.from('team_message_recipients').select('message_id,staff_id,read_at').in('message_id',ids).limit(2000)
-      ]);
-      if(tr.error)throw tr.error;if(rr.error)throw rr.error;
-      tasks=tr.data||[];recipients=rr.data||[];
-    }
-    M.messages=messages;M.tasks=tasks;M.recipients=recipients;
-    M.staff=(sr.data||[]).filter(s=>permitted.includes(s.role));
-    void updateNavCount();
-  }
-  async function refresh(){
-    if(M.busy)return;
-    M.busy=true;
-    try{await load();if(M.detailId)detail(M.detailId);else listing();}
-    catch(e){console.error(e);shell(empty('訊息交辦暫時無法載入。')+'<button class="btn" id="tm-retry">重試</button>');
-      root().querySelector('#tm-retry').onclick=refresh;toast('載入失敗：'+(e.message||e),'error');}
-    finally{M.busy=false;}
-  }
-  function card(m){
-    const tasks=related(m.id),done=tasks.filter(t=>t.is_done).length,st=status(m);
-    const me=readRecord(m.id),r=readSummary(m.id),myId=state.profile.id;
-    const readClass=me?(me.read_at?'tm-read':'tm-unread'):'';
-    const needsAction=M.tab==='mine'&&hasUnfinishedForMe(m,myId);
-    const needsClosure=M.tab==='assigned'&&awaitsMyClosure(m,myId);
-    const attentionClass=needsAction?'tm-focus-pending':needsClosure?'tm-focus-close':'';
-    const attentionLabel=needsAction?'待我辦理':needsClosure?'待我結案':'';
-    const progress=tasks.length?'分工完成 '+done+'／'+tasks.length:'無分工事項';
-    const readHint=me&&!me.read_at?'｜未閱讀':'';
-    return '<article class="tm-card tm-compact '+readClass+' '+attentionClass+
-      '" role="button" tabindex="0" data-open="'+H(m.id)+'" aria-label="查看訊息：'+H(m.description.slice(0,80))+'">'+
-      '<div class="tm-compact-head"><div class="tm-compact-meta"><span>建立者：'+H(name(m.created_by_staff_id))+
-      '｜'+H(date(m.created_at))+'</span><span class="'+(me&&!me.read_at?'tm-compact-read':'')+
-      '">已閱讀 '+r.read+'／'+r.total+' 人 · '+progress+readHint+'</span></div>'+
-      '<span class="tm-pill tm-compact-status '+st+'">'+labels[st]+'</span></div>'+
-      '<div class="tm-compact-main"><div class="tm-desc tm-compact-desc">'+H(m.description)+'</div>'+
-      (attentionLabel?'<span class="tm-action-tag">'+attentionLabel+'</span>':'')+'</div></article>';
-  }
-  function listing(){
-    M.detailId=null;
-    const mine=state.profile.id;
-    const pendingCount=M.messages.filter(m=>hasUnfinishedForMe(m,mine)).length;
-    const closeCount=M.messages.filter(m=>awaitsMyClosure(m,mine)).length;
-    const selected=M.messages.filter(m=>{
-      if(M.tab==='unread')return readRecord(m.id)?.read_at===null;
-      if(M.tab==='all')return true;
-      if(M.tab==='mine')return hasAssignedToMe(m,mine);
-      if(M.tab==='assigned')return hasMyAssignments(m,mine);
-      if(M.tab==='closed')return !!m.closed_at;
-      return false;
-    });
-    // 各頁籤依操作優先順序排序，已結案則依結案時間排序。
-    if(M.tab==='mine'){
-      selected.sort((a,b)=>Number(hasUnfinishedForMe(b,mine))-Number(hasUnfinishedForMe(a,mine)));
-    }else if(M.tab==='assigned'){
-      selected.sort((a,b)=>Number(awaitsMyClosure(b,mine))-Number(awaitsMyClosure(a,mine)));
-    }else if(M.tab==='closed'){
-      selected.sort((a,b)=>new Date(b.closed_at).getTime()-new Date(a.closed_at).getTime());
-    }
-    shell('<div class="tm-head"><div><h1>訊息交辦</h1><p>消息集中管理，交辦只保留最新辦理進度。</p></div>'+
-      '<button class="btn primary" id="tm-new">＋ 新增訊息</button></div><div class="tm-tabs">'+
-      [['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案']].map(v=>{
-        const count=v[0]==='mine'?pendingCount:v[0]==='assigned'?closeCount:null;
-        return '<button class="tm-tab '+(M.tab===v[0]?'active':'')+'" data-tab="'+v[0]+'">'+v[1]+
-          (count===null?'':' <span class="tm-tab-count">'+count+'</span>')+'</button>';
-      }).join('')+
-      '<button class="btn sm" id="tm-refresh">重新整理</button></div><div class="tm-list">'+
-      (selected.length?selected.map(card).join(''):empty('沒有符合條件的訊息'))+'</div>');
-    root().querySelector('#tm-new').onclick=createForm;
-    root().querySelector('#tm-refresh').onclick=refresh;
-    root().querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{M.tab=b.dataset.tab;listing();});
-    root().querySelectorAll('[data-open]').forEach(card=>{
-      card.onclick=()=>detail(card.dataset.open);
-      card.onkeydown=e=>{
-        if(e.key==='Enter'||e.key===' '){
-          e.preventDefault();
-          detail(card.dataset.open);
-        }
-      };
-    });
-  }
-  function assignedIds(){
-    return new Set([...root().querySelectorAll('.tm-form-row [data-assignee]')].map(x=>x.value).filter(Boolean));
-  }
-  function renderRecipientChoices(){
-    const mount=root()?.querySelector('#tm-recipient-options');
-    if(!mount)return;
-    const assigned=assignedIds(),author=state.profile.id;
-    mount.innerHTML=M.staff.map(x=>{
-      const forced=x.id===author||assigned.has(x.id);
-      const checked=forced||M.manualRecipients.has(x.id);
-      return '<label class="tm-option"><input type="checkbox" data-recipient="'+H(x.id)+'" '+(checked?'checked':'')+
-        (forced?' disabled':'')+'> '+H(x.display_name)+(x.id===author?'（建立者）':assigned.has(x.id)?'（承辦人）':'')+'</label>';
-    }).join('');
-    mount.querySelectorAll('[data-recipient]').forEach(c=>c.onchange=()=>{
-      if(c.checked)M.manualRecipients.add(c.dataset.recipient);else M.manualRecipients.delete(c.dataset.recipient);
-    });
-  }
-  function selectedRecipientIds(){
-    return [...new Set([state.profile.id,...M.manualRecipients,...assignedIds()])];
-  }
-  function appendTask(){
-    const box=document.createElement('div');box.className='tm-form-row';
-    const opts=M.staff.map(s=>'<option value="'+H(s.id)+'">'+H(s.display_name)+'</option>').join('');
-    box.innerHTML='<div class="tm-line"><strong class="tm-number">分工事項</strong><button type="button" class="btn sm" data-remove>移除</button></div>'+
-      '<div class="tm-grid"><div class="tm-field"><label>承辦人</label><select data-assignee><option value="">請選擇承辦人</option>'+opts+'</select></div>'+
-      '<div class="tm-field"><label>交辦內容</label><textarea data-work rows="2" maxlength="1000" placeholder="例如：聯繫個案告知請假"></textarea></div></div>';
-    box.querySelector('[data-remove]').onclick=()=>{box.remove();renumber();renderRecipientChoices();};
-    box.querySelector('[data-assignee]').onchange=renderRecipientChoices;
-    root().querySelector('#tm-task-rows').append(box);
-    renumber();renderRecipientChoices();
-  }
-  function renumber(){root().querySelectorAll('.tm-number').forEach((n,i)=>n.textContent='分工 '+(i+1));}
-  function createForm(){
-    M.detailId=null;
-    M.manualRecipients=new Set(M.staff.map(x=>x.id));
-    shell('<div class="tm-head tm-create-head"><div><h1>新增訊息</h1><p>建立者：'+H(state.profile.display_name)+'｜時間由系統記錄</p></div>'+
-      '<button class="btn" id="tm-go-back">返回列表</button></div>'+
-      '<section class="tm-card tm-new-card"><div class="tm-field"><label>說明 *</label>'+
-      '<textarea id="tm-description" maxlength="5000" rows="5" placeholder="例如：居服員○○○來電，稍後臨時需要看醫生。"></textarea></div>'+
-      '<div class="tm-field"><div class="tm-line"><label>通知對象</label>'+
-      '<span><button type="button" class="btn sm" id="tm-select-all">全選</button> '+
-      '<button type="button" class="btn sm" id="tm-clear-all">清除</button></span></div>'+
-      '<div id="tm-recipient-options" class="tm-options"></div></div>'+
-      '<div class="tm-work-heading"><strong>分工（選填）</strong></div>'+
-      '<div class="tm-work-add"><button class="btn sm" id="tm-add-work">＋ 增加分工</button></div>'+
-      '<div id="tm-task-rows"></div>'+
-      '<div class="tm-actions"><button class="btn primary" id="tm-submit">建立訊息</button><button class="btn" id="tm-cancel">取消</button></div></section>');
-    const back=()=>{
-      const started=root().querySelector('#tm-description').value.trim()||root().querySelector('.tm-form-row');
-      if(!started||confirm('尚未發布的內容將不會保留，確定返回？'))listing();
-    };
-    root().querySelector('#tm-go-back').onclick=back;
-    root().querySelector('#tm-cancel').onclick=back;
-    root().querySelector('#tm-add-work').onclick=()=>{
-      if(root().querySelectorAll('.tm-form-row').length>=20)return toast('分工最多20項','error');
-      appendTask();
-    };
-    root().querySelector('#tm-select-all').onclick=()=>{M.manualRecipients=new Set(M.staff.map(x=>x.id));renderRecipientChoices();};
-    root().querySelector('#tm-clear-all').onclick=()=>{M.manualRecipients.clear();renderRecipientChoices();};
-    renderRecipientChoices();
-    root().querySelector('#tm-submit').onclick=publish;
-  }
-  async function publish(){
-    if(M.busy)return;
-    const description=root().querySelector('#tm-description').value.trim();
-    const tasks=[...root().querySelectorAll('.tm-form-row')].map(row=>({
-      description:row.querySelector('[data-work]').value.trim(),
-      assignee_staff_id:row.querySelector('[data-assignee]').value
-    }));
-    if(!description)return toast('請輸入訊息說明','error');
-    if(tasks.some(t=>!t.description||!t.assignee_staff_id))return toast('請填妥每項分工及承辦人','error');
-    const button=root().querySelector('#tm-submit');button.disabled=true;M.busy=true;
-    try{
-      const {data,error}=await db.rpc('create_team_message_v2',{
-        p_description:description,p_tasks:tasks,p_recipient_ids:selectedRecipientIds()
-      });
-      if(error)throw error;
-      M.detailId=data;
-      await load();
-      toast('訊息建立成功','success');detail(data);
-    }catch(e){console.error(e);toast('建立失敗：'+(e.message||e),'error');button.disabled=false;}
-    finally{M.busy=false;}
-  }
-  function readSection(messageId){
-    const list=notified(messageId).slice().sort((a,b)=>name(a.staff_id).localeCompare(name(b.staff_id),'zh-Hant'));
-    const r=readSummary(messageId),mine=readRecord(messageId);
-    const people=list.map(x=>'<div class="tm-recipient-item '+(x.read_at?'read':'unread')+'"><span>'+
-      H(name(x.staff_id))+'</span><span>'+(x.read_at?'✓ 已閱讀':'● 未閱讀')+'</span></div>').join('');
-    const own=mine?(mine.read_at?'<p class="tm-muted">你已於 '+H(date(mine.read_at))+' 確認閱讀。</p>':
-      '<label class="tm-read-self"><input id="tm-mark-read" type="checkbox"> 我已閱讀</label>'):
-      '<p class="tm-muted">你未列入本則訊息的通知對象，無須確認已閱讀。</p>';
-    return '<section class="tm-card" style="margin-top:14px"><div class="tm-line"><strong>閱讀狀態</strong>'+
-      '<span class="tm-muted">已閱讀 '+r.read+'／'+r.total+' 人</span></div>'+
-      '<div class="tm-recipient-grid">'+people+'</div>'+own+'</section>';
-  }
-  async function markRead(id){
-    if(M.busy)return;
-    if(unsaved()){
-      const checkbox=root()?.querySelector('#tm-mark-read');
-      if(checkbox)checkbox.checked=false;
-      toast('請先儲存目前填寫的辦理進度，再確認已閱讀','error');return;
-    }
-    const input=root()?.querySelector('#tm-mark-read');
-    if(!input)return;
-    input.disabled=true;M.busy=true;
-    try{
-      const {data,error}=await db.from('team_message_recipients')
-        .update({read_at:new Date().toISOString()}).eq('message_id',id)
-        .eq('staff_id',state.profile.id).is('read_at',null).select('staff_id');
-      if(error)throw error;
-      if(!data?.length)throw new Error('此訊息不需你確認，或已閱讀');
-      await load();toast('已確認閱讀','success');detail(id);
-    }catch(e){toast('確認已閱讀失敗：'+(e.message||e),'error');input.checked=false;input.disabled=false;}
-    finally{M.busy=false;}
-  }
-  function detail(id){
-    const m=M.messages.find(x=>x.id===id);
-    if(!m){M.tab='all';listing();return;}
-    M.detailId=id;
-    const all=related(id),st=status(m),owner=m.created_by_staff_id===state.profile.id;
-    const done=all.filter(t=>t.is_done).length;
-    const taskHtml=all.map((t,i)=>{
-      const mine=t.assignee_staff_id===state.profile.id&&!m.closed_at;
-      return '<section class="tm-task" data-task="'+t.id+'"><div class="tm-line-start">'+
-        '<div><div style="font-weight:800;line-height:1.7">'+(i+1)+'. '+H(t.description)+'</div>'+
-        '<p class="tm-muted">承辦人：'+H(name(t.assignee_staff_id))+'</p></div>'+
-        '<span class="tm-pill '+(t.is_done?'closed':'')+'">'+(t.is_done?'已完成':'未完成')+'</span></div>'+
-        (mine?'<div class="tm-field"><label>辦理進度（選填，可覆蓋最新內容）</label>'+
-         '<textarea data-note rows="2" maxlength="2000" placeholder="輸入最新辦理進度">'+H(t.progress_note)+'</textarea></div>'+
-         '<div class="tm-actions"><label class="tm-checkbox"><input data-done type="checkbox" '+(t.is_done?'checked':'')+'>已完成</label>'+
-         '<button class="btn primary sm" data-save="'+t.id+'">儲存回報</button></div>':
-         '<div class="tm-field"><label>最新辦理進度</label><div class="tm-note">'+H(t.progress_note||'尚未回報')+'</div></div>'+
-         '<p class="tm-muted">最近更新：'+H(date(t.updated_at))+'</p>')+'</section>';
-    }).join('');
-    shell('<div class="tm-head"><div><h1>訊息詳情</h1><p>建立者：'+H(name(m.created_by_staff_id))+'｜'+H(date(m.created_at))+
-      '</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
-      '<section class="tm-card"><div class="tm-line"><strong>說明</strong><span class="tm-pill '+st+'">'+labels[st]+'</span></div>'+
-      '<div class="tm-desc">'+H(m.description)+'</div>'+
-      (m.closed_at?'<p class="tm-muted">結案時間：'+H(date(m.closed_at))+'</p>':'')+'</section>'+
-      readSection(id)+
-      (all.length?'<h3 style="margin:18px 0 10px">分工事項（'+done+'／'+all.length+' 已完成）</h3><div class="tm-tasks">'+taskHtml+'</div>':
-        '<div class="tm-summary">這是一般訊息，沒有交辦事項，不需要結案。</div>')+
-      (all.length&&done===all.length&&!m.closed_at?
-        '<div class="tm-summary"><strong>全部分工均已完成，待建立者結案。</strong>'+
-        (owner?'<div class="tm-actions"><button id="tm-close" class="btn primary">確認結案</button></div>':
-          '<p class="tm-muted">由原建立者進行結案。</p>')+'</div>':''));
-    root().querySelector('#tm-back').onclick=()=>{
-      if(unsaved()&&!confirm('有尚未儲存的進度，確定返回？'))return;
-      listing();
-    };
-    root().querySelector('#tm-mark-read')?.addEventListener('change',()=>markRead(id));
-    root().querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>save(b.dataset.save));
-    root().querySelector('#tm-close')?.addEventListener('click',()=>close(id));
-  }
-  function unsaved(){
-    if(!M.detailId)return false;
-    return related(M.detailId).some(t=>{
-      const row=root()?.querySelector('[data-task="'+t.id+'"]');
-      const area=row?.querySelector('[data-note]'),check=row?.querySelector('[data-done]');
-      return !!area&&(area.value!==t.progress_note||check.checked!==t.is_done);
-    });
-  }
-  async function save(id){
-    if(M.busy)return;
-    const task=M.tasks.find(t=>t.id===id);
-    if(!task||task.assignee_staff_id!==state.profile.id)return;
-    const row=root().querySelector('[data-task="'+id+'"]');
-    const note=row.querySelector('[data-note]').value,done=row.querySelector('[data-done]').checked;
-    const button=row.querySelector('[data-save]');button.disabled=true;M.busy=true;
-    try{
-      const {data,error}=await db.from('team_message_tasks')
-        .update({progress_note:note,is_done:done}).eq('id',id).select('id');
-      if(error)throw error;
-      if(!data?.length)throw new Error('無修改權限或此訊息已結案');
-      await load();toast('已儲存最新進度','success');detail(task.message_id);
-    }catch(e){toast('儲存失敗：'+(e.message||e),'error');button.disabled=false;}
-    finally{M.busy=false;}
-  }
-  async function close(id){
-    if(M.busy||!confirm('全部分工均已完成，確定結案？'))return;
-    M.busy=true;
-    try{
-      const {data,error}=await db.from('team_messages')
-        .update({closed_at:new Date().toISOString()}).eq('id',id).select('id');
-      if(error)throw error;
-      if(!data?.length)throw new Error('只有建立者能在全部完成後結案');
-      await load();toast('已結案','success');detail(id);
-    }catch(e){toast('結案失敗：'+(e.message||e),'error');}
-    finally{M.busy=false;}
-  }
-  let navRequest=0;
-  async function updateNavCount(){
-    if(!state.profile)return;
-    const request=++navRequest,userId=state.profile.id;
-    try{
-      const {data,error}=await db.rpc('team_message_attention_count');
-      if(error)throw error;
-      if(request!==navRequest||state.profile?.id!==userId)return;
-      const button=[...$('nav').querySelectorAll('.nav-btn')].find(b=>
-        b.querySelectorAll('span')[1]?.textContent==='訊息交辦');
-      if(!button)return;
-      let badge=button.querySelector('.tm-nav-count');
-      const count=Math.max(0,Number(data)||0);
-      if(!count){badge?.remove();return;}
-      if(!badge){badge=document.createElement('span');badge.className='tm-nav-count';button.append(badge);}
-      badge.textContent=count>99?'99+':String(count);
-      badge.title='我的待辦事件＋待我結案事件：'+count;
-    }catch(e){console.error('訊息交辦側欄提醒讀取失敗',e);}
-  }
-  const previousRenderNav=renderNav;
-  renderNav=function(){
-    previousRenderNav();
-    void updateNavCount();
-  };
-  const previous=navigate;
-  navigate=function(id){
-    if(id!=='teamMessages'){
-      if(state.page==='teamMessages'&&unsaved()&&!confirm('有尚未儲存的進度，確定離開？'))return;
-      return previous(id);
-    }
-    if(state.page==='teamMessages'&&unsaved()&&!confirm('有尚未儲存的進度，確定離開？'))return;
-    state.page='teamMessages';renderNav();
-    $('topTitle').textContent='訊息交辦';$('crumb').textContent='內部消息與工作分工';
-    $('sidebar').classList.remove('open');
-    M.tab='unread';M.detailId=null;shell(empty('正在載入訊息…'));refresh();
-    window.scrollTo({top:0,behavior:'auto'});
-  };
-  const index=modules.findIndex(x=>x.id==='dashboard');
-  modules.splice(index>=0?index+1:1,0,{section:'每天工作',id:'teamMessages',icon:'📝',label:'訊息交辦',crumb:'內部消息與工作分工',ready:true});
-  window.teamMessagesModule={refresh};
+'use strict';
+if(window.teamMessagesModule)return;
+const ROLES=['admin','organization_manager','business_manager','supervisor'];
+const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false};
+const root=()=>document.getElementById('tm-root');
+const h=v=>escapeHTML(String(v==null?'':v));
+const name=id=>S.staff.find(x=>x.id===id)?.display_name||'原使用者';
+const stamp=v=>v?new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
+const me=()=>state.profile?.id;
+const tasks=id=>S.tasks.filter(t=>t.message_id===id).sort((a,b)=>a.sort_order-b.sort_order);
+const readers=id=>S.recipients.filter(r=>r.message_id===id);
+const reports=id=>S.updates.filter(r=>r.message_id===id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)||a.id.localeCompare(b.id));
+const myRead=id=>readers(id).find(r=>r.staff_id===me());
+const readCount=id=>{const arr=readers(id);return [arr.filter(r=>r.read_at).length,arr.length];};
+const isMine=m=>!m.closed_at&&tasks(m.id).some(t=>t.assignee_staff_id===me());
+const pending=m=>!m.closed_at&&tasks(m.id).some(t=>t.assignee_staff_id===me()&&!t.is_done);
+const delegated=m=>!m.closed_at&&m.created_by_staff_id===me()&&tasks(m.id).length>0;
+const ready=m=>delegated(m)&&tasks(m.id).every(t=>t.is_done);
+const status=m=>m.closed_at?'closed':!tasks(m.id).length?'notice':tasks(m.id).every(t=>t.is_done)?'ready':'working';
+const labels={closed:'已結案',notice:'一般訊息',ready:'待結案',working:'處理中'};
+const html=markup=>{$('content').innerHTML='<div class="tm" id="tm-root">'+markup+'</div>';};
+const empty=s=>'<div class="tm-empty">'+h(s)+'</div>';
+const style=document.createElement('style');style.id='team-messages-v3';
+style.textContent=
+'.tm{max-width:1060px;margin:0 auto}.tm-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.tm-head h1{font-size:23px;margin:0 0 5px}.tm-head p,.tm-muted{font-size:12px;line-height:1.5;color:#6b7280;margin:0}'+
+'.tm-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:13px}.tm-tab{padding:9px 13px;border:1px solid #e9dad4;background:#fff;border-radius:10px;font:inherit;font-weight:750;cursor:pointer}.tm-tab.active{background:#fff1e9;color:#a65c40;border-color:#d29278}.tm-tab-count{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#d07755;color:#fff;font-size:12px;min-width:20px;height:20px;margin-left:5px;padding:0 5px;box-sizing:border-box}'+
+'.tm-card,.tm-task{padding:14px;background:#fff;border:1px solid #f0ded7;border-radius:13px}.tm-list,.tm-tasks{display:grid;gap:8px}.tm-item{cursor:pointer;padding:10px 14px;transition:background .15s,border-color .15s}.tm-item:hover{background:#fff8f3;border-color:#d99579}.tm-item:focus-visible{outline:3px solid #d9795a;outline-offset:2px}.tm-item.unread{background:#fffaf8;border-left:4px solid #d94848}.tm-item.unread .tm-snippet{font-weight:800}.tm-item.read{border-left:4px solid #b5cec1}.tm-item.action{background:#fff4ee;border-color:#eaa28b;border-left:5px solid #d86549}.tm-item.closing{background:#fff6ec;border-color:#e9b38f;border-left:5px solid #cb7749}'+
+'.tm-line{display:flex;align-items:center;justify-content:space-between;gap:9px}.tm-meta{display:flex;flex-wrap:wrap;gap:2px 13px;min-width:0;color:#6b7280;font-size:12px;line-height:1.45}.tm-main{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px}.tm-snippet{min-width:0;flex:1;font-size:14px;line-height:1.5;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:pre-wrap}.tm-pill{display:inline-block;flex-shrink:0;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:750;white-space:nowrap;color:#475569;background:#f1f5f9}.tm-pill.ready{background:#fff3d5;color:#885a03}.tm-pill.working{background:#fff0e9;color:#a45d49}.tm-pill.closed{background:#e9f7ec;color:#267448}.tm-action{color:#b45335;background:#fce6d8;border-radius:7px;padding:3px 7px;font-size:12px;font-weight:800;white-space:nowrap}'+
+'.tm-field{display:grid;gap:6px;margin:13px 0}.tm-field label,.tm-small-head{font-weight:800;font-size:13px}.tm-field textarea,.tm-field select,.tm-edit{box-sizing:border-box;width:100%;padding:10px;background:#fff;border:1px solid #d1d5db;border-radius:9px;font:inherit;color:#1f2937}.tm-field textarea,.tm-edit{resize:vertical;min-height:76px;line-height:1.6}.tm-form-grid{display:grid;grid-template-columns:210px minmax(0,1fr);gap:10px}.tm-form-row{border:1px solid #f0ded7;background:#faf8f7;padding:12px;border-radius:10px;margin:10px 0}.tm-add{margin:9px 0;display:flex;justify-content:flex-start}.tm-options,.tm-reader-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.tm-options{padding:12px;border:1px solid #f0ded7;border-radius:10px;background:#faf8f7}.tm-option{display:flex;align-items:center;gap:8px;font-size:14px}.tm-option input,.tm-check input{width:17px;height:17px;accent-color:#dc9479}.tm-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px}.tm-description{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;margin:9px 0}'+
+'.tm-reader{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:9px;border:1px solid #e5e7eb;background:#f8fafc;font-size:13px}.tm-reader.read{background:#effaf3;color:#267448}.tm-reader.unread{background:#fff4f4;border-color:#ffd4d4;font-weight:750}.tm-check{display:flex;align-items:center;gap:8px;font-weight:750;cursor:pointer}.tm-section{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 9px}.tm-section h3{font-size:17px;margin:0}.tm-task{display:flex;justify-content:space-between;align-items:center;gap:13px}.tm-task-label{font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}.tm-events{display:grid;gap:9px}.tm-entry{background:#fff;padding:9px 12px;border-left:3px solid #d69a80;border-radius:0 10px 10px 0}.tm-entry-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}.tm-entry-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65}.tm-compose{border:1px solid #f0ded7;background:#faf8f7;border-radius:12px;padding:13px;margin-top:12px}.tm-summary{border:1px solid #f0ded7;background:#fff7f3;border-radius:12px;padding:14px;margin-top:15px}.tm-empty{text-align:center;padding:30px 14px;border:1px dashed #e8d9d1;border-radius:12px;color:#6b7280}.tm-nav-count{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;background:#d92d20;color:white;font-weight:850;font-size:12px;border-radius:999px;min-width:22px;height:22px;padding:0 5px;box-sizing:border-box}'+
+'@media(max-width:700px){.tm-head{flex-direction:column}.tm-form-grid,.tm-options,.tm-reader-grid{grid-template-columns:1fr}.tm-task{align-items:flex-start}.tm-meta{gap:2px 8px}.tm-item{padding:10px 11px}}';
+document.head.appendChild(style);
+
+async function load(){
+ const [m,s]=await Promise.all([
+  db.from('team_messages').select('*').order('created_at',{ascending:false}).limit(300),
+  db.from('staff_users').select('id,display_name,role,is_active').eq('is_active',true).order('display_name')
+ ]);
+ if(m.error)throw m.error;if(s.error)throw s.error;
+ const messages=m.data||[];let taskRows=[],recipientRows=[],updateRows=[];
+ if(messages.length){
+  const ids=messages.map(x=>x.id);
+  const [a,b,c]=await Promise.all([
+   db.from('team_message_tasks').select('*').in('message_id',ids).order('sort_order').limit(3000),
+   db.from('team_message_recipients').select('*').in('message_id',ids).limit(3000),
+   db.from('team_message_updates').select('*').in('message_id',ids).order('created_at').limit(5000)
+  ]);
+  if(a.error)throw a.error;if(b.error)throw b.error;if(c.error)throw c.error;
+  taskRows=a.data||[];recipientRows=b.data||[];updateRows=c.data||[];
+ }
+ S.messages=messages;S.staff=(s.data||[]).filter(x=>ROLES.includes(x.role));
+ S.tasks=taskRows;S.recipients=recipientRows;S.updates=updateRows;
+ void sidebarCount();
+}
+async function refresh(){
+ if(S.busy)return;S.busy=true;
+ try{await load();if(S.view==='detail'&&S.id)detail(S.id);else listing();}
+ catch(e){console.error(e);html(empty('訊息交辦載入失敗')+'<button class="btn" id="tm-retry">重試</button>');root().querySelector('#tm-retry').onclick=refresh;toast('載入失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+function card(m){
+ const ts=tasks(m.id),count=readCount(m.id),own=myRead(m.id);
+ const urgency=S.tab==='mine'&&pending(m)?'action':S.tab==='assigned'&&ready(m)?'closing':own&&!own.read_at?'unread':own?'read':'';
+ const tag=S.tab==='mine'&&pending(m)?'待我辦理':S.tab==='assigned'&&ready(m)?'待我結案':'';
+ const progress=ts.length?'分工完成 '+ts.filter(x=>x.is_done).length+'／'+ts.length:'無分工事項';
+ return '<article class="tm-card tm-item '+urgency+'" role="button" tabindex="0" data-open="'+h(m.id)+'" aria-label="查看訊息：'+h(m.description.slice(0,60))+'">'+
+  '<div class="tm-line"><div class="tm-meta"><span>建立者：'+h(name(m.created_by_staff_id))+'｜'+h(stamp(m.created_at))+'</span>'+
+  '<span>已閱讀 '+count[0]+'／'+count[1]+' 人 · '+h(progress)+(own&&!own.read_at?' · 未閱讀':'')+'</span></div>'+
+  '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
+  '<div class="tm-main"><div class="tm-snippet">'+h(m.description)+'</div>'+
+  (tag?'<span class="tm-action">'+tag+'</span>':'')+'</div></article>';
+}
+function listing(){
+ S.view='list';S.id=null;S.editing=null;
+ const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(ready).length;
+ const rows=S.messages.filter(m=>{
+  if(S.tab==='unread')return myRead(m.id)?.read_at===null;
+  if(S.tab==='all')return true;
+  if(S.tab==='mine')return isMine(m);
+  if(S.tab==='assigned')return delegated(m);
+  if(S.tab==='closed')return !!m.closed_at;
+  return false;
+ });
+ if(S.tab==='mine')rows.sort((a,b)=>Number(pending(b))-Number(pending(a)));
+ if(S.tab==='assigned')rows.sort((a,b)=>Number(ready(b))-Number(ready(a)));
+ if(S.tab==='closed')rows.sort((a,b)=>new Date(b.closed_at)-new Date(a.closed_at));
+ const tabs=[['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案']];
+ html('<div class="tm-head"><div><h1>訊息交辦</h1><p>消息集中管理，事件回報依時間保留完整歷程。</p></div>'+
+  '<button class="btn primary" id="tm-new">＋ 新增訊息</button></div>'+
+  '<div class="tm-tabs">'+tabs.map(([id,label])=>{
+   const n=id==='mine'?pendingCount:id==='assigned'?closeCount:null;
+   return '<button class="tm-tab '+(id===S.tab?'active':'')+'" data-tab="'+id+'">'+label+
+    (n===null?'':' <span class="tm-tab-count">'+n+'</span>')+'</button>';
+  }).join('')+'<button class="btn sm" id="tm-refresh">重新整理</button></div>'+
+  '<div class="tm-list">'+(rows.length?rows.map(card).join(''):empty('目前沒有符合條件的訊息'))+'</div>');
+ root().querySelector('#tm-new').onclick=createForm;
+ root().querySelector('#tm-refresh').onclick=refresh;
+ root().querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;listing();});
+ root().querySelectorAll('[data-open]').forEach(el=>{
+  el.onclick=()=>detail(el.dataset.open);
+  el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();detail(el.dataset.open);}};
+ });
+}
+function assigned(){
+ return new Set([...root().querySelectorAll('.tm-new-task [data-person]')].map(el=>el.value).filter(Boolean));
+}
+function chosen(){
+ return [...new Set([me(),...S.chosen,...assigned()])];
+}
+function renderChoices(){
+ const target=root()?.querySelector('#tm-options');if(!target)return;
+ const assignedPeople=assigned();
+ target.innerHTML=S.staff.map(x=>{
+  const required=x.id===me()||assignedPeople.has(x.id);
+  return '<label class="tm-option"><input type="checkbox" data-recipient="'+h(x.id)+'"'+
+   (required||S.chosen.has(x.id)?' checked':'')+(required?' disabled':'')+'>'+
+   h(x.display_name)+(x.id===me()?'（建立者）':assignedPeople.has(x.id)?'（承辦人）':'')+'</label>';
+ }).join('');
+ target.querySelectorAll('[data-recipient]').forEach(el=>el.onchange=()=>{
+  if(el.checked)S.chosen.add(el.dataset.recipient);else S.chosen.delete(el.dataset.recipient);
+ });
+}
+function addTask(){
+ const mount=root().querySelector('#tm-tasks');
+ if(mount.children.length>=20){toast('一則訊息最多20項分工','error');return;}
+ const row=document.createElement('div');row.className='tm-form-row tm-new-task';
+ row.innerHTML='<div class="tm-line"><strong data-order>分工</strong><button class="btn sm" data-remove>移除</button></div>'+
+ '<div class="tm-form-grid"><div class="tm-field"><label>承辦人</label><select data-person>'+
+ '<option value="">請選擇承辦人</option>'+S.staff.map(x=>'<option value="'+h(x.id)+'">'+h(x.display_name)+'</option>').join('')+
+ '</select></div><div class="tm-field"><label>交辦內容</label><textarea rows="2" data-work maxlength="1000" placeholder="例如：聯絡個案確認請假"></textarea></div></div>';
+ row.querySelector('[data-remove]').onclick=()=>{row.remove();orderRows();renderChoices();};
+ row.querySelector('[data-person]').onchange=renderChoices;
+ mount.append(row);orderRows();renderChoices();
+}
+function orderRows(){root().querySelectorAll('[data-order]').forEach((el,i)=>el.textContent='分工 '+(i+1));}
+function createDirty(){return S.view==='create'&&!!root()&&
+ (!!root().querySelector('#tm-description')?.value.trim()||!!root().querySelector('.tm-new-task'));}
+function createForm(){
+ S.view='create';S.id=null;S.editing=null;S.chosen=new Set(S.staff.map(x=>x.id));
+ html('<div class="tm-head"><div><h1>新增訊息</h1><p>建立者：'+h(state.profile.display_name)+
+ '｜時間由系統記錄</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
+ '<section class="tm-card"><div class="tm-field"><label>說明 *</label>'+
+ '<textarea id="tm-description" rows="5" maxlength="5000" placeholder="例如：居服員○○○來電，稍後臨時需要就醫。"></textarea></div>'+
+ '<div class="tm-field"><div class="tm-line"><label>通知對象</label><span>'+
+ '<button class="btn sm" id="tm-all">全選</button> <button class="btn sm" id="tm-none">清除</button></span></div>'+
+ '<div class="tm-options" id="tm-options"></div></div>'+
+ '<div class="tm-small-head">分工（選填）</div><div class="tm-add">'+
+ '<button class="btn sm" id="tm-add">＋ 增加分工</button></div><div id="tm-tasks"></div>'+
+ '<div class="tm-actions"><button class="btn primary" id="tm-submit">建立訊息</button>'+
+ '<button class="btn" id="tm-cancel">取消</button></div></section>');
+ const back=()=>{if(!createDirty()||confirm('未發布的內容不會保留，確定返回？'))listing();};
+ root().querySelector('#tm-back').onclick=back;root().querySelector('#tm-cancel').onclick=back;
+ root().querySelector('#tm-all').onclick=()=>{S.chosen=new Set(S.staff.map(x=>x.id));renderChoices();};
+ root().querySelector('#tm-none').onclick=()=>{S.chosen.clear();renderChoices();};
+ root().querySelector('#tm-add').onclick=addTask;
+ root().querySelector('#tm-submit').onclick=createMessage;
+ renderChoices();
+}
+async function createMessage(){
+ if(S.busy)return;
+ const description=root().querySelector('#tm-description').value.trim();
+ const jobs=[...root().querySelectorAll('.tm-new-task')].map(el=>({
+  description:el.querySelector('[data-work]').value.trim(),
+  assignee_staff_id:el.querySelector('[data-person]').value
+ }));
+ if(!description){toast('請填寫訊息說明','error');return;}
+ if(jobs.some(x=>!x.assignee_staff_id||!x.description)){toast('請完整填寫各項分工與承辦人','error');return;}
+ const btn=root().querySelector('#tm-submit');btn.disabled=true;S.busy=true;
+ try{
+  const {data,error}=await db.rpc('create_team_message',{
+   p_description:description,p_tasks:jobs,p_recipient_ids:chosen()
+  });
+  if(error)throw error;
+  await load();toast('訊息建立成功','success');detail(data);
+ }catch(e){console.error(e);btn.disabled=false;toast('建立失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+function readPanel(id){
+ const people=readers(id).slice().sort((a,b)=>name(a.staff_id).localeCompare(name(b.staff_id),'zh-Hant'));
+ const count=readCount(id),own=myRead(id);
+ return '<section class="tm-card" style="margin-top:13px"><div class="tm-line"><strong>閱讀狀態</strong>'+
+ '<span class="tm-muted">已閱讀 '+count[0]+'／'+count[1]+' 人</span></div>'+
+ '<div class="tm-reader-grid" style="margin-top:10px">'+people.map(x=>
+  '<div class="tm-reader '+(x.read_at?'read':'unread')+'"><span>'+h(name(x.staff_id))+'</span><span>'+
+  (x.read_at?'✓ 已閱讀':'● 未閱讀')+'</span></div>').join('')+'</div>'+
+ (own?(own.read_at?'<p class="tm-muted" style="margin-top:12px">你已於 '+h(stamp(own.read_at))+' 確認閱讀。</p>':
+  '<label class="tm-check" style="margin-top:12px"><input type="checkbox" id="tm-read">我已閱讀</label>'):
+  '<p class="tm-muted" style="margin-top:12px">你不在本次通知對象內，無須確認閱讀。</p>')+'</section>';
+}
+function taskPanel(m){
+ const list=tasks(m.id);
+ if(!list.length)return '<div class="tm-summary">一般訊息沒有分工事項，不需要結案。</div>';
+ return '<div class="tm-section"><h3>分工事項（'+list.filter(t=>t.is_done).length+'／'+list.length+' 已完成）</h3></div>'+
+ '<div class="tm-tasks">'+list.map((t,i)=>{
+  const editable=t.assignee_staff_id===me()&&!m.closed_at;
+  return '<section class="tm-task"><div><div class="tm-task-label">'+(i+1)+'. '+h(t.description)+'</div>'+
+   '<p class="tm-muted">承辦人：'+h(name(t.assignee_staff_id))+'</p></div>'+
+   (editable?'<label class="tm-check"><input type="checkbox" data-done="'+h(t.id)+'"'+(t.is_done?' checked':'')+'>已完成</label>':
+   '<span class="tm-pill '+(t.is_done?'closed':'')+'">'+(t.is_done?'已完成':'未完成')+'</span>')+'</section>';
+ }).join('')+'</div>';
+}
+function historyPanel(m){
+ const rows=reports(m.id);
+ return '<div class="tm-section"><h3>事件回報歷程（'+rows.length+'）</h3></div>'+
+ '<div class="tm-events">'+(rows.length?rows.map(r=>{
+  const editing=r.staff_id===me()&&S.editing===r.id;
+  return '<section class="tm-entry" data-report="'+h(r.id)+'"><div class="tm-entry-head">'+
+   '<div><strong>'+h(name(r.staff_id))+'</strong><span class="tm-muted">　'+h(stamp(r.created_at))+'</span></div>'+
+   (r.staff_id===me()&&!editing?'<button class="btn sm" data-edit="'+h(r.id)+'">修改</button>':'')+'</div>'+
+   (editing?'<textarea class="tm-edit" maxlength="2000" rows="3" data-edit-body>'+h(r.body)+'</textarea>'+
+    '<div class="tm-actions"><button class="btn primary sm" data-edit-save="'+h(r.id)+'">儲存修改</button>'+
+    '<button class="btn sm" data-edit-cancel>取消</button></div>':
+    '<div class="tm-entry-text">'+h(r.body)+'</div>')+'</section>';
+ }).join(''):empty('目前還沒有回報紀錄'))+'</div>'+
+ (m.closed_at?'<p class="tm-muted" style="margin-top:12px">已結案，不再新增回報；原輸入者仍可修正自己回報的文字。</p>':
+  '<div class="tm-compose"><div class="tm-small-head">新增回報（選填）</div>'+
+  '<div class="tm-field"><textarea id="tm-compose" rows="3" maxlength="2000" placeholder="例如：已聯繫案主，對方表示同意。"></textarea></div>'+
+  '<button class="btn primary" id="tm-send">送出回報</button></div>');
+}
+function dirty(){
+ if(S.view==='create')return createDirty();
+ if(S.view!=='detail'||!root())return false;
+ if(root().querySelector('#tm-compose')?.value.trim())return true;
+ if(S.editing){
+  const original=S.updates.find(x=>x.id===S.editing);
+  const edited=root().querySelector('[data-report="'+S.editing+'"] [data-edit-body]')?.value;
+  return edited!==undefined&&edited!==original?.body;
+ }
+ return false;
+}
+function detail(id){
+ const m=S.messages.find(x=>x.id===id);if(!m){listing();return;}
+ S.view='detail';S.id=id;
+ const jobs=tasks(id),canClose=!m.closed_at&&jobs.length&&jobs.every(x=>x.is_done);
+ html('<div class="tm-head"><div><h1>訊息詳情</h1><p>建立者：'+h(name(m.created_by_staff_id))+
+ '｜'+h(stamp(m.created_at))+'</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
+ '<section class="tm-card"><div class="tm-line"><strong>說明</strong>'+
+ '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
+ '<div class="tm-description">'+h(m.description)+'</div>'+
+ (m.closed_at?'<p class="tm-muted">結案時間：'+h(stamp(m.closed_at))+'</p>':'')+'</section>'+
+ readPanel(id)+taskPanel(m)+historyPanel(m)+
+ (canClose?'<div class="tm-summary"><strong>所有分工已完成，待建立者結案。</strong>'+
+  (m.created_by_staff_id===me()?'<div class="tm-actions"><button class="btn primary" id="tm-close">確認結案</button></div>':
+  '<p class="tm-muted">僅建立者可以結案。</p>')+'</div>':''));
+ root().querySelector('#tm-back').onclick=()=>{if(!dirty()||confirm('尚有未儲存的回報，確定返回？'))listing();};
+ root().querySelector('#tm-read')?.addEventListener('change',()=>markRead(id));
+ root().querySelectorAll('[data-done]').forEach(input=>input.onchange=()=>setDone(input));
+ root().querySelector('#tm-send')?.addEventListener('click',()=>sendReport(id));
+ root().querySelectorAll('[data-edit]').forEach(btn=>btn.onclick=()=>{
+  if(dirty()){toast('請先送出或清除未儲存的回報','error');return;}
+  S.editing=btn.dataset.edit;detail(id);
+ });
+ root().querySelectorAll('[data-edit-save]').forEach(btn=>btn.onclick=()=>saveReport(id,btn.dataset.editSave));
+ root().querySelectorAll('[data-edit-cancel]').forEach(btn=>btn.onclick=()=>{S.editing=null;detail(id);});
+ root().querySelector('#tm-close')?.addEventListener('click',()=>closeMessage(id));
+}
+async function markRead(id){
+ if(S.busy)return;
+ const input=root().querySelector('#tm-read');if(!input)return;
+ if(dirty()){input.checked=false;toast('請先處理未送出的回報','error');return;}
+ input.disabled=true;S.busy=true;
+ try{
+  const {data,error}=await db.from('team_message_recipients').update({read_at:new Date().toISOString()})
+   .eq('message_id',id).eq('staff_id',me()).is('read_at',null).select('staff_id');
+  if(error)throw error;if(!data?.length)throw new Error('已確認閱讀或不需確認');
+  await load();toast('已確認閱讀','success');detail(id);
+ }catch(e){input.disabled=false;input.checked=false;toast('確認失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+async function setDone(input){
+ const job=S.tasks.find(x=>x.id===input.dataset.done);
+ if(!job||S.busy){input.checked=!input.checked;return;}
+ if(dirty()){input.checked=!input.checked;toast('請先處理未送出的回報','error');return;}
+ const completed=input.checked;input.disabled=true;S.busy=true;
+ try{
+  const {data,error}=await db.from('team_message_tasks').update({is_done:completed}).eq('id',job.id).select('id');
+  if(error)throw error;if(!data?.length)throw new Error('只有承辦人可以修改尚未結案的分工');
+  await load();toast(completed?'已標記完成':'已改為未完成','success');detail(job.message_id);
+ }catch(e){input.disabled=false;input.checked=!completed;toast('更新失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+async function sendReport(id){
+ if(S.busy)return;
+ const area=root().querySelector('#tm-compose'),body=area?.value.trim();
+ if(!body){toast('請輸入回報內容','error');return;}
+ const button=root().querySelector('#tm-send');button.disabled=true;S.busy=true;
+ try{
+  const {data,error}=await db.from('team_message_updates').insert({message_id:id,staff_id:me(),body}).select('id');
+  if(error)throw error;if(!data?.length)throw new Error('送出沒有成功');
+  await load();toast('已新增回報','success');detail(id);
+ }catch(e){button.disabled=false;toast('送出失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+async function saveReport(id,updateId){
+ if(S.busy)return;
+ const report=S.updates.find(x=>x.id===updateId);
+ if(!report||report.staff_id!==me())return;
+ const body=root().querySelector('[data-report="'+updateId+'"] [data-edit-body]')?.value.trim();
+ if(!body){toast('回報內容不可空白','error');return;}
+ const button=root().querySelector('[data-edit-save="'+updateId+'"]');button.disabled=true;S.busy=true;
+ try{
+  const {data,error}=await db.from('team_message_updates').update({body}).eq('id',updateId).eq('staff_id',me()).select('id');
+  if(error)throw error;if(!data?.length)throw new Error('只有原輸入者可修改回報');
+  S.editing=null;await load();toast('回報已修正','success');detail(id);
+ }catch(e){button.disabled=false;toast('修改失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+async function closeMessage(id){
+ if(S.busy)return;
+ if(dirty()){toast('請先處理未送出的回報','error');return;}
+ if(!confirm('所有分工已完成，確定結案？'))return;
+ S.busy=true;
+ try{
+  const {data,error}=await db.from('team_messages').update({closed_at:new Date().toISOString()}).eq('id',id).select('id');
+  if(error)throw error;if(!data?.length)throw new Error('僅建立者可在全部完成後結案');
+  await load();toast('已結案','success');detail(id);
+ }catch(e){toast('結案失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+let sidebarSeq=0;
+async function sidebarCount(){
+ if(!state.profile)return;
+ const seq=++sidebarSeq,user=me();
+ try{
+  const {data,error}=await db.rpc('team_message_attention_count');
+  if(error)throw error;if(sidebarSeq!==seq||user!==me())return;
+  const button=[...$('nav').querySelectorAll('.nav-btn')].find(x=>x.querySelectorAll('span')[1]?.textContent==='訊息交辦');
+  if(!button)return;
+  let badge=button.querySelector('.tm-nav-count');
+  const count=Math.max(0,Number(data)||0);
+  if(!count){badge?.remove();return;}
+  if(!badge){badge=document.createElement('span');badge.className='tm-nav-count';button.append(badge);}
+  badge.textContent=count>99?'99+':String(count);
+  badge.title='我的待辦事件＋待我結案事件：'+count;
+ }catch(e){console.error('訊息交辦提醒讀取失敗',e);}
+}
+const oldRenderNav=renderNav;
+renderNav=function(){oldRenderNav();void sidebarCount();};
+const oldNavigate=navigate;
+navigate=function(id){
+ if(id!=='teamMessages'){
+  if(state.page==='teamMessages'&&dirty()&&!confirm('有尚未儲存的內容，確定離開？'))return;
+  return oldNavigate(id);
+ }
+ if(state.page==='teamMessages'&&dirty()&&!confirm('有尚未儲存的內容，確定重新進入？'))return;
+ state.page='teamMessages';S.tab='unread';S.view='list';S.id=null;S.editing=null;
+ renderNav();$('topTitle').textContent='訊息交辦';$('crumb').textContent='內部消息與工作分工';
+ $('sidebar').classList.remove('open');html(empty('正在載入訊息…'));void refresh();
+ window.scrollTo({top:0,behavior:'auto'});
+};
+const home=modules.findIndex(x=>x.id==='dashboard');
+modules.splice(home<0?1:home+1,0,{section:'每天工作',id:'teamMessages',icon:'📝',label:'訊息交辦',crumb:'內部消息與工作分工',ready:true});
+window.teamMessagesModule={refresh};
 })();
