@@ -58,6 +58,35 @@
       resource_financial_crisis:'資源／經濟造成照顧壓力',recent_care_change:'照顧情境改變',
       violence_neglect_risk:'暴力／照顧疏忽風險',suicide_risk:'自殺相關風險'}
   };
+  const COMMON_LABELS={
+    healthcare_events:'就醫事件',unvisited_health_changes:'非例行健康變化',
+    medication_changes:'用藥異動',medication_corrections:'用藥紀錄修正',
+    opening_temporary_medications:'接案時臨時用藥',
+    baseline_important_conditions:'重要疾病／慢性病史',
+    baseline_ongoing_treatments:'固定治療／特殊醫療安排',
+    regular_followup_reason:'回診情形原因',
+    family_change_note:'重大家庭變化說明',family_summary:'家庭狀況摘要',
+    primary_caregiver_availability:'主要照顧者可提供時間',
+    primary_caregiver_role:'主要照顧者協助內容',
+    living_other:'其他居住安排',economic_note:'經濟狀況說明',
+    economic_care_impact_note:'經濟因素影響照顧的情形',
+    social_interaction_note:'社會互動說明',
+    community_participation_note:'活動參與補充',
+    risk_summary:'環境風險摘要',main_risks:'主要環境風險',
+    risk_notes:'環境風險備註',environment_summary:'居家環境概況',
+    level_difference_note:'門檻／高低差說明',
+    housing_other:'其他住宅類型',mobility_other:'其他移動方式',
+    note:'備註',reason:'原因',description:'說明',
+    action_note:'處理紀錄',health_change_note:'健康變化說明',
+    followup_note:'後續追蹤說明',medication_use_note:'用藥情形說明',
+    opening_fixed_unknown_note:'固定用藥無法確認原因',
+    opening_temporary_unknown_note:'臨時用藥無法確認原因',
+    baseline_conditions_unknown_note:'疾病史無法確認原因',
+    baseline_treatments_unknown_note:'特殊治療無法確認原因',
+    family_report:'家屬回報',impact_note:'影響情形',
+    care_impact_note:'照顧影響',comment:'補充說明',
+    planned_end_date:'預計結束日期'
+  };
   const MAX_ADL={feeding:10,transfer:15,grooming:5,toileting:10,bathing:5,walking:15,
     stairs:10,dressing:10,bowel:10,bladder:10};
   const local=new Map();
@@ -65,7 +94,7 @@
   const obj=x=>x&&typeof x==='object'&&!Array.isArray(x)?x:{};
   const arr=x=>Array.isArray(x)?x:[];
   const value=x=>String(x??'').trim();
-  const label=(code,key)=>LABELS[code]?.[key]||key.replace(/_/g,' ');
+  const label=(code,key)=>LABELS[code]?.[key]||COMMON_LABELS[key]||'其他說明';
   const fromNotes=(list,notes,code)=>{
     for(const [key,v] of Object.entries(obj(notes))){
       if(value(v))list.push('【'+label(code,key)+'】'+value(v));
@@ -98,14 +127,19 @@
   function generate(code,raw){
     const r=source(code,raw),find=[],recommend=[];
     if(code==='adl'||code==='iadl'){
-      const answers=obj(r.answers);
+      const answers=obj(r.answers),notes=obj(r.notes),covered=new Set();
       for(const [key,n] of Object.entries(answers)){
         if(n===null||n===undefined||n==='')continue;
         const current=Number(n),max=code==='adl'?MAX_ADL[key]:2;
-        if(Number.isFinite(current)&&max!==undefined&&current<max)
-          find.push('【'+label(code,key)+'】'+(code==='adl'?'評估得分 '+current+'／'+max+' 分':'需協助（'+(current===0?'完全依賴':'部分協助')+'）'));
+        if(Number.isFinite(current)&&max!==undefined&&current<max){
+          const result=code==='adl'?'評估得分 '+current+'／'+max+' 分':
+            '需協助（'+(current===0?'完全依賴':'部分協助')+'）';
+          const note=value(notes[key]);find.push('【'+label(code,key)+'】'+result+(note?'\n備註：'+note:''));
+          covered.add(key);
+        }
       }
-      fromNotes(find,r.notes,code);
+      for(const [k,n] of Object.entries(notes))
+        if(value(n)&&!covered.has(k))find.push('【'+label(code,k)+'】'+value(n));
     }else if(code==='spmsq'){
       if(r.is_unable){find.push('本次無法評估');if(value(r.unable_reason))find.push('無法評估原因：'+value(r.unable_reason));}
       for(const [key,st] of Object.entries(obj(r.judgments)))if(st==='wrong'||st==='unable_answer')
