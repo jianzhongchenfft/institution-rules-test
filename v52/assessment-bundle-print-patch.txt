@@ -322,7 +322,9 @@
         ...(['none','unknown'].includes(usage)?[]:[
         `<tr><td>服藥是否規律</td><td>${html(yesNo(m.medication_regular))}${m.medication_followup?`｜${html(m.medication_followup)}`:''}</td></tr>`,
         ]),
-        `<tr><td>藥物副作用</td><td>${html(yesNo(m.side_effect))}${m.side_effect_note?`｜${html(m.side_effect_note)}`:''}</td></tr>`
+        ...(!opening||!['none','unknown'].includes(usage)?[
+          `<tr><td>${opening?'疑似用藥後不適':'本期疑似用藥後不適'}</td><td>${html(m.side_effect==='present'?'有':m.side_effect==='none'?'無':'—')}${m.side_effect_note?`｜${html(m.side_effect_note)}`:''}</td></tr>`
+        ]:[])
       ],['項目','內容'])}`;
     body+=`<h2>二、用藥紀錄</h2>`;
     if(m.opening_no_fixed_medications===true||m.no_fixed_medications===true)body+=`<div class="plain">固定用藥：目前無固定用藥。</div>`;
@@ -347,7 +349,7 @@
     else body+=rowTable(MED_CHECKS.map(([key,label])=>`<tr><td>${html(label)}</td><td>${html(MED_STATUS[safe(checks[key]).status]||safe(checks[key]).status)}</td><td>${html(safe(checks[key]).note)}</td></tr>`),['項目','狀態','備註']);
     if(m.unvisited_health_change||m.care_impact||m.care_impact_note){
       body+=`<h2>五、後續健康／照顧影響</h2>`+rowTable([
-        `<tr><td>未就醫之健康變化</td><td>${html(m.unvisited_health_change)}${m.unvisited_health_change_note?`｜${html(m.unvisited_health_change_note)}`:''}</td></tr>`,
+        `<tr><td>未就醫之健康變化</td><td>${m.unvisited_health_change_note?html(m.unvisited_health_change_note):m.unvisited_health_change==='no'?'無':'—'}</td></tr>`,
         `<tr><td>對照顧計畫影響</td><td>${html(({no_impact:'無明顯影響',observe:'持續觀察',adjust_plan:'需調整機構照顧計畫',contact_external:'建議聯繫A單位／醫療端'})[m.care_impact]||m.care_impact)}${m.care_impact_note?`｜${html(m.care_impact_note)}`:''}</td></tr>`
       ],['項目','內容']);
     }
