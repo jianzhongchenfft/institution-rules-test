@@ -6,6 +6,20 @@
     if(!row||!canEdit(row))return toast('您沒有此個案的評估編輯權限','error');
 
     syncInputs();
+    const medicationUsage=local.medicalInfo.medication_use_status||'';
+    if(finalize){
+      if(!['using','none','unknown'].includes(medicationUsage))
+        return toast('請確認目前是否使用藥物','warn');
+      if(medicationUsage==='unknown'&&!String(local.medicalInfo.medication_use_note||'').trim())
+        return toast('請說明無法確認用藥情形的原因','warn');
+      if(medicationUsage==='none'){
+        const fixed=rebuildFixedMedicationEntries();
+        const temporary=mode==='baseline'&&!local.medicalInfo.opening_no_temporary_medications
+          &&safeArray(local.medicalInfo.opening_temporary_medications).some(x=>String(x.medication||'').trim());
+        if(fixed.length||temporary)
+          return toast('目前仍有已登錄藥物，請先確認清單；後續評估如已停用固定藥物，請用「新增用藥異動」記錄停用','warn');
+      }
+    }
 
     if(finalize&&answeredCount()!==10){
       const missing=HEALTH_ITEMS
@@ -24,17 +38,17 @@
         return toast('以下健康項目選擇「需觀察／異常轉介」，請填寫備註：'+missingHealthNotes.map(([,label])=>label).join('、'),'warn');
       }
 
-      const missingMedicationNotes=MED_CHECKS.filter(([key])=>{
+      const missingMedicationNotes=medicationUsage==='using'?MED_CHECKS.filter(([key])=>{
         const item=local.medicationChecks[key]||{};
         return ['improve','not_applicable'].includes(item.status)
           && !String(item.note||'').trim();
-      });
+      }):[];
       if(missingMedicationNotes.length){
         return toast('以下用藥安全項目選擇「需改善／不適用」，請填寫備註：'+missingMedicationNotes.map(([,label])=>label).join('、'),'warn');
       }
     }
 
-    if(finalize&&mode==='baseline'){
+    if(finalize&&mode==='baseline'&&medicationUsage!=='unknown'){
       const noFixed=local.medicalInfo.opening_no_fixed_medications===true;
       if(!noFixed&&local.fixedMedicationBaseEntries.length===0){
         return toast('請填寫接案時既有固定用藥，或勾選「接案時無固定用藥」','warn');
@@ -52,6 +66,19 @@
     const medicalInfoForSave={...local.medicalInfo};
     delete medicalInfoForSave.diagnosis_change;
     delete medicalInfoForSave.diagnosis_change_note;
+    if(medicationUsage==='using'){
+      medicalInfoForSave.medication_use_note='';
+      if(medicalInfoForSave.medication_method!=='assisted')medicalInfoForSave.medication_assisted_by='';
+    }else{
+      medicalInfoForSave.medication_method='';
+      medicalInfoForSave.medication_assisted_by='';
+      medicalInfoForSave.medication_regular='';
+      medicalInfoForSave.medication_followup='';
+    }
+    if(medicationUsage!=='using'&&mode==='baseline'){
+      medicalInfoForSave.side_effect='';
+      medicalInfoForSave.side_effect_note='';
+    }
 
     const c=caseById(row.case_id);
     const savedMedical=safe(local.record?.medical_info);
@@ -96,16 +123,17 @@
     }
 
     if(mode==='change'){
-      if(medicalInfoForSave.no_healthcare_events===true){
-        medicalInfoForSave.healthcare_events=[];
-      }else{
-        medicalInfoForSave.healthcare_events=safeArray(medicalInfoForSave.healthcare_events)
-          .filter(item=>Object.values(safe(item)).some(v=>String(v||'').trim()!==''));
-      }
+      medicalInfoForSave.healthcare_events=safeArray(medicalInfoForSave.healthcare_events)
+        .filter(item=>Object.values(safe(item)).some(v=>String(v||'').trim()!==''));
+      medicalInfoForSave.no_healthcare_events=medicalInfoForSave.healthcare_events.length===0;
 
-      if(medicalInfoForSave.unvisited_health_change!=='yes'){
-        medicalInfoForSave.unvisited_health_change_note='';
-      }
+      const unvisited=safeArray(medicalInfoForSave.unvisited_health_changes)
+        .map(x=>({note:String(x.note||'').trim()}));
+      if(finalize&&unvisited.some(x=>!x.note))
+        return toast('請填寫已新增的健康變化說明，或移除空白紀錄','warn');
+      medicalInfoForSave.unvisited_health_changes=unvisited.filter(x=>x.note);
+      medicalInfoForSave.unvisited_health_change=medicalInfoForSave.unvisited_health_changes.length?'yes':'no';
+      medicalInfoForSave.unvisited_health_change_note=medicalInfoForSave.unvisited_health_changes.map(x=>x.note).join('\n');
 
       let medicationChanges=medicalInfoForSave.no_medication_changes===true
         ?[]
@@ -169,7 +197,7 @@
       const {error}=await db.rpc('save_assessment_health',{
         p_event_id:row.id,
         p_medical_info:medicalInfoForSave,
-        p_medication_checks:local.medicationChecks,
+        p_medication_checks:medicationUsage==='using'?local.medicationChecks:{},
         p_health_items:local.healthItems,
         p_health_notes:local.healthNotes,
         p_finalize:!!finalize,
