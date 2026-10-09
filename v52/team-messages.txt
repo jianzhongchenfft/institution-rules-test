@@ -28,10 +28,21 @@ style.textContent=
 '.tm-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:13px}.tm-tab{padding:9px 13px;border:1px solid #e9dad4;background:#fff;border-radius:10px;font:inherit;font-weight:750;cursor:pointer}.tm-tab.active{background:#fff1e9;color:#a65c40;border-color:#d29278}.tm-tab-count{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#d07755;color:#fff;font-size:12px;min-width:20px;height:20px;margin-left:5px;padding:0 5px;box-sizing:border-box}'+
 '.tm-card,.tm-task{padding:14px;background:#fff;border:1px solid #f0ded7;border-radius:13px}.tm-list,.tm-tasks{display:grid;gap:8px}.tm-item{cursor:pointer;padding:10px 14px;transition:background .15s,border-color .15s}.tm-item:hover{background:#fff8f3;border-color:#d99579}.tm-item:focus-visible{outline:3px solid #d9795a;outline-offset:2px}.tm-item.unread{background:#fffaf8;border-left:4px solid #d94848}.tm-item.unread .tm-snippet{font-weight:800}.tm-item.read{border-left:4px solid #b5cec1}.tm-item.action{background:#fff4ee;border-color:#eaa28b;border-left:5px solid #d86549}.tm-item.closing{background:#fff6ec;border-color:#e9b38f;border-left:5px solid #cb7749}'+
 '.tm-line{display:flex;align-items:center;justify-content:space-between;gap:9px}.tm-meta{display:flex;flex-wrap:wrap;gap:2px 13px;min-width:0;color:#6b7280;font-size:12px;line-height:1.45}.tm-main{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px}.tm-snippet{min-width:0;flex:1;font-size:14px;line-height:1.5;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:pre-wrap}.tm-pill{display:inline-block;flex-shrink:0;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:750;white-space:nowrap;color:#475569;background:#f1f5f9}.tm-pill.ready{background:#fff3d5;color:#885a03}.tm-pill.working{background:#fff0e9;color:#a45d49}.tm-pill.closed{background:#e9f7ec;color:#267448}.tm-action{color:#b45335;background:#fce6d8;border-radius:7px;padding:3px 7px;font-size:12px;font-weight:800;white-space:nowrap}'+
-'.tm-field{display:grid;gap:6px;margin:13px 0}.tm-field label,.tm-small-head{font-weight:800;font-size:13px}.tm-field textarea,.tm-field select,.tm-edit{box-sizing:border-box;width:100%;padding:10px;background:#fff;border:1px solid #d1d5db;border-radius:9px;font:inherit;color:#1f2937}.tm-field textarea,.tm-edit{resize:vertical;min-height:76px;line-height:1.6}.tm-form-grid{display:grid;grid-template-columns:210px minmax(0,1fr);gap:10px}.tm-form-row{border:1px solid #f0ded7;background:#faf8f7;padding:12px;border-radius:10px;margin:10px 0}.tm-add{margin:9px 0;display:flex;justify-content:flex-start}.tm-options,.tm-reader-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.tm-options{padding:12px;border:1px solid #f0ded7;border-radius:10px;background:#faf8f7}.tm-option{display:flex;align-items:center;gap:8px;font-size:14px}.tm-option input,.tm-check input{width:17px;height:17px;accent-color:#dc9479}.tm-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px}.tm-description{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;margin:9px 0}'+
+'.tm-field{display:grid;gap:6px;margin:13px 0}.tm-field label,.tm-small-head{font-weight:800;font-size:13px}.tm-field textarea,.tm-field select,.tm-edit{box-sizing:border-box;width:100%;padding:10px;background:#fff;border:1px solid #d1d5db;border-radius:9px;font:inherit;color:#1f2937}.tm-field textarea,.tm-edit{resize:vertical;min-height:76px;line-height:1.6}.tm-form-grid{display:grid;grid-template-columns:145px minmax(0,1fr);gap:10px;align-items:start}.tm-form-grid .tm-field{align-content:start}.tm-form-grid select{height:42px}.tm-field textarea.tm-grow{min-height:42px;resize:none;overflow-y:hidden;line-height:1.6}.tm-form-row{border:1px solid #f0ded7;background:#faf8f7;padding:12px;border-radius:10px;margin:10px 0}.tm-add{margin:9px 0;display:flex;justify-content:flex-start}.tm-options,.tm-reader-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.tm-options{padding:12px;border:1px solid #f0ded7;border-radius:10px;background:#faf8f7}.tm-option{display:flex;align-items:center;gap:8px;font-size:14px}.tm-option input,.tm-check input{width:17px;height:17px;accent-color:#dc9479}.tm-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px}.tm-description{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;margin:9px 0}'+
 '.tm-reader{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:9px;border:1px solid #e5e7eb;background:#f8fafc;font-size:13px}.tm-reader.read{background:#effaf3;color:#267448}.tm-reader.unread{background:#fff4f4;border-color:#ffd4d4;font-weight:750}.tm-check{display:flex;align-items:center;gap:8px;font-weight:750;cursor:pointer}.tm-section{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 9px}.tm-section h3{font-size:17px;margin:0}.tm-task{display:flex;justify-content:space-between;align-items:center;gap:13px}.tm-task-label{font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}.tm-events{display:grid;gap:9px}.tm-entry{background:#fff;padding:9px 12px;border-left:3px solid #d69a80;border-radius:0 10px 10px 0}.tm-entry-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}.tm-entry-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65}.tm-compose{border:1px solid #f0ded7;background:#faf8f7;border-radius:12px;padding:13px;margin-top:12px}.tm-summary{border:1px solid #f0ded7;background:#fff7f3;border-radius:12px;padding:14px;margin-top:15px}.tm-empty{text-align:center;padding:30px 14px;border:1px dashed #e8d9d1;border-radius:12px;color:#6b7280}.tm-nav-count{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;background:#d92d20;color:white;font-weight:850;font-size:12px;border-radius:999px;min-width:22px;height:22px;padding:0 5px;box-sizing:border-box}'+
 '@media(max-width:700px){.tm-head{flex-direction:column}.tm-form-grid,.tm-options,.tm-reader-grid{grid-template-columns:1fr}.tm-task{align-items:flex-start}.tm-meta{gap:2px 8px}.tm-item{padding:10px 11px}}';
 document.head.appendChild(style);
+
+// 「內容」與「交辦內容」預設單行；輸入換行或自動折行時即時增高，刪字也會縮回。
+function autoGrow(field){
+ if(!field)return;
+ const adjust=()=>{
+  field.style.height='auto';
+  field.style.height=Math.max(42,field.scrollHeight)+'px';
+ };
+ field.addEventListener('input',adjust);
+ adjust();
+}
 
 async function load(){
  const [m,s]=await Promise.all([
@@ -129,10 +140,10 @@ function addTask(){
  row.innerHTML='<div class="tm-line"><strong data-order>分工</strong><button class="btn sm" data-remove>移除</button></div>'+
  '<div class="tm-form-grid"><div class="tm-field"><label>承辦人</label><select data-person>'+
  '<option value="">請選擇承辦人</option>'+S.staff.map(x=>'<option value="'+h(x.id)+'">'+h(x.display_name)+'</option>').join('')+
- '</select></div><div class="tm-field"><label>交辦內容</label><textarea rows="2" data-work maxlength="1000" placeholder="例如：聯絡個案確認請假"></textarea></div></div>';
+ '</select></div><div class="tm-field"><label>交辦內容</label><textarea class="tm-grow" rows="1" data-work maxlength="1000" placeholder="例如：聯絡個案確認請假"></textarea></div></div>';
  row.querySelector('[data-remove]').onclick=()=>{row.remove();orderRows();renderChoices();};
  row.querySelector('[data-person]').onchange=renderChoices;
- mount.append(row);orderRows();renderChoices();
+ mount.append(row);autoGrow(row.querySelector('[data-work]'));orderRows();renderChoices();
 }
 function orderRows(){root().querySelectorAll('[data-order]').forEach((el,i)=>el.textContent='分工 '+(i+1));}
 function createDirty(){return S.view==='create'&&!!root()&&
@@ -141,8 +152,8 @@ function createForm(){
  S.view='create';S.id=null;S.editing=null;S.chosen=new Set(S.staff.map(x=>x.id));
  html('<div class="tm-head"><div><h1>新增訊息</h1><p>建立者：'+h(state.profile.display_name)+
  '｜時間由系統記錄</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
- '<section class="tm-card"><div class="tm-field"><label>說明 *</label>'+
- '<textarea id="tm-description" rows="5" maxlength="5000" placeholder="例如：居服員○○○來電，稍後臨時需要就醫。"></textarea></div>'+
+ '<section class="tm-card"><div class="tm-field"><label>內容 *</label>'+
+ '<textarea id="tm-description" class="tm-grow" rows="1" maxlength="5000" placeholder="例如：居服員○○○來電，稍後臨時需要就醫。"></textarea></div>'+
  '<div class="tm-field"><div class="tm-line"><label>通知對象</label><span>'+
  '<button class="btn sm" id="tm-all">全選</button> <button class="btn sm" id="tm-none">清除</button></span></div>'+
  '<div class="tm-options" id="tm-options"></div></div>'+
@@ -156,6 +167,7 @@ function createForm(){
  root().querySelector('#tm-none').onclick=()=>{S.chosen.clear();renderChoices();};
  root().querySelector('#tm-add').onclick=addTask;
  root().querySelector('#tm-submit').onclick=createMessage;
+ autoGrow(root().querySelector('#tm-description'));
  renderChoices();
 }
 async function createMessage(){
@@ -236,7 +248,7 @@ function detail(id){
  const jobs=tasks(id),canClose=!m.closed_at&&jobs.length&&jobs.every(x=>x.is_done);
  html('<div class="tm-head"><div><h1>訊息詳情</h1><p>建立者：'+h(name(m.created_by_staff_id))+
  '｜'+h(stamp(m.created_at))+'</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
- '<section class="tm-card"><div class="tm-line"><strong>說明</strong>'+
+ '<section class="tm-card"><div class="tm-line"><strong>內容</strong>'+
  '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
  '<div class="tm-description">'+h(m.description)+'</div>'+
  (m.closed_at?'<p class="tm-muted">結案時間：'+h(stamp(m.closed_at))+'</p>':'')+'</section>'+
