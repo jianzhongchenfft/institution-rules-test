@@ -726,10 +726,13 @@
         }
         syncInputs();
         if(key==='medication_use_status'&&mode==='baseline'&&local.medicalInfo.medication_use_status==='none'){
+          local.fixedMedicationBaseEntries=[];
+          local.medicalInfo.opening_temporary_medications=[];
           local.medicalInfo.opening_fixed_status='no';
           local.medicalInfo.opening_temporary_status='no';
           local.medicalInfo.opening_no_fixed_medications=true;
           local.medicalInfo.opening_no_temporary_medications=true;
+          rebuildFixedMedicationEntries();
         }
         if(['baseline_conditions_status','baseline_treatments_status','regular_followup','medication_method','medication_use_status','opening_fixed_status','opening_temporary_status'].includes(key)){
           const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
