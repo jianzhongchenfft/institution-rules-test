@@ -146,7 +146,7 @@
     previousSummaryEvent:null,
     toolSummaryRows:[],toolMerged:{findings:'',recommendations:'',missing:[]},
     overallSourceHash:'',overallSignature:{findings:'',recommendations:''},
-    overallPreview:false,lastSavedOverall:null
+    overallPreview:false,lastSavedOverall:null,savedOverallSnapshot:null
   };
 
   const safeObj=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
@@ -297,6 +297,7 @@
       findings:String(summary.data.key_findings||''),
       recommendations:String(summary.data.care_recommendations||'')
     }:null;
+    local.savedOverallSnapshot=summary.data?JSON.parse(JSON.stringify(summary.data)):null;
     if(!summary.data){
       local.summary.key_findings=local.toolMerged.findings;
       local.summary.care_recommendations=local.toolMerged.recommendations;
@@ -969,7 +970,9 @@
   }
 
   function openPrintPreview(){
+    const editingSummary=local.summary;
     try{
+      if(local.savedOverallSnapshot)local.summary=JSON.parse(JSON.stringify(local.savedOverallSnapshot));
       if(overallNeedsReview())toast('整體評估總結尚未確認最新單項內容；仍會列印最後儲存的版本','warn');
       const html=buildPrintHtml();
       const w=window.open('','_blank');
@@ -983,6 +986,8 @@
     }catch(err){
       console.error(err);
       toast('建立評估列印預覽失敗：'+(err?.message||err),'error');
+    }finally{
+      local.summary=editingSummary;
     }
   }
 
