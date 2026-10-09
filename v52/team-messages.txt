@@ -3,7 +3,7 @@
 'use strict';
 if(window.teamMessagesModule)return;
 const ROLES=['admin','organization_manager','business_manager','supervisor'];
-const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false,taskAction:null};
+const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false,taskAction:null,addingTask:false};
 const root=()=>document.getElementById('tm-root');
 const h=v=>escapeHTML(String(v==null?'':v));
 const name=id=>S.staff.find(x=>x.id===id)?.display_name||'原使用者';
@@ -91,7 +91,7 @@ function card(m){
   (tag?'<span class="tm-action">'+tag+'</span>':'')+'</div></article>';
 }
 function listing(){
- S.view='list';S.id=null;S.editing=null;S.taskAction=null;
+ S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;
  const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(needsCreatorAction).length;
  const rows=S.messages.filter(m=>{
   if(S.tab==='unread')return myRead(m.id)?.read_at===null;
@@ -105,7 +105,7 @@ function listing(){
  if(S.tab==='assigned')rows.sort((a,b)=>Number(needsHelp(b))-Number(needsHelp(a))||Number(ready(b))-Number(ready(a)));
  if(S.tab==='closed')rows.sort((a,b)=>new Date(b.closed_at)-new Date(a.closed_at));
  const tabs=[['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案']];
- html('<div class="tm-head"><div><h1>訊息交辦</h1><p>消息集中管理，事件回報依時間保留完整歷程。</p></div>'+
+ html('<div class="tm-head" style="justify-content:flex-end">'+
   '<button class="btn primary" id="tm-new">＋ 新增訊息</button></div>'+
   '<div class="tm-tabs">'+tabs.map(([id,label])=>{
    const n=id==='mine'?pendingCount:id==='assigned'?closeCount:null;
@@ -170,7 +170,7 @@ function orderRows(){
 function createDirty(){return S.view==='create'&&!!root()&&
  (!!root().querySelector('#tm-description')?.value.trim()||!!root().querySelector('.tm-new-task'));}
 function createForm(){
- S.view='create';S.id=null;S.editing=null;S.taskAction=null;S.chosen=new Set(S.staff.map(x=>x.id));
+ S.view='create';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.chosen=new Set(S.staff.map(x=>x.id));
  html('<div class="tm-head"><div><h1>新增訊息</h1><p>建立者：'+h(state.profile.display_name)+
  '｜時間由系統記錄</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
  '<section class="tm-card"><div class="tm-field"><label>內容 *</label>'+
@@ -255,6 +255,23 @@ function taskPanel(m){
    '<div class="tm-task-actions">'+buttons.join('')+'</div>'+composer+'</section>';
  }).join('')+'</div>';
 }
+function additionalTaskPanel(message){
+ if(message.closed_at||message.created_by_staff_id!==me())return '';
+ if(!S.addingTask){
+  return '<div class="tm-add" style="margin-top:10px">'+
+   '<button class="btn sm" type="button" id="tm-show-add-task">＋ 增加分工</button></div>';
+ }
+ return '<section class="tm-task-compose" style="margin-top:10px">'+
+  '<div class="tm-small-head">新增分工</div>'+
+  '<div class="tm-work-row" style="margin-top:9px"><span class="tm-work-number">＋</span>'+
+  '<select id="tm-extra-person" data-person aria-label="新增分工承辦人">'+
+  '<option value="">請選擇承辦人</option>'+
+  S.staff.map(p=>'<option value="'+h(p.id)+'">'+h(p.display_name)+'</option>').join('')+
+  '</select><textarea id="tm-extra-work" data-work class="tm-grow" rows="1" maxlength="1000"'+
+  ' aria-label="新增分工內容" placeholder="例如：聯絡個案確認請假"></textarea><span></span></div>'+
+  '<div class="tm-actions"><button class="btn primary sm" type="button" id="tm-save-extra">新增分工</button>'+
+  '<button class="btn sm" type="button" id="tm-cancel-extra">取消</button></div></section>';
+}
 function historyPanel(m){
  const rows=reports(m.id);
  return '<div class="tm-section"><h3>事件回報歷程（'+rows.length+'）</h3></div>'+
@@ -278,6 +295,7 @@ function dirty(){
  if(S.view!=='detail'||!root())return false;
  if(root().querySelector('#tm-compose')?.value.trim())return true;
  if(root().querySelector('[data-task-note]')?.value.trim())return true;
+ if(root().querySelector('#tm-extra-work')?.value.trim()||root().querySelector('#tm-extra-person')?.value)return true;
  if(S.editing){
   const original=S.updates.find(x=>x.id===S.editing);
   const edited=root().querySelector('[data-report="'+S.editing+'"] [data-edit-body]')?.value;
@@ -288,22 +306,26 @@ function dirty(){
 function detail(id){
  const m=S.messages.find(x=>x.id===id);if(!m){listing();return;}
  S.view='detail';S.id=id;
- const jobs=tasks(id),remaining=jobs.filter(x=>!x.is_done).length;
+ const jobs=tasks(id);
  const isOwner=m.created_by_staff_id===me();
  const canClose=Boolean(!m.closed_at&&jobs.length&&isOwner);
- const allFinished=Boolean(jobs.length&&remaining===0);
  html('<div class="tm-head"><div><h1>訊息詳情</h1><p>建立者：'+h(name(m.created_by_staff_id))+
  '｜'+h(stamp(m.created_at))+'</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
  '<section class="tm-card"><div class="tm-line"><strong>內容</strong>'+
  '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
  '<div class="tm-description">'+h(m.description)+'</div>'+
  (m.closed_at?'<p class="tm-muted">結案時間：'+h(stamp(m.closed_at))+'</p>':'')+'</section>'+
- readPanel(id)+taskPanel(m)+historyPanel(m)+
- (canClose?'<div class="tm-summary"><strong>'+
-   (allFinished?'所有分工已完成，可以結案。':'尚有 '+remaining+' 項分工未完成；建立者仍可直接結案。')+
-   '</strong><div class="tm-actions"><button class="btn primary" id="tm-close">確認結案</button></div></div>':
-   (!m.closed_at&&allFinished?'<div class="tm-summary"><strong>全部分工已完成，待建立者結案。</strong></div>':'')));
+ readPanel(id)+taskPanel(m)+additionalTaskPanel(m)+historyPanel(m)+
+ (canClose?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-close">確認結案</button></div>':''));
  root().querySelector('#tm-back').onclick=()=>{if(!dirty()||confirm('尚有未儲存的回報，確定返回？'))listing();};
+ root().querySelector('#tm-show-add-task')?.addEventListener('click',()=>{
+  if(dirty()){toast('請先處理未儲存的內容','error');return;}
+  if(jobs.length>=20){toast('一則訊息最多20項分工','error');return;}
+  S.addingTask=true;detail(id);
+ });
+ root().querySelector('#tm-save-extra')?.addEventListener('click',()=>addExtraTask(id));
+ root().querySelector('#tm-cancel-extra')?.addEventListener('click',()=>{S.addingTask=false;detail(id);});
+ if(S.addingTask)autoGrow(root().querySelector('#tm-extra-work'));
  root().querySelector('#tm-read')?.addEventListener('change',()=>markRead(id));
  root().querySelectorAll('[data-done]').forEach(input=>input.onchange=()=>setDone(input));
  root().querySelectorAll('[data-ack]').forEach(btn=>btn.onclick=()=>taskAction(btn.dataset.ack,'ack'));
@@ -324,6 +346,26 @@ function detail(id){
  root().querySelectorAll('[data-edit-save]').forEach(btn=>btn.onclick=()=>saveReport(id,btn.dataset.editSave));
  root().querySelectorAll('[data-edit-cancel]').forEach(btn=>btn.onclick=()=>{S.editing=null;detail(id);});
  root().querySelector('#tm-close')?.addEventListener('click',()=>closeMessage(id));
+}
+async function addExtraTask(messageId){
+ if(S.busy)return;
+ const message=S.messages.find(x=>x.id===messageId);
+ if(!message||message.closed_at||message.created_by_staff_id!==me())return;
+ const person=root().querySelector('#tm-extra-person')?.value;
+ const description=root().querySelector('#tm-extra-work')?.value.trim();
+ if(!person){toast('請選擇承辦人','error');return;}
+ if(!description){toast('請填寫交辦內容','error');return;}
+ const button=root().querySelector('#tm-save-extra');
+ button.disabled=true;S.busy=true;
+ try{
+  const {error}=await db.rpc('add_team_message_task',{
+   p_message_id:messageId,p_description:description,p_assignee_staff_id:person
+  });
+  if(error)throw error;
+  S.addingTask=false;
+  await load();toast('已新增分工，承辦人將在我的待辦看到事件','success');detail(messageId);
+ }catch(e){button.disabled=false;toast('新增分工失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
 }
 async function markRead(id){
  if(S.busy)return;
@@ -440,7 +482,7 @@ navigate=function(id){
   return oldNavigate(id);
  }
  if(state.page==='teamMessages'&&dirty()&&!confirm('有尚未儲存的內容，確定重新進入？'))return;
- state.page='teamMessages';S.tab='unread';S.view='list';S.id=null;S.editing=null;S.taskAction=null;
+ state.page='teamMessages';S.tab='unread';S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;
  renderNav();$('topTitle').textContent='訊息交辦';$('crumb').textContent='內部消息與工作分工';
  $('sidebar').classList.remove('open');html(empty('正在載入訊息…'));void refresh();
  window.scrollTo({top:0,behavior:'auto'});
