@@ -698,7 +698,7 @@
             <h3 style="margin-bottom:5px">${payrollMonthLabel(state.overtimeMonth)}薪資結算</h3>
             <div class="ot-detail" data-payroll-status-note>${escapeHTML(settledInfo)}</div>
           </div>
-          ${!settlement?'<button id="payrollCloseBtn" class="btn primary">✓ 確認本月已結算</button>':'<span class="ot-status approved">🔒 已結算</span>'}
+          ${!settlement?'<button id="payrollCloseBtn" class="btn primary">結算本月加班費</button>':'<span class="ot-status approved">🔒 已結算</span>'}
         </div>
       </section>
 
