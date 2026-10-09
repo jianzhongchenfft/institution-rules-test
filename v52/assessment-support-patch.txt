@@ -399,7 +399,7 @@
 
   function renderOverall(){
     const s=local.summary;
-    return `<section class="support-section"><div class="support-section-head"><div><strong>七、整體支持評估與後續</strong><small>此處不計分，由督導依前述家庭與社會支持狀況綜合判斷。</small></div></div>
+    return `<section class="support-section"><div class="support-section-head"><div><strong>七、整體支持評估</strong><small>此處不計分，由督導依前述家庭與社會支持狀況綜合判斷。</small></div></div>
       <div class="support-grid">
         <div class="support-field"><label>整體支持狀況 *</label><select data-support-summary="overall_support">
           <option value="">請選擇</option><option value="adequate" ${s.overall_support==='adequate'?'selected':''}>支持充足</option><option value="needs_attention" ${s.overall_support==='needs_attention'?'selected':''}>部分不足／需追蹤</option><option value="weak" ${s.overall_support==='weak'?'selected':''}>支持薄弱／需介入</option>
