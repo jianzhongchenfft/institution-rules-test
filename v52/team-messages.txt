@@ -159,8 +159,8 @@ function createForm(){
  '<div class="tm-recipient-body"><div class="tm-line"><span></span><span>'+
  '<button class="btn sm" id="tm-all" type="button">全選</button> <button class="btn sm" id="tm-none" type="button">清除</button></span></div>'+
  '<div class="tm-options" id="tm-options"></div></div></details>'+
- '<div class="tm-small-head">分工（選填）</div><div class="tm-add">'+
- '<button class="btn sm" id="tm-add">＋ 增加分工</button></div><div id="tm-tasks"></div>'+
+ '<div class="tm-small-head">分工（選填）</div><div id="tm-tasks"></div>'+
+ '<div class="tm-add"><button class="btn sm" id="tm-add" type="button">＋ 增加分工</button></div>'+
  '<div class="tm-actions"><button class="btn primary" id="tm-submit">建立訊息</button>'+
  '<button class="btn" id="tm-cancel">取消</button></div></section>');
  const back=()=>{if(!createDirty()||confirm('未發布的內容不會保留，確定返回？'))listing();};
