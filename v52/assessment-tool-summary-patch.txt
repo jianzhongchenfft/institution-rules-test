@@ -217,6 +217,16 @@
     </section>`;
     return html;
   }
+  function mount(eventId,code,record,rootSelector,actionSelector){
+    const root=document.querySelector(rootSelector);
+    if(!root)return;
+    const view=render(eventId,code,record);
+    if(!view)return;
+    const action=root.querySelector(actionSelector);
+    if(action)action.insertAdjacentHTML('beforebegin',view);
+    else root.insertAdjacentHTML('beforeend',view);
+    bind(eventId,code,record);
+  }
   function bind(eventId,code,record){
     const root=document.querySelector('[data-ats-root="'+code+'"]');if(!root)return;
     const s=get(eventId,code,record);if(!s)return;
@@ -304,5 +314,5 @@
     .ats-compare-row pre{white-space:pre-wrap;word-break:break-word;min-height:70px;background:#f8f9fb;border-radius:8px;padding:9px;font-size:11px;font-family:inherit}
     @media(max-width:720px){.ats-compare-row>div{display:block;width:100%}}
   `;document.head.appendChild(style);
-  window.v52AssessmentToolSummary={load,get,render,bind,saveAfterTool,list,merged,printBlock,fingerprint,generate,source,TOOL_TABLE,TITLES};
+  window.v52AssessmentToolSummary={load,get,render,mount,bind,saveAfterTool,list,merged,printBlock,fingerprint,generate,source,TOOL_TABLE,TITLES};
 })();
