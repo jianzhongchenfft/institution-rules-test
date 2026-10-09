@@ -550,7 +550,7 @@
       </div>
       ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
       ${finalized?`<div class="asum-complete">本次整體評估已完成。若後續修正總結內容，系統會保留修改歷程。</div>`:''}
-      ${finalized&&legacyTrackingIncomplete()?`<div class="asum-help" style="border-color:#fedf89;background:#fffaeb;color:#93370d"><strong>前次追蹤尚未補充：</strong>此筆總結是在前次追蹤功能上線前完成，可於本頁補充後按「儲存修正」。</div>`:''}
+      ${finalized&&legacyTrackingIncomplete()?`<div class="asum-help" style="border-color:#fedf89;background:#fffaeb;color:#93370d"><strong>前次追蹤尚未補充：</strong>此筆總結尚未填寫前次追蹤結果，可於本頁補充後按「儲存修正」。</div>`:''}
       <div class="asum-help">以下工具摘要均讀取本次評估已儲存的正式紀錄，並與評估日期以前最近一次正式完成的同類工具比較；不依賴家訪紀錄。</div>
 
       <section class="asum-section">
