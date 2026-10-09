@@ -537,6 +537,47 @@ async function voidReport(messageId,reportId){
  }catch(error){toast('作廢回報失敗：'+(error.message||error),'error');}
  finally{S.busy=false;}
 }
+async function saveEventContent(id){
+ if(S.busy)return;
+ const m=S.messages.find(x=>x.id===id);
+ if(!m||m.closed_at||m.created_by_staff_id!==me())return;
+ const description=root().querySelector('#tm-message-text')?.value.trim();
+ const notify=root().querySelector('#tm-message-notify')?.checked!==false;
+ if(!description){toast('事件內容不可空白','error');return;}
+ if(description===m.description){toast('事件內容尚未修改','error');return;}
+ const btn=root().querySelector('#tm-message-edit-save');
+ if(btn)btn.disabled=true;
+ S.busy=true;
+ try{
+  const {error}=await db.rpc('team_message_manage_event',{
+   p_message_id:id,p_action:'edit',p_description:description,p_notify:notify
+  });
+  if(error)throw error;
+  S.editingMessage=false;
+  await load();toast(notify?'事件內容已更新，通知對象重新列入未閱讀':'事件內容已更新，不另行通知','success');detail(id);
+ }catch(e){if(btn)btn.disabled=false;toast('修改事件內容失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+async function reopenEvent(id){
+ if(S.busy)return;
+ if(dirty()){toast('請先處理未儲存的內容','error');return;}
+ const m=S.messages.find(x=>x.id===id);
+ if(!m||!m.closed_at||m.created_by_staff_id!==me())return;
+ const unfinished=activeTasks(id).filter(x=>!x.is_done).length;
+ const confirmMessage=unfinished
+  ?'重新開啟後，原有 '+unfinished+' 項未完成分工將恢復列入承辦人待辦。確定重新開啟？'
+  :'確定重新開啟此事件？原本分工的完成與取消狀態不會改變。';
+ if(!confirm(confirmMessage))return;
+ S.busy=true;
+ try{
+  const {error}=await db.rpc('team_message_manage_event',{
+   p_message_id:id,p_action:'reopen',p_description:null,p_notify:false
+  });
+  if(error)throw error;
+  await load();toast('事件已重新開啟，保留原分工與閱讀狀態','success');detail(id);
+ }catch(e){toast('重新開啟失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
 async function markRead(id){
  if(S.busy)return;
  const input=root().querySelector('#tm-read');if(!input)return;
@@ -622,7 +663,7 @@ async function closeMessage(id){
  try{
   const {data,error}=await db.from('team_messages').update({closed_at:new Date().toISOString()}).eq('id',id).select('id');
   if(error)throw error;if(!data?.length)throw new Error('僅建立者能將尚未結案的交辦事件結案');
-  await load();toast('已結案','success');detail(id);
+  await load();toast('已結案，事件已移至「已結案」','success');listing();
  }catch(e){toast('結案失敗：'+(e.message||e),'error');}
  finally{S.busy=false;}
 }
