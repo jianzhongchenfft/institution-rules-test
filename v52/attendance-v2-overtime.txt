@@ -1708,7 +1708,7 @@
       title:`核准紀錄調整｜${monthLabel(state.overtimeMonth)}`,
       html:`
         <div class="ot-rule-highlight" style="margin-top:0">${settled
-          ?'此月份已完成薪資結算，所有原始資料均已鎖定，不能直接作廢；若需調整，後續請使用「月結更正」流程。'
+          ?'此月份已完成薪資結算，原始資料已鎖定；如需調整，請先由機構負責人或系統管理員撤銷月結，再依原有流程處理。'
           :'此功能不會刪除原紀錄。作廢後原紀錄仍會保留並標示「已作廢」；如需更正內容，請再建立一筆正確申請重新送審。'}</div>
         <div style="margin-top:12px">${renderCorrectionRows(items,settled)}</div>`,
       large:true,
