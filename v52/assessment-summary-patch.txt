@@ -970,6 +970,7 @@
 
   function openPrintPreview(){
     try{
+      if(overallNeedsReview())toast('整體評估總結尚未確認最新單項內容；仍會列印最後儲存的版本','warn');
       const html=buildPrintHtml();
       const w=window.open('','_blank');
       if(!w){
