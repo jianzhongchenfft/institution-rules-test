@@ -909,7 +909,7 @@ async function sidebarCount(){
   if(!count){badge?.remove();return;}
   if(!badge){badge=document.createElement('span');badge.className='tm-nav-count';button.append(badge);}
   badge.textContent=count>99?'99+':String(count);
-  badge.title='我的待辦事件＋執行困難或待結案事件：'+count;
+  badge.title='待辦、執行困難或待結案訊息（每則只計一次）：'+count;
  }catch(e){console.error('訊息交辦提醒讀取失敗',e);}
 }
 const oldRenderNav=renderNav;
