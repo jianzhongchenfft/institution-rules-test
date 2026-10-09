@@ -144,7 +144,7 @@
         db.from('case_approved_services').select('case_id,service_group,service_code,service_name,approved_quantity').eq('is_current',true).order('service_code'),
         db.from('case_followup_items').select('*').order('due_date',{ascending:true,nullsFirst:false}).order('created_at'),
         db.from('case_routine_plans').select('*').eq('status','planned').order('planned_date'),
-        db.from('assessment_events').select('id,case_id,assessment_type,planned_date,status,counts_as_full_reassessment,combined_with_home_visit,completed_at,voided_at').neq('status','voided').order('planned_date',{ascending:false})
+        db.from('assessment_events').select('id,case_id,assessment_type,planned_date,status,counts_as_full_reassessment,completed_at,voided_at').neq('status','voided').order('planned_date',{ascending:false})
       ]);
       var bad=results.find(function(x){return x.error;});if(bad&&bad.error)throw bad.error;
       state.caseStaff=results[0].data||[];
