@@ -95,11 +95,11 @@ function card(m){
   (tag?'<span class="tm-action">'+tag+'</span>':'')+'</div></article>';
 }
 function listing(){
- S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;
+ S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;S.editingMessage=false;
  const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(needsCreatorAction).length;
  const rows=S.messages.filter(m=>{
-  if(S.tab==='unread')return myRead(m.id)?.read_at===null;
-  if(S.tab==='all')return true;
+  if(S.tab==='unread')return !m.closed_at&&myRead(m.id)?.read_at===null;
+  if(S.tab==='all')return !m.closed_at;
   if(S.tab==='mine')return isMine(m);
   if(S.tab==='assigned')return delegated(m);
   if(S.tab==='closed')return !!m.closed_at;
@@ -176,7 +176,7 @@ function orderRows(){
 function createDirty(){return S.view==='create'&&!!root()&&
  (!!root().querySelector('#tm-description')?.value.trim()||!!root().querySelector('.tm-new-task'));}
 function createForm(){
- S.view='create';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;S.chosen=new Set(S.staff.map(x=>x.id));
+ S.view='create';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;S.editingMessage=false;S.chosen=new Set(S.staff.map(x=>x.id));
  html('<div class="tm-head"><div><h1>新增訊息</h1><p>建立者：'+h(state.profile.display_name)+
  '｜時間由系統記錄</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
  '<section class="tm-card"><div class="tm-field"><label>內容 *</label>'+
@@ -341,10 +341,31 @@ function historyPanel(m){
   '<div class="tm-actions"><button class="btn primary" id="tm-send">送出回報</button>'+
   '<button class="btn" type="button" id="tm-compose-cancel">取消</button></div></div>'));
 }
+function eventContentPanel(m){
+ const canEdit=!m.closed_at&&m.created_by_staff_id===me();
+ const editing=canEdit&&S.editingMessage;
+ return '<section class="tm-card"><div class="tm-line">'+
+  '<div class="tm-message-content-actions"><strong>內容</strong>'+
+  (canEdit&&!editing?'<button class="btn sm" type="button" id="tm-message-edit-open">編輯</button>':'')+'</div>'+
+  '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
+  (editing?'<div class="tm-message-editor">'+
+   '<textarea id="tm-message-text" class="tm-edit" maxlength="5000" rows="3" placeholder="請輸入事件內容">'+h(m.description)+'</textarea>'+
+   '<label class="tm-check"><input type="checkbox" id="tm-message-notify" checked>通知對象（重新標記為未閱讀）</label>'+
+   '<div class="tm-actions"><button class="btn primary sm" type="button" id="tm-message-edit-save">儲存修改</button>'+
+   '<button class="btn sm" type="button" id="tm-message-edit-cancel">取消</button></div></div>':
+   '<div class="tm-description">'+h(m.description)+'</div>')+
+  (m.closed_at?'<p class="tm-muted">結案時間：'+h(stamp(m.closed_at))+'</p>':'')+'</section>';
+}
 function dirty(){
  if(S.view==='create')return createDirty();
  if(S.view!=='detail'||!root())return false;
  if(root().querySelector('#tm-compose')?.value.trim())return true;
+ if(S.editingMessage){
+  const current=S.messages.find(x=>x.id===S.id);
+  const input=root().querySelector('#tm-message-text')?.value;
+  const notify=root().querySelector('#tm-message-notify')?.checked;
+  if(input!==undefined&&(input!==current?.description||notify===false))return true;
+ }
  if(root().querySelector('[data-task-note]')?.value.trim())return true;
  if(root().querySelector('#tm-extra-work')?.value.trim()||root().querySelector('#tm-extra-person')?.value)return true;
  if(S.managingTask){
@@ -366,19 +387,16 @@ function dirty(){
 }
 function detail(id){
  const m=S.messages.find(x=>x.id===id);if(!m){listing();return;}
- if(S.id!==id)S.composeOpen=false;
+ if(S.id!==id){S.composeOpen=false;S.editingMessage=false;}
  S.view='detail';S.id=id;
  const jobs=tasks(id);
  const isOwner=m.created_by_staff_id===me();
  const canClose=Boolean(!m.closed_at&&jobs.length&&isOwner);
  html('<div class="tm-head"><div><h1>訊息詳情</h1><p>建立者：'+h(name(m.created_by_staff_id))+
  '｜'+h(stamp(m.created_at))+'</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
- '<section class="tm-card"><div class="tm-line"><strong>內容</strong>'+
- '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
- '<div class="tm-description">'+h(m.description)+'</div>'+
- (m.closed_at?'<p class="tm-muted">結案時間：'+h(stamp(m.closed_at))+'</p>':'')+'</section>'+
- readPanel(id)+taskPanel(m)+additionalTaskPanel(m)+historyPanel(m)+
- (canClose?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-close">確認結案</button></div>':''));
+ eventContentPanel(m)+readPanel(id)+taskPanel(m)+additionalTaskPanel(m)+historyPanel(m)+
+ (canClose?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-close">確認結案</button></div>':
+  m.closed_at&&isOwner?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-reopen">重新開啟</button></div>':''));
  root().querySelector('#tm-back').onclick=()=>{if(!dirty()||confirm('尚有未儲存的回報，確定返回？'))listing();};
  root().querySelector('#tm-show-add-task')?.addEventListener('click',()=>{
   if(dirty()){toast('請先處理未儲存的內容','error');return;}
@@ -388,6 +406,15 @@ function detail(id){
  root().querySelector('#tm-save-extra')?.addEventListener('click',()=>addExtraTask(id));
  root().querySelector('#tm-cancel-extra')?.addEventListener('click',()=>{S.addingTask=false;detail(id);});
  if(S.addingTask)autoGrow(root().querySelector('#tm-extra-work'));
+ root().querySelector('#tm-message-edit-open')?.addEventListener('click',()=>{
+  if(dirty()){toast('請先處理未儲存的內容','error');return;}
+  S.editingMessage=true;detail(id);
+ });
+ root().querySelector('#tm-message-edit-cancel')?.addEventListener('click',()=>{
+  if(dirty()&&!confirm('事件內容尚未儲存，確定取消編輯？'))return;
+  S.editingMessage=false;detail(id);
+ });
+ root().querySelector('#tm-message-edit-save')?.addEventListener('click',()=>saveEventContent(id));
  root().querySelector('#tm-read')?.addEventListener('change',()=>markRead(id));
  root().querySelectorAll('[data-done]').forEach(input=>input.onchange=()=>setDone(input));
  root().querySelectorAll('[data-ack]').forEach(btn=>btn.onclick=()=>taskAction(btn.dataset.ack,'ack'));
@@ -443,6 +470,7 @@ function detail(id){
  root().querySelectorAll('[data-void]').forEach(btn=>btn.onclick=()=>voidReport(id,btn.dataset.void));
  root().querySelectorAll('[data-edit-cancel]').forEach(btn=>btn.onclick=()=>{S.editing=null;detail(id);});
  root().querySelector('#tm-close')?.addEventListener('click',()=>closeMessage(id));
+ root().querySelector('#tm-reopen')?.addEventListener('click',()=>reopenEvent(id));
 }
 async function addExtraTask(messageId){
  if(S.busy)return;
@@ -624,7 +652,7 @@ navigate=function(id){
   return oldNavigate(id);
  }
  if(state.page==='teamMessages'&&dirty()&&!confirm('有尚未儲存的內容，確定重新進入？'))return;
- state.page='teamMessages';S.tab='unread';S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;
+ state.page='teamMessages';S.tab='unread';S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;S.editingMessage=false;
  renderNav();$('topTitle').textContent='訊息交辦';$('crumb').textContent='內部消息與工作分工';
  $('sidebar').classList.remove('open');html(empty('正在載入訊息…'));void refresh();
  window.scrollTo({top:0,behavior:'auto'});
