@@ -730,7 +730,6 @@
           if($('assessmentCase'))$('assessmentCase').value=c.id;
           if($('assessmentType'))$('assessmentType').value='condition_change';
           if($('assessmentPlannedDate'))$('assessmentPlannedDate').value=mainPayload.record_date;
-          if($('assessmentWithVisit'))$('assessmentWithVisit').checked=type==='home_visit';
           $('assessmentCase')?.dispatchEvent(new Event('change',{bubbles:true}));
           $('assessmentType')?.dispatchEvent(new Event('change',{bubbles:true}));
         },0);
