@@ -178,6 +178,7 @@
     ]);
 
     local.eventId=eventId;local.row=row;local.caseRow=c;local.forms=forms;local.summary=summary;
+    local.toolSummaries=await window.v52AssessmentToolSummary.list(eventId);
     local.records={adl,iadl,health_medication:health,home_safety:homeSafety,support,spmsq,gds15,caregiver_burden:caregiver};
     local.previous={
       adl:prevAdl?.record||null,iadl:prevIadl?.record||null,health_medication:prevHealth?.record||null,
@@ -477,20 +478,32 @@
   }
 
   function renderTool(form){
-    if(form.form_code==='adl')return renderAdl(form);
-    if(form.form_code==='iadl')return renderIadl(form);
-    if(form.form_code==='health_medication')return renderHealth(form);
-    if(form.form_code==='home_safety')return renderHome(form);
-    if(form.form_code==='support')return renderSupport(form);
-    if(form.form_code==='spmsq')return renderSpmsq(form);
-    if(form.form_code==='gds15')return renderGds(form);
-    if(form.form_code==='caregiver_burden')return renderCaregiver(form);
-    return sectionMissing(form.form_name);
+    const renderers={
+      adl:renderAdl,iadl:renderIadl,health_medication:renderHealth,home_safety:renderHome,
+      support:renderSupport,spmsq:renderSpmsq,gds15:renderGds,caregiver_burden:renderCaregiver
+    };
+    const raw=(renderers[form.form_code]||(()=>sectionMissing(form.form_name)))(form);
+    if(!local.records[form.form_code])return raw;
+    const record=(local.toolSummaries||[]).find(x=>x.tool_code===form.form_code);
+    const block=window.v52AssessmentToolSummary.printBlock(record);
+    // 本項總結接在原始表單最後，督導簽名欄之前。
+    if(raw.includes('<div class="signature">'))return raw.replace('<div class="signature">',block+'<div class="signature">');
+    return raw.replace(/<\/section>\s*$/,block+'</section>');
   }
 
   function selectionHtml(){
     const summaryChecked=!!local.summary;
-    return `<div style="font-size:11px;color:#667085;line-height:1.6;margin-bottom:10px">
+    const api=window.v52AssessmentToolSummary;
+    const updates=local.forms.filter(f=>{
+      const record=local.records?.[f.form_code],s=(local.toolSummaries||[]).find(x=>x.tool_code===f.form_code);
+      if(!record||!s)return false;
+      let sig={};try{sig=JSON.parse(s.source_signature||'{}')||{};}catch(_){}
+      const hash=api.fingerprint(api.source(f.form_code,record));
+      return sig.findings!==hash||sig.recommendations!==hash;
+    });
+    const notice=updates.length?`<div style="margin-bottom:10px;padding:9px;border:1px solid #fedf89;background:#fffaeb;border-radius:9px;color:#93370d;font-size:11px">以下單項總結尚未確認最新原始評估：${updates.map(x=>escapeHTML(x.form_name)).join('、')}。仍可列印，內容以最後成功儲存的總結為準。</div>`:'';
+
+    return notice+`<div style="font-size:11px;color:#667085;line-height:1.6;margin-bottom:10px">
       預設勾選本次實際使用的全部評估工具；可取消不需要列印的項目。每個工具會自新頁開始。
     </div>
     <div style="display:flex;gap:7px;margin-bottom:10px">
@@ -505,10 +518,11 @@
 
   function buildHtml(selected){
     const sections=[];
-    if(selected.includes('summary')&&local.summary)sections.push(renderSummary());
     for(const form of local.forms){
       if(selected.includes(form.form_code))sections.push(renderTool(form));
     }
+    // 整體總結永遠放在所有已選評估工具之後。
+    if(selected.includes('summary')&&local.summary)sections.push(renderSummary());
     if(!sections.length)throw new Error('請至少選擇一項列印內容');
 
     const row=local.row,c=local.caseRow;
