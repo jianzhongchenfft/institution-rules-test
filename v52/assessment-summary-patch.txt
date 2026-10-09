@@ -143,7 +143,10 @@
     previousRecords:{},
     previousEvents:{},
     previousSummary:null,
-    previousSummaryEvent:null
+    previousSummaryEvent:null,
+    toolSummaryRows:[],toolMerged:{findings:'',recommendations:'',missing:[]},
+    overallSourceHash:'',overallSignature:{findings:'',recommendations:''},
+    overallPreview:false,lastSavedOverall:null
   };
 
   const safeObj=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
@@ -279,6 +282,64 @@
         local.previousSummaryEvent=eventById(sourceRes.data.assessment_event_id)||local.previousSummaryEvent;
       }
     }
+    const api=window.v52AssessmentToolSummary;
+    local.toolSummaryRows=await api.list(eventId);
+    local.toolMerged=api.merged(local.toolSummaryRows,formsByEvent(eventId));
+    local.overallSourceHash=overallHash(local.toolSummaryRows,formsByEvent(eventId));
+    const checkpoint=local.toolSummaryRows.find(x=>x.tool_code==='overall');
+    let checkpointSig={};
+    try{checkpointSig=JSON.parse(checkpoint?.source_signature||'{}')||{};}catch(_){}
+    local.overallSignature={
+      findings:checkpointSig.findings||'',recommendations:checkpointSig.recommendations||''
+    };
+    local.overallPreview=false;
+    local.lastSavedOverall=summary.data?{
+      findings:String(summary.data.key_findings||''),
+      recommendations:String(summary.data.care_recommendations||'')
+    }:null;
+    if(!summary.data){
+      local.summary.key_findings=local.toolMerged.findings;
+      local.summary.care_recommendations=local.toolMerged.recommendations;
+      local.overallSignature={findings:local.overallSourceHash,recommendations:local.overallSourceHash};
+    }
+  }
+
+  function overallHash(rows,forms){
+    const byCode=new Map(rows.filter(x=>x.tool_code!=='overall').map(x=>[x.tool_code,x]));
+    return window.v52AssessmentToolSummary.fingerprint(forms.map(f=>{
+      const s=byCode.get(f.form_code);
+      return [f.form_code,f.status,s?.findings??null,s?.recommendations??null];
+    }));
+  }
+
+  function overallNeedsReview(){
+    if(!local.lastSavedOverall)return false;
+    return local.overallSignature.findings!==local.overallSourceHash
+      ||local.overallSignature.recommendations!==local.overallSourceHash;
+  }
+
+  function renderOverallMergeTools(){
+    const stale=overallNeedsReview();
+    return `<div class="asum-help" style="margin-bottom:12px">
+      <strong>兩階段評估總結：</strong>依本次已完成工具的單項總結，分別整理到下方兩個文字欄位；保留【工具名稱】段落，由督導自由修改。
+      ${local.toolMerged.missing.length?`<div style="margin-top:6px;color:#93370d">以下工具尚未儲存本項總結，匯整時不會自動編造內容：${escapeHTML(local.toolMerged.missing.join('、'))}</div>`:''}
+    </div>
+    ${stale?'<div class="asum-help" style="background:#fffaeb;border-color:#fedf89;color:#93370d">單項評估總結已有更新或尚未確認匯整版本。原本整體總結不會被自動覆蓋；仍可儲存或列印。</div>':''}
+    <div class="asum-actions" style="position:static;background:transparent;margin:0 0 12px;padding:0">
+      ${stale?'<button id="asumKeepMerge" type="button" class="btn sm">保留目前總結並確認</button>':''}
+      <button id="asumMergePreview" type="button" class="btn sm">重新匯整並預覽</button>
+    </div>
+    ${local.overallPreview?`<section class="ats-compare">
+      <strong>整體總結重新匯整預覽（可分別選擇取代）</strong>
+      ${[['findings','主要評估發現／問題與需求','key_findings'],['recommendations','照顧服務重點／建議','care_recommendations']].map(([k,title,target])=>`
+        <div class="ats-compare-row">
+          <label><input data-asum-replace="${k}" type="checkbox" checked> ${title}</label>
+          <div><span>目前內容</span><pre>${escapeHTML(local.summary?.[target]||'—')}</pre></div>
+          <div><span>本次工具總結匯整後</span><pre>${escapeHTML(local.toolMerged[k]||'—')}</pre></div>
+        </div>`).join('')}
+      <div class="ats-buttons"><button id="asumMergeCancel" type="button" class="btn sm">取消</button>
+        <button id="asumMergeApply" type="button" class="btn sm primary">確認取代所選欄位</button></div>
+    </section>`:''}`;
   }
 
   function gdsResult(score){
@@ -568,6 +629,7 @@
               <option value="">請選擇</option>
               ${Object.entries(OVERALL_LABELS).map(([v,l])=>`<option value="${v}" ${s.overall_status===v?'selected':''}>${l}</option>`).join('')}
             </select></div>
+            <div class="asum-field full">${renderOverallMergeTools()}</div>
             <div class="asum-field full"><label>主要評估發現／問題與需求 *</label><textarea id="asumFindings" placeholder="請整合功能、健康、認知／情緒、環境、家庭支持與照顧者狀況。">${escapeHTML(s.key_findings||'')}</textarea></div>
             <div class="asum-field full"><label>照顧服務重點／建議 *</label><textarea id="asumRecommendations" placeholder="請記錄後續居家服務需注意、維持或調整的重點。">${escapeHTML(s.care_recommendations||'')}</textarea></div>
 
@@ -617,6 +679,40 @@
       api.open(row.id);
     });
     $('asumPrint')?.addEventListener('click',()=>openPrintPreview());
+    $('asumMergePreview')?.addEventListener('click',()=>{
+      captureText();local.overallPreview=true;rerenderWithScroll();
+    });
+    $('asumMergeCancel')?.addEventListener('click',()=>{
+      captureText();local.overallPreview=false;rerenderWithScroll();
+    });
+    $('asumMergeApply')?.addEventListener('click',()=>{
+      captureText();
+      const selected=[...document.querySelectorAll('[data-asum-replace]:checked')].map(x=>x.dataset.asumReplace);
+      if(!selected.length)return toast('請至少勾選一項再確認取代','warn');
+      if(selected.includes('findings')){
+        local.summary.key_findings=local.toolMerged.findings;
+        local.overallSignature.findings=local.overallSourceHash;
+      }
+      if(selected.includes('recommendations')){
+        local.summary.care_recommendations=local.toolMerged.recommendations;
+        local.overallSignature.recommendations=local.overallSourceHash;
+      }
+      local.overallPreview=false;rerenderWithScroll();
+      toast('已匯入選取的內容，請按儲存草稿或完成本次評估','success');
+    });
+    $('asumKeepMerge')?.addEventListener('click',async()=>{
+      captureText();
+      if(!local.lastSavedOverall||local.summary.key_findings!==local.lastSavedOverall.findings||
+         local.summary.care_recommendations!==local.lastSavedOverall.recommendations)
+        return toast('請先儲存目前編輯中的整體總結，再確認保留','warn');
+      const old={...local.overallSignature};
+      local.overallSignature={findings:local.overallSourceHash,recommendations:local.overallSourceHash};
+      try{
+        await window.v52AssessmentToolSummary.trackOverall(row.id,row.case_id,local.summary.key_findings,
+          local.summary.care_recommendations,local.overallSignature);
+        rerenderWithScroll();toast('已確認保留原有整體總結','success');
+      }catch(e){local.overallSignature=old;toast('確認失敗：'+(e?.message||e),'error');}
+    });
     $('asumOverall')?.addEventListener('change',e=>local.summary.overall_status=e.target.value||null);
     $('asumFindings')?.addEventListener('input',e=>local.summary.key_findings=e.target.value);
     $('asumRecommendations')?.addEventListener('input',e=>local.summary.care_recommendations=e.target.value);
@@ -699,6 +795,7 @@
         p_finalize:!!finalize
       });
       if(error)throw error;
+      await window.v52AssessmentToolSummary.trackOverall(row.id,row.case_id,s.key_findings,s.care_recommendations,local.overallSignature);
       await window.v52AssessmentApi?.loadAssessmentData?.(false);
       if(finalize){
         await load(row.id);
