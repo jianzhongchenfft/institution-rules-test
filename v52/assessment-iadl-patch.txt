@@ -284,6 +284,7 @@
       </div>
     `;
 
+    window.v52AssessmentToolSummary?.mount(local.eventId,'iadl',currentToolSummarySource(),'.iadl-page','.iadl-actions');
     $('iadlBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
     document.querySelectorAll('input[name^="iadl_"]').forEach(input=>{
@@ -325,6 +326,8 @@
     window.scrollTo({top:0,behavior:'auto'});
   }
 
+  function currentToolSummarySource(){return ({answers:local.answers,notes:local.notes});}
+
   async function saveIadl(finalize){
     const row=eventById(local.eventId);
     if(!row||!canEditEvent(row))return toast('您沒有此個案的評估編輯權限','error');
@@ -352,6 +355,7 @@
         p_copied_from_id:local.pendingCopyFromId||null
       });
       if(error)throw error;
+      await window.v52AssessmentToolSummary.saveAfterTool(row.id,'iadl',currentToolSummarySource(),row.case_id);
 
       await window.v52AssessmentApi?.loadAssessmentData?.(false);
       if(finalize){
@@ -381,6 +385,7 @@
     showLoading(true);
     try{
       await loadIadl(eventId);
+      await window.v52AssessmentToolSummary.load(eventId,'iadl',currentToolSummarySource());
       renderIadlPage();
     }catch(err){
       console.error(err);
