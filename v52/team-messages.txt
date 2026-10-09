@@ -271,7 +271,7 @@ async function createMessage(){
    p_description:description,p_tasks:jobs,p_recipient_ids:chosen()
   });
   if(error)throw error;
-  await load();toast('訊息建立成功','success');detail(data);
+  await load();S.tab='unread';toast('訊息建立成功','success');listing();
  }catch(e){console.error(e);btn.disabled=false;toast('建立失敗：'+(e.message||e),'error');}
  finally{S.busy=false;}
 }
