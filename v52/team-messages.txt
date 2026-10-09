@@ -56,6 +56,8 @@ style.textContent = `
 .tm-item.closing{background:#fff6ec;border-color:#e9b38f;border-left:5px solid #cb7749}
 .tm-line{display:flex;align-items:center;justify-content:space-between;gap:9px}
 .tm-meta{display:flex;flex-wrap:wrap;gap:2px 13px;min-width:0;color:#6b7280;font-size:12px;line-height:1.45}
+.tm-item>.tm-line>.tm-meta{flex:1 1 0}
+.tm-item>.tm-line>.tm-pill{flex:0 0 92px;box-sizing:border-box;text-align:center}
 .tm-main{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px}
 .tm-snippet{min-width:0;flex:1;font-size:14px;line-height:1.5;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:pre-wrap}
 .tm-pill{display:inline-block;flex-shrink:0;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:750;white-space:nowrap;color:#475569;background:#f1f5f9}
