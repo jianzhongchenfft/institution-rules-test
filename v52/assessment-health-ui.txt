@@ -361,7 +361,7 @@
                 </select>
               </div>
               <div class="health-field">
-                <label>未定期回診原因／其他需追蹤事項</label>
+                <label>未定期回診原因／現況說明</label>
                 <textarea data-health-medical="regular_followup_reason">${escapeHTML(local.medicalInfo.regular_followup_reason||'')}</textarea>
               </div>
             </div>
@@ -431,7 +431,7 @@
                 </select>
               </div>
               <div class="health-field">
-                <label>服藥需追蹤事項</label>
+                <label>服藥異常或注意事項</label>
                 <textarea data-health-medical="medication_followup">${escapeHTML(local.medicalInfo.medication_followup||'')}</textarea>
               </div>
               <div class="health-field">
@@ -496,7 +496,7 @@
                 </select>
               </div>
               <div class="health-field" style="${unvisitedHealthChanged?'':'display:none'}">
-                <label>變化與需追蹤事項</label>
+                <label>重要健康變化說明</label>
                 <textarea data-health-medical="unvisited_health_change_note" placeholder="例如：近兩週走路穩定度明顯下降，目前尚未就醫。">${escapeHTML(local.medicalInfo.unvisited_health_change_note||'')}</textarea>
               </div>
             </div>
@@ -545,7 +545,7 @@
                 </select>
               </div>
               <div class="health-field">
-                <label>未定期回診原因／其他需追蹤事項</label>
+                <label>未定期回診原因／現況說明</label>
                 <textarea data-health-medical="regular_followup_reason">${escapeHTML(local.medicalInfo.regular_followup_reason||'')}</textarea>
               </div>
               <div class="health-field">
@@ -569,7 +569,7 @@
                 </select>
               </div>
               <div class="health-field">
-                <label>服藥需追蹤事項</label>
+                <label>服藥異常或注意事項</label>
                 <textarea data-health-medical="medication_followup">${escapeHTML(local.medicalInfo.medication_followup||'')}</textarea>
               </div>
               <div class="health-field">
@@ -611,7 +611,7 @@
                 </select>
               </div>
               <div class="health-field">
-                <label>說明／後續追蹤</label>
+                <label>對照顧需求的影響說明</label>
                 <textarea data-health-medical="care_impact_note">${escapeHTML(local.medicalInfo.care_impact_note||'')}</textarea>
               </div>
             </div>
