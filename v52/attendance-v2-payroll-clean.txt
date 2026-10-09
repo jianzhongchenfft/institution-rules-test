@@ -444,8 +444,6 @@
       ? (total>0?`目前來源：直接計薪加班 ${prFinalMoney(total)}；若本月另有到期換休，將於月結時一併折算。`:'目前無直接計薪加班；若本月有到期換休，將於月結時一併折算。')
       : '薪資資料尚未完整，請先完成設定。';
   }
-  function prEnhanceCorrectionModal(){ return; }
-
   function prEnhance(){
     if(state.page!=='overtime')return;
     if(!prCanReview()&&['review','payroll'].includes(state.overtimeView)){
@@ -453,7 +451,7 @@
       renderOvertimePage();
       return;
     }
-    prEnsureSettingsButton();prBindFormPreview();prEnhancePayroll();prEnhanceCorrectionModal();
+    prEnsureSettingsButton();prBindFormPreview();prEnhancePayroll();
   }
 
   const prLifecycle=()=>{
