@@ -307,14 +307,21 @@
     const events=arr(m.healthcare_events);
     const medChanges=arr(m.medication_changes);
     const medCorrections=arr(m.medication_corrections);
+    const usage=m.medication_use_status||'';
+    const opening=local.row?.assessment_type==='opening';
     let body=commonMeta(form.form_name,form);
     body+=`<h2>一、健康與就醫概況</h2>
       ${rowTable([
         `<tr><td>重要疾病／健康狀況</td><td>${html(m.baseline_important_conditions)}</td></tr>`,
         `<tr><td>持續治療／固定醫療</td><td>${html(m.baseline_ongoing_treatments)}</td></tr>`,
         `<tr><td>是否固定回診</td><td>${html(yesNo(m.regular_followup))}${m.regular_followup_reason?`｜${html(m.regular_followup_reason)}`:''}</td></tr>`,
+        `<tr><td>目前是否使用藥物</td><td>${html(usage==='using'?'有使用藥物':usage==='none'?'目前無使用藥物':usage==='unknown'?'無法確認用藥情形':'—')}${usage==='unknown'&&m.medication_use_note?'｜'+html(m.medication_use_note):''}</td></tr>`,
+        ...(['none','unknown'].includes(usage)?[]:[
         `<tr><td>服藥方式</td><td>${html(m.medication_method==='self'?'自行':m.medication_method==='assisted'?'他人協助':'—')}${m.medication_assisted_by?`｜協助者：${html(m.medication_assisted_by)}`:''}</td></tr>`,
+        ]),
+        ...(['none','unknown'].includes(usage)?[]:[
         `<tr><td>服藥是否規律</td><td>${html(yesNo(m.medication_regular))}${m.medication_followup?`｜${html(m.medication_followup)}`:''}</td></tr>`,
+        ]),
         `<tr><td>藥物副作用</td><td>${html(yesNo(m.side_effect))}${m.side_effect_note?`｜${html(m.side_effect_note)}`:''}</td></tr>`
       ],['項目','內容'])}`;
     body+=`<h2>二、用藥紀錄</h2>`;
@@ -334,7 +341,10 @@
     }
     body+=`<h2>三、身體健康狀態 10 項</h2>`+rowTable(HEALTH_ITEMS.map(([key,label])=>`<tr><td>${html(label)}</td><td>${html(HEALTH_STATUS[items[key]]||items[key])}</td><td>${html(notes[key])}</td></tr>`),['項目','狀態','備註']);
     body+=`<div class="result-box"><strong>健康狀態總分：${html(r.total_score)}／20 分</strong></div>`;
-    body+=`<h2>四、用藥安全現況</h2>`+rowTable(MED_CHECKS.map(([key,label])=>`<tr><td>${html(label)}</td><td>${html(MED_STATUS[safe(checks[key]).status]||safe(checks[key]).status)}</td><td>${html(safe(checks[key]).note)}</td></tr>`),['項目','狀態','備註']);
+    body+=`<h2>四、用藥安全現況</h2>`;
+    if(usage==='none')body+='<div class="plain">目前無使用藥物，用藥管理與用藥安全整段不適用。</div>';
+    else if(usage==='unknown')body+=`<div class="plain">目前無法確認用藥情形｜${html(m.medication_use_note)}</div>`;
+    else body+=rowTable(MED_CHECKS.map(([key,label])=>`<tr><td>${html(label)}</td><td>${html(MED_STATUS[safe(checks[key]).status]||safe(checks[key]).status)}</td><td>${html(safe(checks[key]).note)}</td></tr>`),['項目','狀態','備註']);
     if(m.unvisited_health_change||m.care_impact||m.care_impact_note){
       body+=`<h2>五、後續健康／照顧影響</h2>`+rowTable([
         `<tr><td>未就醫之健康變化</td><td>${html(m.unvisited_health_change)}${m.unvisited_health_change_note?`｜${html(m.unvisited_health_change_note)}`:''}</td></tr>`,
