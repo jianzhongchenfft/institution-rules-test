@@ -11,7 +11,7 @@
     health_medication:'健康與用藥',home_safety:'居家環境安全',support:'支持系統',caregiver_burden:'高負荷家庭照顧者初篩'};
   const LABELS={
     adl:{feeding:'進食',transfer:'移位',grooming:'個人衛生',toileting:'如廁',bathing:'洗澡',
-      walking:'平地走動',stairs:'上下樓梯',dressing:'穿衣',bowels:'大便控制',bladder:'小便控制'},
+      walking:'平地走動',stairs:'上下樓梯',dressing:'穿衣',bowel:'大便控制',bladder:'小便控制'},
     iadl:{telephone:'使用電話',shopping:'購物',meal_prep:'準備餐食',housekeeping:'家務清潔',
       laundry:'洗衣',transportation:'使用交通工具',medication:'服藥管理',finances:'理財'},
     health_medication:{consciousness:'意識狀況',eating:'進食狀況',elimination:'排泄狀況',
@@ -59,7 +59,7 @@
       violence_neglect_risk:'暴力／照顧疏忽風險',suicide_risk:'自殺相關風險'}
   };
   const MAX_ADL={feeding:10,transfer:15,grooming:5,toileting:10,bathing:5,walking:15,
-    stairs:10,dressing:10,bowels:10,bladder:10};
+    stairs:10,dressing:10,bowel:10,bladder:10};
   const local=new Map();
   const esc=x=>String(x??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const obj=x=>x&&typeof x==='object'&&!Array.isArray(x)?x:{};
