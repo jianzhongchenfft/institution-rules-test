@@ -699,6 +699,7 @@
       </div>
     `;
 
+    window.v52AssessmentToolSummary?.mount(local.eventId,'health_medication',currentToolSummarySource(),'.health-page','.health-actions');
     $('healthBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
     document.querySelectorAll('[data-health-medical]').forEach(el=>{
