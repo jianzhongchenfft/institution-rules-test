@@ -3,25 +3,26 @@
 'use strict';
 if(window.teamMessagesModule)return;
 const ROLES=['admin','organization_manager','business_manager','supervisor'];
-const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false,taskAction:null,addingTask:false};
+const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false,taskAction:null,addingTask:false,managingTask:null};
 const root=()=>document.getElementById('tm-root');
 const h=v=>escapeHTML(String(v==null?'':v));
 const name=id=>S.staff.find(x=>x.id===id)?.display_name||'原使用者';
 const stamp=v=>v?new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
 const me=()=>state.profile?.id;
 const tasks=id=>S.tasks.filter(t=>t.message_id===id).sort((a,b)=>a.sort_order-b.sort_order);
+const activeTasks=id=>tasks(id).filter(t=>!t.cancelled_at);
 const readers=id=>S.recipients.filter(r=>r.message_id===id);
 const reports=id=>S.updates.filter(r=>r.message_id===id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)||a.id.localeCompare(b.id));
 const myRead=id=>readers(id).find(r=>r.staff_id===me());
 const readCount=id=>{const arr=readers(id);return [arr.filter(r=>r.read_at).length,arr.length];};
-const isMine=m=>!m.closed_at&&tasks(m.id).some(t=>t.assignee_staff_id===me());
-const pending=m=>!m.closed_at&&tasks(m.id).some(t=>t.assignee_staff_id===me()&&!t.is_done);
+const isMine=m=>!m.closed_at&&activeTasks(m.id).some(t=>t.assignee_staff_id===me());
+const pending=m=>!m.closed_at&&activeTasks(m.id).some(t=>t.assignee_staff_id===me()&&!t.is_done);
 const delegated=m=>!m.closed_at&&m.created_by_staff_id===me()&&tasks(m.id).length>0;
-const ready=m=>delegated(m)&&tasks(m.id).every(t=>t.is_done);
-const needsHelp=m=>delegated(m)&&tasks(m.id).some(t=>t.assistance_needed);
+const ready=m=>delegated(m)&&activeTasks(m.id).every(t=>t.is_done);
+const needsHelp=m=>delegated(m)&&activeTasks(m.id).some(t=>t.assistance_needed);
 const needsCreatorAction=m=>needsHelp(m)||ready(m);
-const hasInstruction=m=>tasks(m.id).some(t=>t.assignee_staff_id===me()&&t.instruction_pending);
-const status=m=>m.closed_at?'closed':!tasks(m.id).length?'notice':tasks(m.id).every(t=>t.is_done)?'ready':'working';
+const hasInstruction=m=>activeTasks(m.id).some(t=>t.assignee_staff_id===me()&&t.instruction_pending);
+const status=m=>m.closed_at?'closed':!tasks(m.id).length?'notice':activeTasks(m.id).every(t=>t.is_done)?'ready':'working';
 const labels={closed:'已結案',notice:'一般訊息',ready:'待結案',working:'處理中'};
 const html=markup=>{$('content').innerHTML='<div class="tm" id="tm-root">'+markup+'</div>';};
 const empty=s=>'<div class="tm-empty">'+h(s)+'</div>';
@@ -36,6 +37,7 @@ style.textContent=
 '@media(max-width:700px){.tm-head{flex-direction:column}.tm-options,.tm-reader-grid{grid-template-columns:1fr}.tm-task{align-items:flex-start}.tm-meta{gap:2px 8px}.tm-item{padding:10px 11px}}@media(max-width:600px){.tm-work-row{grid-template-columns:24px minmax(0,1fr) 38px;gap:7px}.tm-work-number{grid-column:1;grid-row:1}.tm-work-row [data-person]{grid-column:2;grid-row:1}.tm-work-row [data-work]{grid-column:2/4;grid-row:2}.tm-work-remove{grid-column:3;grid-row:1}}';
 style.textContent+=' .tm-recipient-details{margin:13px 0}.tm-recipient-details>summary{font-size:13px;font-weight:800;cursor:pointer;list-style:revert;user-select:none;line-height:1.6}.tm-recipient-details>summary:focus-visible{outline:2px solid #dc9479;outline-offset:3px;border-radius:3px}.tm-recipient-body{padding:10px 0 0}.tm-recipient-body>.tm-line{margin-bottom:8px}';
 style.textContent+='.tm-task{flex-wrap:wrap}.tm-task-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.tm-task-compose{flex:0 0 100%;background:#fff8f3;border:1px solid #f0ded7;border-radius:9px;padding:10px}.tm-task-compose textarea{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:9px;padding:10px;font:inherit;resize:vertical;min-height:74px;line-height:1.6}.tm-task-flag{font-size:12px;padding:4px 8px;background:#fff3d5;color:#885a03;border-radius:7px;font-weight:750}.tm-task-flag.new{background:#ffe7d9;color:#a14926}';
+style.textContent+='.tm-task-cancelled{opacity:.72;background:#f6f6f6}.tm-task-cancelled .tm-task-label{text-decoration:line-through}.tm-task-manage{flex-basis:100%;background:#fffbf8;border:1px solid #efd7c9;border-radius:9px;padding:12px}.tm-task-manage .tm-small-head{margin-bottom:7px}.tm-manage-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px;align-items:start}.tm-manage-grid select,.tm-manage-grid textarea{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:9px;padding:9px;font:inherit;background:#fff;color:#1f2937;min-height:42px}.tm-manage-grid textarea{resize:vertical;min-height:42px}.tm-voided .tm-entry-text{text-decoration:line-through;opacity:.62}.tm-voided{border-left-color:#9ca3af;background:#f6f6f6}.tm-task-manage .tm-check{margin-top:9px;font-size:13px}@media(max-width:600px){.tm-manage-grid{grid-template-columns:1fr}}';
 document.head.appendChild(style);
 
 // 「內容」與「交辦內容」預設單行；輸入換行或自動折行時即時增高，刪字也會縮回。
@@ -77,12 +79,12 @@ async function refresh(){
  finally{S.busy=false;}
 }
 function card(m){
- const ts=tasks(m.id),count=readCount(m.id),own=myRead(m.id);
+ const all=tasks(m.id),ts=activeTasks(m.id),count=readCount(m.id),own=myRead(m.id);
  const difficult=S.tab==='assigned'&&needsHelp(m),close=S.tab==='assigned'&&ready(m);
  const mine=S.tab==='mine'&&pending(m);
  const urgency=mine||difficult?'action':close?'closing':own&&!own.read_at?'unread':own?'read':'';
  const tag=difficult?'執行困難':close?'待我結案':mine?(hasInstruction(m)?'有新指示':'待我辦理'):'';
- const progress=ts.length?'分工完成 '+ts.filter(x=>x.is_done).length+'／'+ts.length:'無分工事項';
+ const progress=ts.length?'分工完成 '+ts.filter(x=>x.is_done).length+'／'+ts.length:all.length?'分工皆已取消':'無分工事項';
  return '<article class="tm-card tm-item '+urgency+'" role="button" tabindex="0" data-open="'+h(m.id)+'" aria-label="查看訊息：'+h(m.description.slice(0,60))+'">'+
   '<div class="tm-line"><div class="tm-meta"><span>建立者：'+h(name(m.created_by_staff_id))+'｜'+h(stamp(m.created_at))+'</span>'+
   '<span>已閱讀 '+count[0]+'／'+count[1]+' 人 · '+h(progress)+(own&&!own.read_at?' · 未閱讀':'')+'</span></div>'+
@@ -91,7 +93,7 @@ function card(m){
   (tag?'<span class="tm-action">'+tag+'</span>':'')+'</div></article>';
 }
 function listing(){
- S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;
+ S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;
  const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(needsCreatorAction).length;
  const rows=S.messages.filter(m=>{
   if(S.tab==='unread')return myRead(m.id)?.read_at===null;
@@ -170,7 +172,7 @@ function orderRows(){
 function createDirty(){return S.view==='create'&&!!root()&&
  (!!root().querySelector('#tm-description')?.value.trim()||!!root().querySelector('.tm-new-task'));}
 function createForm(){
- S.view='create';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.chosen=new Set(S.staff.map(x=>x.id));
+ S.view='create';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.chosen=new Set(S.staff.map(x=>x.id));
  html('<div class="tm-head"><div><h1>新增訊息</h1><p>建立者：'+h(state.profile.display_name)+
  '｜時間由系統記錄</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
  '<section class="tm-card"><div class="tm-field"><label>內容 *</label>'+
@@ -482,7 +484,7 @@ navigate=function(id){
   return oldNavigate(id);
  }
  if(state.page==='teamMessages'&&dirty()&&!confirm('有尚未儲存的內容，確定重新進入？'))return;
- state.page='teamMessages';S.tab='unread';S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;
+ state.page='teamMessages';S.tab='unread';S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;
  renderNav();$('topTitle').textContent='訊息交辦';$('crumb').textContent='內部消息與工作分工';
  $('sidebar').classList.remove('open');html(empty('正在載入訊息…'));void refresh();
  window.scrollTo({top:0,behavior:'auto'});
