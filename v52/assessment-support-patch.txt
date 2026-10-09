@@ -404,10 +404,8 @@
         <div class="support-field"><label>整體支持狀況 *</label><select data-support-summary="overall_support">
           <option value="">請選擇</option><option value="adequate" ${s.overall_support==='adequate'?'selected':''}>支持充足</option><option value="needs_attention" ${s.overall_support==='needs_attention'?'selected':''}>部分不足／需追蹤</option><option value="weak" ${s.overall_support==='weak'?'selected':''}>支持薄弱／需介入</option>
         </select></div>
-        <div class="support-field"><label>是否需後續追蹤 *</label><select data-support-summary="followup_required"><option value="">請選擇</option><option value="yes" ${s.followup_required==='yes'?'selected':''}>是</option><option value="no" ${s.followup_required==='no'?'selected':''}>否</option></select></div>
         ${['needs_attention','weak'].includes(s.overall_support)?`<div class="support-field full"><label>主要支持問題 *</label><textarea data-support-summary="key_issues" placeholder="請說明目前最需要注意的家庭或社會支持缺口。">${escapeHTML(s.key_issues||'')}</textarea></div>`:''}
         <div class="support-field full"><label>目前支持安排／建議</label><textarea data-support-summary="support_plan" placeholder="例如：持續由案次子處理就醫接送，並連結社福資源；假日由案長子替代照顧。">${escapeHTML(s.support_plan||'')}</textarea></div>
-        ${s.followup_required==='yes'?`<div class="support-field full"><label>後續追蹤重點 *</label><textarea data-support-summary="followup_note" placeholder="請記錄下次需確認的家庭支持、資源申請或轉介情形。">${escapeHTML(s.followup_note||'')}</textarea></div>`:''}
       </div>
     </section>`;
   }
@@ -485,7 +483,7 @@
     document.querySelectorAll('[data-support-need-row-field]').forEach(el=>el.addEventListener(el.tagName==='SELECT'?'change':'input',syncNeeds));
 
     document.querySelectorAll('[data-support-summary]').forEach(el=>{
-      const key=el.dataset.supportSummary;el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{local.summary[key]=el.value;if(['overall_support','followup_required'].includes(key))rerenderPreservingScroll();});
+      const key=el.dataset.supportSummary;el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{local.summary[key]=el.value;if(key==='overall_support')rerenderPreservingScroll();});
     });
 
     $('supportCopyPrevious')?.addEventListener('click',()=>{
@@ -557,8 +555,6 @@
 
     if(!s.overall_support)return '請選擇整體支持狀況';
     if(['needs_attention','weak'].includes(s.overall_support)&&!String(s.key_issues||'').trim())return '請填寫主要支持問題';
-    if(!s.followup_required)return '請選擇是否需後續追蹤';
-    if(s.followup_required==='yes'&&!String(s.followup_note||'').trim())return '請填寫後續追蹤重點';
     return null;
   }
 
