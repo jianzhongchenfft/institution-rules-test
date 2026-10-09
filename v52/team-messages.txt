@@ -383,12 +383,36 @@ function detail(id){
   taskAction(btn.dataset.taskSave,S.taskAction.kind,root().querySelector('[data-task-note]')?.value.trim());
  });
  root().querySelectorAll('[data-task-cancel]').forEach(btn=>btn.onclick=()=>{S.taskAction=null;detail(id);});
+ root().querySelectorAll('[data-manage-open]').forEach(btn=>btn.onclick=()=>{
+  if(dirty()){toast('請先處理尚未儲存的內容','error');return;}
+  S.taskAction=null;S.addingTask=false;
+  S.managingTask={id:btn.dataset.manageOpen,kind:btn.dataset.manageKind};
+  detail(id);
+ });
+ root().querySelector('#tm-manage-submit')?.addEventListener('click',()=>saveManagedTask(id));
+ root().querySelector('#tm-manage-abort')?.addEventListener('click',()=>{S.managingTask=null;detail(id);});
+ if(S.managingTask?.kind==='edit'){
+  const t=S.tasks.find(x=>x.id===S.managingTask.id);
+  const person=root().querySelector('#tm-manage-person');
+  const checkbox=root().querySelector('#tm-manage-notify');
+  const hint=root().querySelector('#tm-manage-hint');
+  if(t&&person&&checkbox) {
+   const sync=()=>{
+    const changed=person.value!==t.assignee_staff_id;
+    if(changed)checkbox.checked=true;
+    checkbox.disabled=changed;
+    if(hint)hint.textContent=changed?'已更換承辦人，必須通知新承辦人。':'修正錯字可取消通知；更換承辦人會強制通知新承辦人。';
+   };
+   person.addEventListener('change',sync);sync();
+  }
+ }
  root().querySelector('#tm-send')?.addEventListener('click',()=>sendReport(id));
  root().querySelectorAll('[data-edit]').forEach(btn=>btn.onclick=()=>{
   if(dirty()){toast('請先送出或清除未儲存的回報','error');return;}
   S.editing=btn.dataset.edit;detail(id);
  });
  root().querySelectorAll('[data-edit-save]').forEach(btn=>btn.onclick=()=>saveReport(id,btn.dataset.editSave));
+ root().querySelectorAll('[data-void]').forEach(btn=>btn.onclick=()=>voidReport(id,btn.dataset.void));
  root().querySelectorAll('[data-edit-cancel]').forEach(btn=>btn.onclick=()=>{S.editing=null;detail(id);});
  root().querySelector('#tm-close')?.addEventListener('click',()=>closeMessage(id));
 }
@@ -410,6 +434,54 @@ async function addExtraTask(messageId){
   S.addingTask=false;
   await load();toast('已新增分工，承辦人將在我的待辦看到事件','success');detail(messageId);
  }catch(e){button.disabled=false;toast('新增分工失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
+async function saveManagedTask(messageId){
+ if(S.busy||!S.managingTask)return;
+ const task=S.tasks.find(t=>t.id===S.managingTask.id);
+ const message=S.messages.find(m=>m.id===messageId);
+ if(!task||task.cancelled_at||!message||message.closed_at||message.created_by_staff_id!==me())return;
+ const cancel=S.managingTask.kind==='cancel';
+ const description=cancel?null:root().querySelector('#tm-manage-description')?.value.trim();
+ const assignee=cancel?null:root().querySelector('#tm-manage-person')?.value;
+ const notification=cancel?true:root().querySelector('#tm-manage-notify')?.checked;
+ const reason=cancel?root().querySelector('#tm-manage-reason')?.value.trim():null;
+ if(cancel){
+  if(!reason){toast('請填寫取消分工原因','error');return;}
+  if(!confirm('確定取消這項分工？取消後會保留原紀錄，但不再計入待辦與完成比例。'))return;
+ }else{
+  if(!description||!assignee){toast('請填妥交辦內容及承辦人','error');return;}
+  if(description===task.description&&assignee===task.assignee_staff_id){
+   toast('交辦內容及承辦人皆未變更','error');return;
+  }
+ }
+ const button=root().querySelector('#tm-manage-submit');button.disabled=true;
+ S.busy=true;
+ try{
+  const {error}=await db.rpc('team_message_manage_task',{
+   p_task_id:task.id,p_action:cancel?'cancel':'edit',
+   p_description:description,p_assignee_staff_id:assignee,
+   p_notify:notification,p_reason:reason
+  });
+  if(error)throw error;
+  S.managingTask=null;await load();
+  toast(cancel?'分工已取消，事件歷程已記錄':'分工已更新，相關提醒已同步','success');
+  detail(messageId);
+ }catch(error){button.disabled=false;toast('操作失敗：'+(error.message||error),'error');}
+ finally{S.busy=false;}
+}
+async function voidReport(messageId,reportId){
+ if(S.busy||dirty()){toast('請先處理未儲存的內容','error');return;}
+ const row=S.updates.find(r=>r.id===reportId);
+ const event=S.messages.find(m=>m.id===messageId);
+ if(!row||row.is_system||row.voided_at||!(row.staff_id===me()||event?.created_by_staff_id===me()))return;
+ if(!confirm('確定作廢這筆回報？原文字仍會保留並標示作廢者與時間。'))return;
+ S.busy=true;
+ try{
+  const {error}=await db.rpc('void_team_message_update',{p_update_id:reportId});
+  if(error)throw error;
+  await load();toast('回報已作廢','success');detail(messageId);
+ }catch(error){toast('作廢回報失敗：'+(error.message||error),'error');}
  finally{S.busy=false;}
 }
 async function markRead(id){
@@ -488,10 +560,10 @@ async function closeMessage(id){
  if(dirty()){toast('請先處理未送出的回報','error');return;}
  const message=S.messages.find(x=>x.id===id);
  if(!message||message.closed_at||message.created_by_staff_id!==me())return;
- const remaining=tasks(id).filter(x=>!x.is_done).length;
+ const remaining=activeTasks(id).filter(x=>!x.is_done).length;
  const prompt=remaining>0
-  ?'目前仍有 '+remaining+' 項分工未完成。結案後承辦人不能再勾選完成，也無法新增回報。確定仍要結案？'
-  :'所有分工均已完成，確定結案？';
+  ?'目前仍有 '+remaining+' 項分工未完成。結案後不能再勾選完成或新增回報。確定仍要結案？'
+  :activeTasks(id).length===0?'所有分工皆已取消，確定結案？':'所有分工均已完成，確定結案？';
  if(!confirm(prompt))return;
  S.busy=true;
  try{
