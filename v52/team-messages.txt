@@ -24,7 +24,6 @@ const favoriteButton=(id,short=false)=>{
  '" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="m12 2 3.1 6.3 7 .9-5.1 4.9 1.2 7-6.2-3.3-6.2 3.3 1.2-7-5.1-4.9 7-.9Z"/></svg>'+
  (short?'':'<span>'+title+'</span>')+'</button>';
 };
-const isMine=m=>!m.closed_at&&activeTasks(m.id).some(t=>t.assignee_staff_id===me());
 const pending=m=>!m.closed_at&&activeTasks(m.id).some(t=>t.assignee_staff_id===me()&&!t.is_done);
 const delegated=m=>!m.closed_at&&m.created_by_staff_id===me()&&tasks(m.id).length>0;
 const ready=m=>delegated(m)&&activeTasks(m.id).every(t=>t.is_done);
@@ -210,12 +209,12 @@ function getTabRows(tab){
  const rows=S.messages.filter(m=>{
   if(tab==='unread')return !m.closed_at&&myRead(m.id)?.read_at===null;
   if(tab==='all')return true;
-  if(tab==='mine')return isMine(m);
+  if(tab==='mine')return pending(m);
   if(tab==='assigned')return delegated(m);
   if(tab==='favorites')return favorite(m.id);
   return false;
  });
- if(tab==='mine')rows.sort((a,b)=>Number(hasInstruction(b))-Number(hasInstruction(a))||Number(pending(b))-Number(pending(a)));
+ if(tab==='mine')rows.sort((a,b)=>Number(hasInstruction(b))-Number(hasInstruction(a)));
  if(tab==='assigned')rows.sort((a,b)=>Number(needsHelp(b))-Number(needsHelp(a))||Number(ready(b))-Number(ready(a)));
  return rows;
 }
