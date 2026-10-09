@@ -113,6 +113,23 @@ async function load(){
  S.tasks=taskRows;S.recipients=recipientRows;S.updates=updateRows;S.favorites=new Set((f.data||[]).map(x=>x.message_id));
  void sidebarCount();
 }
+async function toggleFavorite(id){
+ if(S.busy)return;
+ if(dirty()){toast('請先處理未儲存的內容','error');return;}
+ const message=S.messages.find(m=>m.id===id);
+ if(!message)return;
+ S.busy=true;const adding=!favorite(id);
+ try{
+  let result;
+  if(adding)result=await db.from('team_message_favorites').insert({message_id:id,staff_id:me()});
+  else result=await db.from('team_message_favorites').delete().eq('message_id',id).eq('staff_id',me());
+  if(result.error)throw result.error;
+  await load();toast(adding?'已加入我的最愛':'已從我的最愛移除','success');
+  if(S.view==='detail'&&S.id)detail(S.id);
+  else listing();
+ }catch(e){toast('收藏操作失敗：'+(e.message||e),'error');}
+ finally{S.busy=false;}
+}
 async function refresh(){
  if(S.busy)return;S.busy=true;
  try{await load();if(S.view==='detail'&&S.id)detail(S.id);else listing();}
@@ -129,25 +146,16 @@ function card(m){
  return '<article class="tm-card tm-item '+urgency+'" role="button" tabindex="0" data-open="'+h(m.id)+'" aria-label="查看訊息：'+h(m.description.slice(0,60))+'">'+
   '<div class="tm-line"><div class="tm-meta"><span>建立者：'+h(name(m.created_by_staff_id))+'｜'+h(stamp(m.created_at))+'</span>'+
   '<span>已閱讀 '+count[0]+'／'+count[1]+' 人 · '+h(progress)+(own&&!own.read_at?' · 未閱讀':'')+'</span></div>'+
-  '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span></div>'+
+  '<span class="tm-pill '+status(m)+'">'+labels[status(m)]+'</span>'+favoriteButton(m.id,true)+'</div>'+
   '<div class="tm-main"><div class="tm-snippet">'+h(m.description)+'</div>'+
   (tag?'<span class="tm-action">'+tag+'</span>':'')+'</div></article>';
 }
 function listing(){
  S.view='list';S.id=null;S.editing=null;S.taskAction=null;S.addingTask=false;S.managingTask=null;S.composeOpen=false;S.editingMessage=false;
  const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(needsCreatorAction).length;
- const rows=S.messages.filter(m=>{
-  if(S.tab==='unread')return !m.closed_at&&myRead(m.id)?.read_at===null;
-  if(S.tab==='all')return !m.closed_at;
-  if(S.tab==='mine')return isMine(m);
-  if(S.tab==='assigned')return delegated(m);
-  if(S.tab==='closed')return !!m.closed_at;
-  return false;
- });
- if(S.tab==='mine')rows.sort((a,b)=>Number(hasInstruction(b))-Number(hasInstruction(a))||Number(pending(b))-Number(pending(a)));
- if(S.tab==='assigned')rows.sort((a,b)=>Number(needsHelp(b))-Number(needsHelp(a))||Number(ready(b))-Number(ready(a)));
- if(S.tab==='closed')rows.sort((a,b)=>new Date(b.closed_at)-new Date(a.closed_at));
- const tabs=[['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案']];
+ const rows=getTabRows(S.tab);
+ S.browseTab=S.tab;S.browseIds=rows.map(m=>m.id);
+ const tabs=[['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案'],['favorites','我的最愛']];
  html('<div class="tm-head" style="justify-content:flex-end">'+
   '<button class="btn primary" id="tm-new">＋ 新增訊息</button></div>'+
   '<div class="tm-tabs">'+tabs.map(([id,label])=>{
@@ -160,6 +168,9 @@ function listing(){
   '<div class="tm-list">'+(rows.length?rows.map(card).join(''):empty('目前沒有符合條件的訊息'))+'</div>');
  root().querySelector('#tm-new').onclick=createForm;
  root().querySelector('#tm-refresh').onclick=refresh;
+ root().querySelectorAll('[data-favorite]').forEach(btn=>btn.onclick=e=>{
+  e.stopPropagation();void toggleFavorite(btn.dataset.favorite);
+ });
  root().querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;listing();});
  root().querySelectorAll('[data-open]').forEach(el=>{
   el.onclick=()=>detail(el.dataset.open);
