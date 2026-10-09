@@ -303,16 +303,24 @@ function historyPanel(m){
  const rows=reports(m.id);
  return '<div class="tm-section"><h3>事件回報歷程（'+rows.length+'）</h3></div>'+
  '<div class="tm-events">'+(rows.length?rows.map(r=>{
-  const editing=r.staff_id===me()&&S.editing===r.id;
-  return '<section class="tm-entry" data-report="'+h(r.id)+'"><div class="tm-entry-head">'+
+  const canceled=!!r.voided_at,system=!!r.is_system;
+  const canEdit=!system&&!canceled&&r.staff_id===me();
+  const canVoid=!system&&!canceled&&(r.staff_id===me()||m.created_by_staff_id===me());
+  const editing=canEdit&&S.editing===r.id;
+  return '<section class="tm-entry'+(canceled?' tm-voided':'')+'" data-report="'+h(r.id)+'"><div class="tm-entry-head">'+
    '<div><strong>'+h(name(r.staff_id))+'</strong><span class="tm-muted">　'+h(stamp(r.created_at))+'</span></div>'+
-   (r.staff_id===me()&&!editing?'<button class="btn sm" data-edit="'+h(r.id)+'">修改</button>':'')+'</div>'+
+   '<div class="tm-actions" style="margin-top:0">'+(system?'<span class="tm-muted">系統紀錄</span>':'')+
+    (canEdit&&!editing?'<button class="btn sm" data-edit="'+h(r.id)+'">修改</button>':'')+
+    (canVoid&&!editing?'<button class="btn sm" data-void="'+h(r.id)+'">作廢</button>':'')+
+    (canceled?'<span class="tm-muted">已作廢</span>':'')+'</div></div>'+
    (editing?'<textarea class="tm-edit" maxlength="2000" rows="3" data-edit-body>'+h(r.body)+'</textarea>'+
     '<div class="tm-actions"><button class="btn primary sm" data-edit-save="'+h(r.id)+'">儲存修改</button>'+
     '<button class="btn sm" data-edit-cancel>取消</button></div>':
-    '<div class="tm-entry-text">'+h(r.body)+'</div>')+'</section>';
+    '<div class="tm-entry-text">'+h(r.body)+'</div>')+
+   (canceled?'<p class="tm-muted" style="margin-top:7px">由 '+h(name(r.voided_by_staff_id))+
+      ' 於 '+h(stamp(r.voided_at))+' 作廢</p>':'')+'</section>';
  }).join(''):empty('目前還沒有回報紀錄'))+'</div>'+
- (m.closed_at?'<p class="tm-muted" style="margin-top:12px">已結案，不再新增回報；原輸入者仍可修正自己回報的文字。</p>':
+ (m.closed_at?'<p class="tm-muted" style="margin-top:12px">已結案，不再新增回報；原輸入者仍可修正或作廢人工回報。</p>':
   '<div class="tm-compose"><div class="tm-small-head">新增回報（選填）</div>'+
   '<div class="tm-field"><textarea id="tm-compose" rows="3" maxlength="2000" placeholder="例如：已聯繫案主，對方表示同意。"></textarea></div>'+
   '<button class="btn primary" id="tm-send">送出回報</button></div>');
@@ -323,6 +331,16 @@ function dirty(){
  if(root().querySelector('#tm-compose')?.value.trim())return true;
  if(root().querySelector('[data-task-note]')?.value.trim())return true;
  if(root().querySelector('#tm-extra-work')?.value.trim()||root().querySelector('#tm-extra-person')?.value)return true;
+ if(S.managingTask){
+  const task=S.tasks.find(t=>t.id===S.managingTask.id);
+  if(S.managingTask.kind==='cancel')return !!root().querySelector('#tm-manage-reason')?.value.trim();
+  if(task){
+   const desc=root().querySelector('#tm-manage-description')?.value;
+   const person=root().querySelector('#tm-manage-person')?.value;
+   const notify=root().querySelector('#tm-manage-notify')?.checked;
+   if(desc!==undefined&&(desc!==task.description||person!==task.assignee_staff_id||notify===false))return true;
+  }
+ }
  if(S.editing){
   const original=S.updates.find(x=>x.id===S.editing);
   const edited=root().querySelector('[data-report="'+S.editing+'"] [data-edit-body]')?.value;
