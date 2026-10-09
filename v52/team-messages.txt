@@ -316,7 +316,7 @@ function taskManagementForm(t){
 }
 function taskPanel(m){
  const list=tasks(m.id);
- if(!list.length)return '<div class="tm-summary">一般訊息沒有分工事項，不需要結案。</div>';
+ if(!list.length)return '';
  const open=!m.closed_at,creator=m.created_by_staff_id===me();
  const active=list.filter(t=>!t.cancelled_at);
  return '<div class="tm-section"><h3>分工事項（'+active.filter(t=>t.is_done).length+'／'+active.length+' 已完成）</h3></div>'+
