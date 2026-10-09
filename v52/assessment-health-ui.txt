@@ -534,8 +534,6 @@
             </div>
           </div>
 
-          </div>
-
           <div class="health-subsection">
             <div class="health-subtitle">
               <strong>3. 本期用藥變化</strong>
@@ -558,10 +556,24 @@
               </div>
               <button id="healthAddMedicationChange" type="button" class="btn sm" style="margin-top:8px">＋ 新增用藥異動</button>
             </div>
+            <div class="health-grid" style="margin-top:12px">
+              <div class="health-field">
+                <label>本期是否自述或觀察到疑似用藥後不適</label>
+                <select data-health-medical="side_effect">
+                  <option value="">請選擇</option>
+                  <option value="none" ${local.medicalInfo.side_effect==='none'?'selected':''}>否</option>
+                  <option value="present" ${hasSideEffect?'selected':''}>有</option>
+                </select>
+              </div>
+              ${hasSideEffect?`<div class="health-field">
+                <label>本期疑似用藥後不適情形</label>
+                <textarea data-health-medical="side_effect_note">${escapeHTML(local.medicalInfo.side_effect_note||'')}</textarea>
+              </div>`:''}
+            </div>
           </div>
 
           <div class="health-subsection">
-            <div class="health-subtitle"><strong>4. 目前回診與用藥管理</strong></div>
+            <div class="health-subtitle"><strong>4. 目前回診現況</strong></div>
             <div class="health-grid">
               <div class="health-field">
                 <label>是否定期回診</label>
@@ -571,58 +583,52 @@
                   <option value="no" ${local.medicalInfo.regular_followup==='no'?'selected':''}>否</option>
                 </select>
               </div>
-              <div class="health-field">
-                <label>未定期回診原因／現況說明</label>
-                <textarea data-health-medical="regular_followup_reason">${escapeHTML(local.medicalInfo.regular_followup_reason||'')}</textarea>
-              </div>
-              <div class="health-field">
-                <label>用藥方式</label>
-                <select data-health-medical="medication_method">
-                  <option value="">請選擇</option>
-                  <option value="self" ${local.medicalInfo.medication_method==='self'?'selected':''}>自行</option>
-                  <option value="assisted" ${local.medicalInfo.medication_method==='assisted'?'selected':''}>他人協助</option>
-                </select>
-              </div>
-              <div class="health-field">
-                <label>協助者</label>
-                <input data-health-medical="medication_assisted_by" value="${escapeHTML(local.medicalInfo.medication_assisted_by||'')}">
-              </div>
-              <div class="health-field">
-                <label>是否服藥規律</label>
-                <select data-health-medical="medication_regular">
-                  <option value="">請選擇</option>
-                  <option value="yes" ${local.medicalInfo.medication_regular==='yes'?'selected':''}>是</option>
-                  <option value="no" ${local.medicalInfo.medication_regular==='no'?'selected':''}>否</option>
-                </select>
-              </div>
-              <div class="health-field">
-                <label>服藥異常或注意事項</label>
-                <textarea data-health-medical="medication_followup">${escapeHTML(local.medicalInfo.medication_followup||'')}</textarea>
-              </div>
-              <div class="health-field">
-                <label>本期是否自述或觀察到疑似用藥後不適</label>
-                <select data-health-medical="side_effect">
-                  <option value="">請選擇</option>
-                  <option value="none" ${local.medicalInfo.side_effect==='none'?'selected':''}>否</option>
-                  <option value="present" ${hasSideEffect?'selected':''}>有</option>
-                </select>
-              </div>
-              <div class="health-field" style="${hasSideEffect?'':'display:none'}">
-                <label>疑似用藥後不適情形</label>
-                <textarea data-health-medical="side_effect_note">${escapeHTML(local.medicalInfo.side_effect_note||'')}</textarea>
-              </div>
+              ${(local.medicalInfo.regular_followup==='no'||String(local.medicalInfo.regular_followup_reason||'').trim())
+                ?`<div class="health-field">
+                  <label>未定期回診原因／現況說明</label>
+                  <textarea data-health-medical="regular_followup_reason">${escapeHTML(local.medicalInfo.regular_followup_reason||'')}</textarea>
+                </div>`:''}
             </div>
           </div>
 
           <div class="health-subsection">
-            <div class="health-subtitle">
-              <strong>5. 用藥安全現況</strong>
-              <div style="display:flex;align-items:center;gap:8px">
-                <small>請依本次實際狀況重新評估</small>
+            <div class="health-subtitle"><strong>5. 目前用藥管理及用藥安全</strong></div>
+            ${renderMedicationUsage()}
+            ${medUsage==='using'?`
+              <div class="health-grid">
+                <div class="health-field">
+                  <label>用藥方式</label>
+                  <select data-health-medical="medication_method">
+                    <option value="">請選擇</option>
+                    <option value="self" ${local.medicalInfo.medication_method==='self'?'selected':''}>自行</option>
+                    <option value="assisted" ${local.medicalInfo.medication_method==='assisted'?'selected':''}>他人協助</option>
+                  </select>
+                </div>
+                ${local.medicalInfo.medication_method==='assisted'?`<div class="health-field">
+                  <label>協助者</label>
+                  <input data-health-medical="medication_assisted_by" value="${escapeHTML(local.medicalInfo.medication_assisted_by||'')}">
+                </div>`:''}
+                <div class="health-field">
+                  <label>是否服藥規律</label>
+                  <select data-health-medical="medication_regular">
+                    <option value="">請選擇</option>
+                    <option value="yes" ${local.medicalInfo.medication_regular==='yes'?'selected':''}>是</option>
+                    <option value="no" ${local.medicalInfo.medication_regular==='no'?'selected':''}>否</option>
+                  </select>
+                </div>
+                <div class="health-field">
+                  <label>服藥異常或注意事項</label>
+                  <textarea data-health-medical="medication_followup">${escapeHTML(local.medicalInfo.medication_followup||'')}</textarea>
+                </div>
+              </div>
+              <div class="health-subtitle" style="margin-top:14px">
+                <strong>用藥安全現況</strong>
                 ${local.previous?'<button id="healthCopyMedicationSafety" type="button" class="btn sm">帶入前次</button>':''}
               </div>
-            </div>
-            <div class="health-med-checks">${MED_CHECKS.map(renderMedCheck).join('')}</div>
+              <div class="health-med-checks">${MED_CHECKS.map(renderMedCheck).join('')}</div>
+            `:`<div class="health-notice" style="background:#f9fafb;border-color:#eaecf0;color:#667085">
+              ${medUsage==='none'?'目前無使用藥物，用藥管理與安全現況不適用。':medUsage==='unknown'?'目前用藥情形無法確認，請於上方填寫原因。':'請先確認目前是否使用藥物。'}
+            </div>`}
           </div>
 
           <div class="health-subsection">
@@ -702,8 +708,13 @@
       el.addEventListener(evt,()=>{
         syncInputs();
         const key=el.dataset.healthMedical;
-        if(key==='no_medication_changes')rebuildFixedMedicationEntries();
-        if(['no_healthcare_events','unvisited_health_change','no_medication_changes','side_effect'].includes(key)){
+        if(key==='medication_use_status'&&mode==='baseline'&&local.medicalInfo.medication_use_status==='none'){
+          const fixed=local.fixedMedicationBaseEntries.length>0;
+          const temporary=safeArray(local.medicalInfo.opening_temporary_medications).length>0;
+          if(!fixed)local.medicalInfo.opening_no_fixed_medications=true;
+          if(!temporary)local.medicalInfo.opening_no_temporary_medications=true;
+        }
+        if(['regular_followup','medication_method','medication_use_status','side_effect'].includes(key)){
           const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
         }
       });
@@ -807,6 +818,19 @@
       const items=safeArray(local.medicalInfo.healthcare_events);
       items.splice(index,1);
       local.medicalInfo.healthcare_events=items;
+      render();
+    }));
+
+    $('healthAddUnvisitedChange')?.addEventListener('click',()=>{
+      syncInputs();
+      local.medicalInfo.unvisited_health_changes=[...safeArray(local.medicalInfo.unvisited_health_changes),{note:''}];
+      render();
+    });
+    document.querySelectorAll('[data-remove-unvisited-health]').forEach(btn=>btn.addEventListener('click',()=>{
+      syncInputs();
+      const items=safeArray(local.medicalInfo.unvisited_health_changes);
+      items.splice(Number(btn.dataset.removeUnvisitedHealth),1);
+      local.medicalInfo.unvisited_health_changes=items;
       render();
     }));
 
