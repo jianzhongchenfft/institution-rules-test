@@ -221,6 +221,8 @@
         find.push('【'+label(code,k)+'】符合');
       fromNotes(find,r.notes,code);
       const summary=obj(r.summary);
+      if(summary.referral_required===true)find.push('高負荷家庭照顧者初篩：達轉介標準');
+      if(summary.professional_referral===true)find.push('專業判斷：有轉介需要');
       if(value(summary.unable_reason))find.push('無法評估原因：'+value(summary.unable_reason));
       if(value(summary.professional_reason))find.push('專業判斷理由：'+value(summary.professional_reason));
       if(value(summary.general_note))find.push('其他補充：'+value(summary.general_note));
@@ -243,12 +245,15 @@
     const data=summaryRes.data;
     const saved=source(code,toolRes.data),src=source(code,record);
     const gen=generate(code,src),hash=fingerprint(src);
+    const prior=local.get(key(eventId,code));
+    const keepDraft=!!prior?.edited;
     const state={
-      eventId,code,savedSource:saved,source:src,pendingFields:new Set(),
-      findings:data?.findings??gen.findings,
-      recommendations:data?.recommendations??gen.recommendations,
-      sig:data?hashes(data.source_signature):{findings:hash,recommendations:hash},
-      generated:!!data?.has_generated,exists:!!data,edited:false,preview:false
+      eventId,code,savedSource:saved,source:src,pendingFields:keepDraft?new Set(prior.pendingFields):new Set(),
+      findings:keepDraft?prior.findings:(data?.findings??gen.findings),
+      recommendations:keepDraft?prior.recommendations:(data?.recommendations??gen.recommendations),
+      sig:keepDraft?{...prior.sig}:(data?hashes(data.source_signature):{findings:hash,recommendations:hash}),
+      generated:keepDraft?prior.generated:!!data?.has_generated,
+      exists:!!data,edited:keepDraft,preview:false
     };
     local.set(key(eventId,code),state);return state;
   }
@@ -339,7 +344,7 @@
     if(!s||!caseId)throw new Error('缺少評估事件或個案資料');
     const payload={assessment_event_id:s.eventId,tool_code:s.code,case_id:caseId,
       findings:s.findings,recommendations:s.recommendations,source_signature:JSON.stringify(s.sig),has_generated:true,
-      updated_at:new Date().toISOString(),updated_by:(await db.auth.getUser()).data?.user?.id||null};
+      updated_at:new Date().toISOString()};
     const {error}=await db.from(TABLE).upsert(payload,{onConflict:'assessment_event_id,tool_code'});
     if(error)throw error;s.exists=true;s.generated=true;s.edited=false;
   }
