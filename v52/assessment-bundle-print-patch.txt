@@ -116,8 +116,7 @@
   const CG_APPLICABILITY={applicable:'適用：主要照顧者為家人／親友',no_family_caregiver:'不適用：無主要家庭照顧者',paid_caregiver:'不適用：主要照顧者為聘僱看護／非家人',unable:'本次無法評估'};
   const REFERRAL_ACTIONS={planned:'預計轉介家庭照顧者支持服務',referred:'已完成轉介／聯繫',declined_followup:'照顧者暫無意願，持續追蹤',other:'其他處置'};
   const SUMMARY_OVERALL={stable:'整體狀況穩定',attention:'有需留意事項',intervention:'有明顯問題／需介入'};
-  const PREV_PROBLEM={improved:'已改善',persistent:'持續存在',worse:'惡化',not_applicable:'不再適用'};
-  const PREV_RECOMMENDATION={completed:'已完成',partial:'部分執行',ongoing:'持續執行',not_done:'未執行',not_applicable:'不再適用'};
+  const PREV_FOLLOWUP={done:'已完成',partial:'部分完成',undone:'未完成',closed:'不再需要追蹤'};
 
   const local={eventId:null,row:null,caseRow:null,forms:[],records:{},previous:{},previousEvents:{},summary:null};
 
@@ -359,11 +358,10 @@
     for(const [title,items] of HOME_SECTIONS){
       body+=`<h2>${idx++}、${html(title)}</h2>`+rowTable(items.map(([key,label])=>`<tr><td>${html(label)}</td><td>${html(HOME_STATUS[a[key]]||a[key])}</td><td>${html(n[key])}</td></tr>`),['項目','結果','備註']);
     }
-    body+=`<h2>評估結論與後續</h2>`+rowTable([
+    body+=`<h2>評估結論與改善建議</h2>`+rowTable([
       `<tr><td>主要環境安全問題／改善建議</td><td>${html(s.recommendations)}</td></tr>`,
       `<tr><td>說明對象</td><td>${html(({client:'個案',family:'家屬',both:'個案及家屬',not_explained:'未說明'})[s.explained_to]||s.explained_to)}${s.not_explained_reason?`｜${html(s.not_explained_reason)}`:''}</td></tr>`,
-      `<tr><td>個案／家屬回應</td><td>${html(({accept:'接受',consider:'考慮中',unwilling:'暫無意願',other:'其他'})[s.family_response]||s.family_response)}${s.family_response_other?`｜${html(s.family_response_other)}`:''}</td></tr>`,
-      `<tr><td>是否需追蹤</td><td>${html(yesNo(s.followup_required))}${s.followup_note?`｜${html(s.followup_note)}`:''}</td></tr>`
+      `<tr><td>個案／家屬回應</td><td>${html(({agree:'同意改善',partial:'部分同意',unwilling:'暫無意願改善',unable:'無能力自行改善',other:'其他',not_needed:'本次無需改善'})[s.family_response]||s.family_response)}${s.family_response_other?`｜${html(s.family_response_other)}`:''}</td></tr>`
     ],['項目','內容']);
     return toolPage(body);
   }
@@ -393,11 +391,10 @@
     body+=`<h3>目前已有資源</h3>`+(social.length?rowTable(social.map((x,i)=>`<tr><td>${i+1}</td><td>${html(RESOURCE_TYPES[x.type]||x.type)}</td><td>${html(x.name)}</td><td>${html(x.assistance)}</td><td>${html(RESOURCE_USAGE[x.usage_status]||x.usage_status)}</td><td>${html(RESOURCE_SUFFICIENCY[x.sufficiency]||x.sufficiency)}${x.insufficiency_note?`｜${html(x.insufficiency_note)}`:''}</td></tr>`),['#','類型','單位／名稱','協助內容','使用狀況','是否足夠']):`<div class="plain">未登錄目前已有資源。</div>`);
     const needs=arr(res.unmet_needs);
     body+=`<h3>尚缺資源／轉介需求</h3>`+(needs.length?rowTable(needs.map((x,i)=>`<tr><td>${i+1}</td><td>${html(RESOURCE_TYPES[x.type]||x.type)}</td><td>${html(x.need)}</td><td>${html(x.action)}</td><td>${html(NEED_STATUS[x.status]||x.status)}</td></tr>`),['#','類型','需求內容','處理／轉介方式','狀態']):`<div class="plain">目前無登錄之尚缺資源／轉介需求。</div>`);
-    body+=`<h2>五、整體支持評估與後續</h2>`+rowTable([
+    body+=`<h2>五、整體支持評估</h2>`+rowTable([
       `<tr><td>整體支持狀況</td><td>${html(OVERALL_SUPPORT[s.overall_support]||s.overall_support)}</td></tr>`,
       `<tr><td>主要支持問題</td><td>${html(s.key_issues)}</td></tr>`,
-      `<tr><td>目前支持安排／建議</td><td>${html(s.support_plan)}</td></tr>`,
-      `<tr><td>是否需後續追蹤</td><td>${html(yesNo(s.followup_required))}${s.followup_note?`｜${html(s.followup_note)}`:''}</td></tr>`
+      `<tr><td>目前支持安排／建議</td><td>${html(s.support_plan)}</td></tr>`
     ],['項目','內容']);
     return toolPage(body);
   }
@@ -439,14 +436,11 @@
         <tr><th>評估原因</th><td colspan="3">${html(reason)}</td></tr>
       </tbody></table>
     </header>`;
-    if(s.previous_summary_id||s.previous_key_findings_snapshot||s.previous_care_recommendations_snapshot){
+    if(String(s.previous_followup_plan_snapshot||'').trim()){
       body+=`<h2>一、前次評估追蹤</h2>`+rowTable([
-        `<tr><td>前次主要問題／需求</td><td>${html(s.previous_key_findings_snapshot)}</td></tr>`,
-        `<tr><td>本次追蹤結果</td><td>${html(PREV_PROBLEM[s.previous_problem_status]||s.previous_problem_status)}</td></tr>`,
-        `<tr><td>追蹤說明</td><td>${html(s.previous_problem_followup_note)}</td></tr>`,
-        `<tr><td>前次服務重點／建議</td><td>${html(s.previous_care_recommendations_snapshot)}</td></tr>`,
-        `<tr><td>本次執行情形</td><td>${html(PREV_RECOMMENDATION[s.previous_recommendation_status]||s.previous_recommendation_status)}</td></tr>`,
-        `<tr><td>執行情形說明</td><td>${html(s.previous_recommendation_followup_note)}</td></tr>`
+        `<tr><td>前次後續追蹤計畫</td><td>${html(s.previous_followup_plan_snapshot)}</td></tr>`,
+        `<tr><td>本次執行情形</td><td>${html(PREV_FOLLOWUP[s.previous_followup_status]||s.previous_followup_status)}</td></tr>`,
+        `<tr><td>追蹤結果說明</td><td>${html(s.previous_followup_note)}</td></tr>`
       ],['項目','內容']);
       body+=`<h2>二、本次整體評估與照顧建議</h2>`;
     }else body+=`<h2>一、本次整體評估與照顧建議</h2>`;
