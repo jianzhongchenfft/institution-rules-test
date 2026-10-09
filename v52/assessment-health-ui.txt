@@ -579,9 +579,11 @@
                   <option value="">請選擇</option>
                   <option value="yes" ${local.medicalInfo.regular_followup==='yes'?'selected':''}>是</option>
                   <option value="no" ${local.medicalInfo.regular_followup==='no'?'selected':''}>否</option>
+                  <option value="not_needed" ${local.medicalInfo.regular_followup==='not_needed'?'selected':''}>無需定期回診</option>
+                  <option value="unknown" ${local.medicalInfo.regular_followup==='unknown'?'selected':''}>無法確認</option>
                 </select>
               </div>
-              ${(local.medicalInfo.regular_followup==='no'||String(local.medicalInfo.regular_followup_reason||'').trim())
+              ${(['no','unknown'].includes(local.medicalInfo.regular_followup))
                 ?`<div class="health-field">
                   <label>未定期回診原因／現況說明</label>
                   <textarea data-health-medical="regular_followup_reason">${escapeHTML(local.medicalInfo.regular_followup_reason||'')}</textarea>
