@@ -16,10 +16,42 @@
       laundry:'洗衣',transportation:'使用交通工具',medication:'服藥管理',finances:'理財'},
     health_medication:{consciousness:'意識狀況',eating:'進食狀況',elimination:'排泄狀況',
       mobility:'行動能力',upper_limb:'上肢運動能力',lower_limb:'下肢運動能力',
-      daily_activity:'日常活動與休閒',sleep:'夜間睡眠狀況',appetite_weight:'食慾與體重',mood:'情緒與精神狀況'},
+      daily_activity:'日常活動與休閒',sleep:'夜間睡眠狀況',appetite_weight:'食慾與體重',mood:'情緒與精神狀況',
+      "storage_safety":"藥品放置安全、可避免誤食","expired_medicine":"目前無過期藥物","medicine_recognition":"個案或協助者能辨識不同藥物（外觀或標示）","follow_prescription":"可依醫囑服藥（含時間與劑量）","medication_management_support":"藥物管理有適當人員協助（如有需要）" },
     support:{daily_care:'日常生活照顧',meal_housework:'餐食與家務協助',
       medical_transport:'就醫陪同／交通協助',medication_health:'用藥與健康管理',
       financial:'經濟支持',emotional:'陪伴與情緒支持',decision_contact:'重要決策／緊急聯絡'},
+    spmsq:{"q1":"1. 今天是幾年幾月幾日？",
+      "q2":"2. 今天星期幾？",
+      "q3":"3. 您現在住在哪裡？",
+      "q4":"4. 您的電話號碼是幾號？（或可辨識之聯絡方式）",
+      "q5":"5. 您今年幾歲？",
+      "q6":"6. 您的出生年月日是？",
+      "q7":"7. 現任總統是誰？",
+      "q8":"8. 上一任總統是誰？",
+      "q9":"9. 您母親的名字是什麼？",
+      "q10":"10. 請從20開始，每次減3，連續說下去。"},
+    home_safety:{"entrance_clear":"主要出入口及行走動線暢通",
+      "floor_level":"地面平整，無明顯危險高低差或門檻",
+      "floor_nonslip":"地面、地墊具有適當防滑措施",
+      "walkway_clear":"走道無雜物、電線或其他絆倒物",
+      "lighting":"主要活動區域及走道照明充足",
+      "furniture_safe":"家具擺放穩固，不影響個案移動或轉位",
+      "bath_floor_nonslip":"浴廁地面有防滑措施，且無明顯積水風險",
+      "bath_seat":"沐浴時有適合且穩固的座椅／洗澡椅可使用",
+      "bath_grab":"淋浴區或浴缸旁有適當扶手或可安全抓握處",
+      "toilet_transfer":"馬桶旁有適當扶手、便盆椅或其他安全移位措施",
+      "bath_threshold":"浴廁出入口及門檻不致造成明顯跌倒風險",
+      "bed_transfer":"床鋪高度及床邊空間適合個案上下床／轉位",
+      "night_lighting":"床邊或夜間活動時有足夠照明",
+      "night_toilet_route":"床至廁所的夜間動線安全",
+      "stairs_lighting":"樓梯照明充足",
+      "stairs_handrail":"樓梯設有穩固扶手",
+      "stairs_nonslip":"階梯具有適當防滑措施，且無雜物",
+      "kitchen_reach":"常用物品可安全取得，不需攀爬或踩椅子",
+      "kitchen_floor_work":"廚房地面及工作區無明顯滑倒、燙傷或碰撞風險",
+      "emergency_contact":"個案有可使用的緊急聯絡方式，必要時能取得協助",
+      "escape_route":"主要逃生／出入口通道保持暢通"},
     caregiver_burden:{behavior_stress:'被照顧者行為／情緒造成照顧困難',older_caregiver:'高齡照顧者',
       limited_experience:'照顧經驗或知能不足',no_relief:'缺乏替代照顧人力',
       multiple_dependents:'同時照顧多名家人',caregiver_health:'照顧者健康影響照顧',
@@ -99,20 +131,22 @@
         if(typeof item==='object'&&value(item?.note))find.push('【用藥安全：'+label(code,k)+'】'+value(item.note));
       }
       const m=obj(r.medical_info);
-      const narrative=['baseline_important_conditions','baseline_ongoing_treatments','baseline_conditions_unknown_note',
-        'baseline_treatments_unknown_note','regular_followup_reason','medication_use_note',
-        'opening_fixed_unknown_note','opening_temporary_unknown_note','family_report','current_health_status',
-        'health_change_note','medication_change_note'];
-      narrative.forEach(k=>{if(value(m[k]))find.push('【'+label(code,k)+'】'+value(m[k]));});
-      // 醫療事件及異動為文字紀錄，不將整份用藥清單重複寫入總結
-      for(const key of ['health_events','health_changes','health_change_items','medication_changes','medication_corrections']){
-        arr(r[key]).forEach((entry,i)=>{
-          const e=obj(entry);
-          for(const field of ['note','description','reason','impact_note','care_impact_note','response','action_note']){
-            if(value(e[field]))find.push('【'+key+' '+(i+1)+'】'+value(e[field]));
-          }
-        });
-      }
+      // 重要現況直接呈現；所有補充說明（含陣列子項目）逐一收集，不複製完整藥物清單。
+      for(const k of ['baseline_important_conditions','baseline_ongoing_treatments'])
+        if(value(m[k]))find.push('【'+label(code,k)+'】'+value(m[k]));
+      const narrativeKey=/^(note|reason|description|remark|comment)$|(_note|_reason|_description|_remarks|_comments)$/i;
+      const crawl=(entry,path,depth)=>{
+        if(depth>5)return;
+        if(Array.isArray(entry)){entry.forEach((v,i)=>crawl(v,path+' '+(i+1),depth+1));return;}
+        if(!entry||typeof entry!=='object')return;
+        for(const [k,v] of Object.entries(entry)){
+          if(k==='origin_note'||k==='side_effect_note')continue;
+          if(typeof v==='string'&&value(v)&&narrativeKey.test(k)){
+            find.push('【'+(path?path+'／':'')+label(code,k)+'】'+value(v));
+          }else if(v&&typeof v==='object')crawl(v,path?path+'／'+label(code,k):label(code,k),depth+1);
+        }
+      };
+      crawl(m,'',0);
     }else if(code==='home_safety'){
       for(const [k,st] of Object.entries(obj(r.answers)))if(st==='needs_improvement')
         find.push('【'+label(code,k)+'】需改善');
