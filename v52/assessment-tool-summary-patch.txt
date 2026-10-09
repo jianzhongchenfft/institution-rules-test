@@ -168,6 +168,9 @@
       // 重要現況直接呈現；所有補充說明（含陣列子項目）逐一收集，不複製完整藥物清單。
       for(const k of ['baseline_important_conditions','baseline_ongoing_treatments'])
         if(value(m[k]))find.push('【'+label(code,k)+'】'+value(m[k]));
+      if(value(m.medication_followup))find.push('【服藥異常或注意事項】'+value(m.medication_followup));
+      if(['observe','adjust_plan','contact_external'].includes(m.care_impact))
+        find.push('【本期健康與用藥照顧影響】'+({observe:'需持續觀察',adjust_plan:'需調整機構照顧計畫',contact_external:'建議聯繫A單位／醫療端'})[m.care_impact]);
       const narrativeKey=/^(note|reason|description|remark|comment)$|(_note|_reason|_description|_remarks|_comments)$/i;
       const crawl=(entry,path,depth)=>{
         if(depth>5)return;
@@ -189,6 +192,8 @@
         if(value(r.home_profile?.[k]))find.push('【'+label(code,k)+'】'+value(r.home_profile[k]));
       }
       const summary=obj(r.summary);
+      for(const k of ['not_explained_reason','family_response_other'])
+        if(value(summary[k]))find.push('【'+(k==='not_explained_reason'?'未說明原因':'個案／家屬回應')+'】'+value(summary[k]));
       for(const k of ['risk_summary','main_risks','risk_notes','environment_summary']){
         if(value(summary[k]))find.push('【'+label(code,k)+'】'+value(summary[k]));
       }
@@ -239,7 +244,7 @@
     const saved=source(code,toolRes.data),src=source(code,record);
     const gen=generate(code,src),hash=fingerprint(src);
     const state={
-      eventId,code,savedSource:saved,source:src,
+      eventId,code,savedSource:saved,source:src,pendingFields:new Set(),
       findings:data?.findings??gen.findings,
       recommendations:data?.recommendations??gen.recommendations,
       sig:data?hashes(data.source_signature):{findings:hash,recommendations:hash},
@@ -316,7 +321,7 @@
     root.querySelector('[data-ats-confirm]')?.addEventListener('click',()=>{
       const suggested=generate(code,s.source),h=fingerprint(s.source);
       root.querySelectorAll('[data-ats-replace]:checked').forEach(el=>{
-        const f=el.dataset.atsReplace;s[f]=suggested[f];s.sig[f]=h;
+        const f=el.dataset.atsReplace;s[f]=suggested[f];s.sig[f]=h;s.pendingFields.add(f);
       });
       s.generated=true;s.edited=true;s.preview=false;refresh();
       toast('已更新選取的總結欄位，請儲存本項評估','success');
@@ -333,7 +338,8 @@
   async function persist(s,caseId){
     if(!s||!caseId)throw new Error('缺少評估事件或個案資料');
     const payload={assessment_event_id:s.eventId,tool_code:s.code,case_id:caseId,
-      findings:s.findings,recommendations:s.recommendations,source_signature:JSON.stringify(s.sig),has_generated:true};
+      findings:s.findings,recommendations:s.recommendations,source_signature:JSON.stringify(s.sig),has_generated:true,
+      updated_at:new Date().toISOString(),updated_by:(await db.auth.getUser()).data?.user?.id||null};
     const {error}=await db.from(TABLE).upsert(payload,{onConflict:'assessment_event_id,tool_code'});
     if(error)throw error;s.exists=true;s.generated=true;s.edited=false;
   }
@@ -346,10 +352,12 @@
     const saved=source(code,data),h=fingerprint(saved);
     if(!s.exists){
       if(!s.edited){const g=generate(code,saved);s.findings=g.findings;s.recommendations=g.recommendations;}
-      // 首次完成表單即視為確認目前原始資料，避免資料庫正規化造成誤提醒。
+      // 首次完成表單視為確認目前原始資料。
       s.sig={findings:h,recommendations:h};
     }
+    for(const field of s.pendingFields){s.sig[field]=h;}
     await persist(s,caseId);
+    s.pendingFields.clear();
     s.savedSource=saved;
   }
   async function trackOverall(eventId,caseId,findings,recommendations,signature){
