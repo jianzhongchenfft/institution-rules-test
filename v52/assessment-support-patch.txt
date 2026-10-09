@@ -442,7 +442,7 @@
         if(el.type==='radio'&&!el.checked)return;
         item[el.dataset.supportFamilyField]=el.value;
       });
-      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))items.push(item);
+      items.push(item);
     });local.familyMembers=items;
   }
   function syncSocialResources(){
@@ -453,7 +453,7 @@
         item[el.dataset.supportResourceRowField]=el.value;
       });
       item.nature=resourceNatureForType(item.type);
-      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))items.push(item);
+      items.push(item);
     });local.resources.social_resources=items;
   }
   function syncNeeds(){
@@ -463,7 +463,7 @@
         if(el.type==='radio'&&!el.checked)return;
         item[el.dataset.supportNeedRowField]=el.value;
       });
-      if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))items.push(item);
+      items.push(item);
     });local.resources.unmet_needs=items;
   }
   function syncDynamicRows(){syncFamilyMembers();syncSocialResources();syncNeeds();}
