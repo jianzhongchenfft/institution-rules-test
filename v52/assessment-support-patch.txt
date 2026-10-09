@@ -474,6 +474,7 @@
   function syncDynamicRows(){syncFamilyMembers();syncSocialResources();syncNeeds();}
 
   function bindEvents(row){
+    window.v52AssessmentToolSummary?.mount(local.eventId,'support',currentToolSummarySource(),'.support-page','.support-actions');
     $('supportBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
     document.querySelectorAll('[data-support-household]').forEach(el=>{
@@ -599,6 +600,8 @@
     return null;
   }
 
+  function currentToolSummarySource(){return ({household:local.household,family_members:local.familyMembers,support_domains:local.supportDomains,resources:local.resources,summary:local.summary});}
+
   async function saveSupport(finalize){
     const row=eventById(local.eventId);if(!row||!canEditEvent(row))return toast('您沒有此個案的評估編輯權限','error');
     syncDynamicRows();
@@ -614,6 +617,7 @@
         p_resources:local.resources,p_summary:local.summary,p_finalize:!!finalize,p_copied_from_id:local.pendingCopyFromId||local.record?.copied_from_id||null
       });
       if(error)throw error;
+      await window.v52AssessmentToolSummary.saveAfterTool(row.id,'support',currentToolSummarySource(),row.case_id);
       await window.v52AssessmentApi?.loadAssessmentData?.(false);
       if(finalize){window.v52AssessmentApi?.renderAssessmentDetail?.(row.id);toast('支持系統評估已完成','success');}
       else{await loadSupport(row.id);renderSupportPage();requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'auto'}));toast('支持系統草稿已儲存','success');}
@@ -626,7 +630,8 @@
     if(row.status==='pending')return toast('請先開始本次評估','warn');
     if(!supportForm(eventId))return toast('本次評估未選用支持系統','warn');
     showLoading(true);
-    try{await loadSupport(eventId);renderSupportPage();window.scrollTo({top:0,behavior:'auto'});}
+    try{await loadSupport(eventId);
+      await window.v52AssessmentToolSummary.load(eventId,'support',currentToolSummarySource());renderSupportPage();window.scrollTo({top:0,behavior:'auto'});}
     catch(err){console.error(err);toast('讀取支持系統失敗：'+(err?.message||err),'error');}
     finally{showLoading(false);}
   }
