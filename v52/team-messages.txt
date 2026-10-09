@@ -226,35 +226,60 @@ function readPanel(id){
   '<label class="tm-check" style="margin-top:12px"><input type="checkbox" id="tm-read">我已閱讀</label>'):
   '<p class="tm-muted" style="margin-top:12px">你不在本次通知對象內，無須確認閱讀。</p>')+'</section>';
 }
+function taskManagementForm(t){
+ if(S.managingTask?.id!==t.id)return '';
+ if(S.managingTask.kind==='cancel'){
+  return '<div class="tm-task-manage"><div class="tm-small-head">取消分工</div>'+
+   '<div class="tm-field"><textarea id="tm-manage-reason" maxlength="500" rows="2" placeholder="請簡短說明取消原因（必填）"></textarea></div>'+
+   '<div class="tm-actions"><button class="btn primary sm" id="tm-manage-submit">確認取消分工</button>'+
+   '<button class="btn sm" id="tm-manage-abort">返回</button></div></div>';
+ }
+ return '<div class="tm-task-manage"><div class="tm-small-head">編輯分工</div>'+
+  '<div class="tm-manage-grid"><div class="tm-field"><label>承辦人</label><select id="tm-manage-person">'+
+  S.staff.map(x=>'<option value="'+h(x.id)+'"'+(x.id===t.assignee_staff_id?' selected':'')+'>'+h(x.display_name)+'</option>').join('')+
+  '</select></div><div class="tm-field"><label>交辦內容</label>'+
+  '<textarea id="tm-manage-description" rows="2" maxlength="1000">'+h(t.description)+'</textarea></div></div>'+
+  '<label class="tm-check"><input type="checkbox" id="tm-manage-notify" checked>通知承辦人</label>'+
+  '<p class="tm-muted" id="tm-manage-hint">修正錯字可取消通知；更換承辦人會強制通知新承辦人。</p>'+
+  '<div class="tm-actions"><button class="btn primary sm" id="tm-manage-submit">儲存修改</button>'+
+  '<button class="btn sm" id="tm-manage-abort">返回</button></div></div>';
+}
 function taskPanel(m){
  const list=tasks(m.id);
  if(!list.length)return '<div class="tm-summary">一般訊息沒有分工事項，不需要結案。</div>';
- const creator=m.created_by_staff_id===me(),open=!m.closed_at;
- return '<div class="tm-section"><h3>分工事項（'+list.filter(t=>t.is_done).length+'／'+list.length+' 已完成）</h3></div>'+
+ const open=!m.closed_at,creator=m.created_by_staff_id===me();
+ const active=list.filter(t=>!t.cancelled_at);
+ return '<div class="tm-section"><h3>分工事項（'+active.filter(t=>t.is_done).length+'／'+active.length+' 已完成）</h3></div>'+
  '<div class="tm-tasks">'+list.map((t,i)=>{
-  const assigned=t.assignee_staff_id===me();
+  const canceled=!!t.cancelled_at,assigned=t.assignee_staff_id===me();
+  const help=t.assistance_needed&&open&&!canceled,fresh=t.instruction_pending&&open&&!canceled;
   const editing=S.taskAction?.taskId===t.id;
-  const help=t.assistance_needed&&!m.closed_at;
-  const fresh=t.instruction_pending&&!m.closed_at;
   const buttons=[];
-  if(open&&assigned){
+  if(canceled){
+   buttons.push('<span class="tm-pill">已取消</span>');
+  }else if(open){
    if(help)buttons.push('<span class="tm-task-flag">執行困難，等待建立者回覆</span>');
-   else if(fresh)buttons.push('<span class="tm-task-flag new">有新指示</span><button class="btn sm" data-ack="'+h(t.id)+'">已知悉</button>');
-   else buttons.push('<label class="tm-check"><input type="checkbox" data-done="'+h(t.id)+'"'+(t.is_done?' checked':'')+'>已完成</label>');
-   if(!t.is_done&&!help&&!fresh)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="request_help">執行困難</button>');
+   else if(fresh){
+     buttons.push('<span class="tm-task-flag new">有新指示</span>');
+     if(assigned)buttons.push('<button class="btn sm" data-ack="'+h(t.id)+'">已知悉</button>');
+   }else buttons.push('<label class="tm-check"><input type="checkbox" data-done="'+h(t.id)+'"'+(t.is_done?' checked':'')+'>已完成</label>');
+   if(assigned&&!t.is_done&&!help&&!fresh)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="request_help">執行困難</button>');
+   if(creator){
+    if(help)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="guide">給予新指示</button>');
+    else if(t.is_done)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="redo">退回重辦</button>');
+    buttons.push('<button class="btn sm" data-manage-open="'+h(t.id)+'" data-manage-kind="edit">編輯</button>');
+    buttons.push('<button class="btn sm" data-manage-open="'+h(t.id)+'" data-manage-kind="cancel">取消分工</button>');
+   }
   }else buttons.push('<span class="tm-pill '+(t.is_done?'closed':'')+'">'+(t.is_done?'已完成':'未完成')+'</span>');
-  if(open&&creator){
-   if(help)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="guide">給予新指示</button>');
-   else if(t.is_done)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="redo">退回重辦</button>');
-  }
   const prompt=editing?(S.taskAction.kind==='request_help'?'請說明遇到的困難':S.taskAction.kind==='redo'?'請說明需要重新辦理的事項':'請輸入新的處理指示'):'';
   const composer=editing?'<div class="tm-task-compose"><strong>'+prompt+'</strong><div class="tm-field">'+
    '<textarea data-task-note maxlength="1700" rows="3" placeholder="送出後會自動加入事件回報歷程"></textarea></div>'+
    '<div class="tm-actions"><button class="btn primary sm" data-task-save="'+h(t.id)+'">送出</button>'+
    '<button class="btn sm" data-task-cancel>取消</button></div></div>':'';
-  return '<section class="tm-task"><div><div class="tm-task-label">'+(i+1)+'. '+h(t.description)+'</div>'+
-   '<p class="tm-muted">承辦人：'+h(name(t.assignee_staff_id))+'</p></div>'+
-   '<div class="tm-task-actions">'+buttons.join('')+'</div>'+composer+'</section>';
+  return '<section class="tm-task'+(canceled?' tm-task-cancelled':'')+'"><div><div class="tm-task-label">'+(i+1)+'. '+h(t.description)+'</div>'+
+   '<p class="tm-muted">承辦人：'+h(name(t.assignee_staff_id))+'</p>'+
+   (canceled?'<p class="tm-muted">取消原因：'+h(t.cancel_reason||'—')+'</p>':'')+'</div>'+
+   '<div class="tm-task-actions">'+buttons.join('')+'</div>'+composer+taskManagementForm(t)+'</section>';
  }).join('')+'</div>';
 }
 function additionalTaskPanel(message){
