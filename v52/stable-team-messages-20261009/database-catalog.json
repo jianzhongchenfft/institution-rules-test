@@ -1,0 +1,301 @@
+{
+  "snapshot_date": "2026-10-09",
+  "scope": "TEST Supabase, team_message* only",
+  "notes": "No business data, credentials, or full private authorization source. MD5 of stored pg_proc.prosrc is used for change detection, not a cryptographic attestation. Policies use MD5(qual || '|' || with_check), constraints and indexes use the queries in verification.sql.",
+  "routines": [
+    {
+      "signature": "add_team_message_task(uuid,text,uuid)",
+      "security_definer": true,
+      "body_md5": "f2a92a3c10631dae7e506d899a4d8b91",
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "create_team_message(text,jsonb,uuid[])",
+      "security_definer": true,
+      "body_md5": "92a8fa917d5fea7516ce47d3339c030b",
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "team_message_attention_count()",
+      "security_definer": false,
+      "body_md5": "87d2f45f8af3e0455784a92c26e8065d",
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "team_message_edit_help(uuid,text)",
+      "security_definer": true,
+      "body_md5": "128ab74b54d29187eb40889f940c776f",
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "team_message_manage_event(uuid,text,text,boolean)",
+      "security_definer": true,
+      "body_md5": "1f1496176c55183760462978bfe1a2c0",
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "team_message_manage_task(uuid,text,text,uuid,boolean,text)",
+      "security_definer": true,
+      "body_md5": "453460341d638b57db8f1d6fc4b5281f",
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "team_message_task_action(uuid,text,text)",
+      "security_definer": true,
+      "body_md5": "c15232a2ae6ac0c6fada13bcb0ec9e26",
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "void_team_message_update(uuid)",
+      "security_definer": true,
+      "body_md5": "8973054df95eaf2ff7fff0d02e57f617",
+      "authenticated_execute": true,
+      "anon_execute": false
+    }
+  ],
+  "policies": [
+    {
+      "tablename": "team_message_favorites",
+      "policyname": "team_favorites_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "8b964a3fe63a113682ade37b7e0499d6"
+    },
+    {
+      "tablename": "team_message_favorites",
+      "policyname": "team_favorites_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "daf8b7bf92020de986532f325f4f2aa8"
+    },
+    {
+      "tablename": "team_message_favorites",
+      "policyname": "team_favorites_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "8b964a3fe63a113682ade37b7e0499d6"
+    },
+    {
+      "tablename": "team_message_recipients",
+      "policyname": "team_recipients_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "8bb57790bba4ecff60e7f94d6514026a"
+    },
+    {
+      "tablename": "team_message_recipients",
+      "policyname": "team_recipients_manage_own_read",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "0042f1374ac2bb5cd0de0848b71132c2"
+    },
+    {
+      "tablename": "team_message_recipients",
+      "policyname": "team_recipients_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "ee00baa2f71b6fcef10fba48ea765484"
+    },
+    {
+      "tablename": "team_message_tasks",
+      "policyname": "team_tasks_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "480b5ad0db668a837048c28944a8eced"
+    },
+    {
+      "tablename": "team_message_tasks",
+      "policyname": "team_tasks_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "ee00baa2f71b6fcef10fba48ea765484"
+    },
+    {
+      "tablename": "team_message_updates",
+      "policyname": "team_updates_author_edit",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "0103d1c2a41302b7024d18b866441950"
+    },
+    {
+      "tablename": "team_message_updates",
+      "policyname": "team_updates_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "f287730a5696ae8bfa6ea51cd9f279ac"
+    },
+    {
+      "tablename": "team_message_updates",
+      "policyname": "team_updates_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "ee00baa2f71b6fcef10fba48ea765484"
+    },
+    {
+      "tablename": "team_messages",
+      "policyname": "team_messages_close",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "52ed529b927b0580db0d843fc0fad5d8"
+    },
+    {
+      "tablename": "team_messages",
+      "policyname": "team_messages_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "707d74d20034b60f604d2c4011895d62"
+    },
+    {
+      "tablename": "team_messages",
+      "policyname": "team_messages_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "permissive": "PERMISSIVE",
+      "policy_logic_md5": "ee00baa2f71b6fcef10fba48ea765484"
+    }
+  ],
+  "tables": [
+    {
+      "table_name": "team_message_favorites",
+      "rls": true,
+      "force_rls": false,
+      "constraints_count": 3,
+      "constraints_md5": "44a50d183fc32c475c57d0a657ef2fde",
+      "indexes_count": 2,
+      "indexes_md5": "1e41728da43f388b00cb8c86fb11c4fd",
+      "auth_select": true,
+      "auth_insert": true,
+      "auth_update": false,
+      "auth_delete": true,
+      "auth_truncate": false,
+      "anon_select": false
+    },
+    {
+      "table_name": "team_message_recipients",
+      "rls": true,
+      "force_rls": false,
+      "constraints_count": 3,
+      "constraints_md5": "dd9eaa6bdb550fc9aa12fbdead5ea0a0",
+      "indexes_count": 2,
+      "indexes_md5": "7f12b31c907546d099e242bfca4eb173",
+      "auth_select": true,
+      "auth_insert": false,
+      "auth_update": false,
+      "auth_delete": false,
+      "auth_truncate": false,
+      "anon_select": false
+    },
+    {
+      "table_name": "team_message_tasks",
+      "rls": true,
+      "force_rls": false,
+      "constraints_count": 10,
+      "constraints_md5": "9fd8c07c4d68c3e9ee8f461e6f72e52a",
+      "indexes_count": 3,
+      "indexes_md5": "83d6d8159bb6eee27d7380168fb0c8f9",
+      "auth_select": true,
+      "auth_insert": false,
+      "auth_update": false,
+      "auth_delete": false,
+      "auth_truncate": false,
+      "anon_select": false
+    },
+    {
+      "table_name": "team_message_updates",
+      "rls": true,
+      "force_rls": false,
+      "constraints_count": 6,
+      "constraints_md5": "f4a717064a3f41bb58f398b5096e21e1",
+      "indexes_count": 3,
+      "indexes_md5": "d01ea957aff6be50f6ee8569767e86dd",
+      "auth_select": true,
+      "auth_insert": false,
+      "auth_update": false,
+      "auth_delete": false,
+      "auth_truncate": false,
+      "anon_select": false
+    },
+    {
+      "table_name": "team_messages",
+      "rls": true,
+      "force_rls": false,
+      "constraints_count": 3,
+      "constraints_md5": "003174bfc75b6a09f30bc1de19444345",
+      "indexes_count": 3,
+      "indexes_md5": "5beae315de1ad75b334f0c535e7bcb3b",
+      "auth_select": true,
+      "auth_insert": false,
+      "auth_update": false,
+      "auth_delete": false,
+      "auth_truncate": false,
+      "anon_select": false
+    }
+  ],
+  "column_grants": [
+    {
+      "table_name": "team_message_favorites",
+      "column_name": "created_at",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "team_message_favorites",
+      "column_name": "message_id",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "team_message_favorites",
+      "column_name": "staff_id",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "team_message_recipients",
+      "column_name": "read_at",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "table_name": "team_message_updates",
+      "column_name": "body",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "team_message_updates",
+      "column_name": "body",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "table_name": "team_message_updates",
+      "column_name": "message_id",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "team_message_updates",
+      "column_name": "staff_id",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "team_messages",
+      "column_name": "closed_at",
+      "privilege_type": "UPDATE"
+    }
+  ]
+}
