@@ -288,7 +288,7 @@
     const h=local.household;
     return `<section class="support-section">
       <div class="support-section-head"><div><strong>二、主要照顧者與重要支持者</strong><small>只記錄實際參與照顧或能提供支持的重要人物，不取代家系圖。</small></div>
-        <button id="supportAddFamilyMember" type="button" class="btn sm">＋ 新增支持者</button></div>
+        ${h.backup_available==='yes'?'<button id="supportAddFamilyMember" type="button" class="btn sm">＋ 新增支持者</button>':''}</div>
       <div class="support-grid">
         <div class="support-field full support-choice-question"><label>是否有主要照顧者 *</label>${renderChoiceOptions('data-support-household','primary_caregiver_status',[['present','有'],['none','無']],h.primary_caregiver_status)}</div>
         ${h.primary_caregiver_status==='present'?`
@@ -299,6 +299,7 @@
           <div class="support-field"><label>主要協助內容</label><input data-support-household="primary_caregiver_role" value="${escapeHTML(h.primary_caregiver_role||'')}" placeholder="例如：就醫、備餐、用藥管理"></div>`:''}
         <div class="support-field full support-choice-question"><label>是否有替代照顧者／其他重要支持者 *</label>${renderChoiceOptions('data-support-household','backup_available',[['yes','有'],['no','無']],h.backup_available)}</div>
       </div>
+      ${h.backup_available==='yes'||local.familyMembers.length?`
       <div class="support-list">
         ${local.familyMembers.length?local.familyMembers.map((m,index)=>`<div class="support-row" data-support-family="${escapeHTML(m.id)}">
           <div class="support-row-head"><strong>重要支持者 ${index+1}</strong><button type="button" class="btn sm" data-remove-support-family="${escapeHTML(m.id)}">移除</button></div>
@@ -311,6 +312,7 @@
             <input class="wide" data-support-family-field="note" value="${escapeHTML(m.note||'')}" placeholder="其他備註（選填）">
           </div></div>`).join(''):'<div class="support-empty">目前未新增其他重要支持者。</div>'}
       </div>
+      `:''}
     </section>`;
   }
 
