@@ -3,7 +3,7 @@
 'use strict';
 if(window.teamMessagesModule)return;
 const ROLES=['admin','organization_manager','business_manager','supervisor'];
-const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false,taskAction:null,addingTask:false,managingTask:null,composeOpen:false,editingMessage:false};
+const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false,taskAction:null,addingTask:false,managingTask:null,composeOpen:false,editingMessage:false,favorites:new Set(),browseTab:null,browseIds:[]};
 const root=()=>document.getElementById('tm-root');
 const h=v=>escapeHTML(String(v==null?'':v));
 const name=id=>S.staff.find(x=>x.id===id)?.display_name||'原使用者';
@@ -15,6 +15,15 @@ const readers=id=>S.recipients.filter(r=>r.message_id===id);
 const reports=id=>S.updates.filter(r=>r.message_id===id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)||a.id.localeCompare(b.id));
 const myRead=id=>readers(id).find(r=>r.staff_id===me());
 const readCount=id=>{const arr=readers(id);return [arr.filter(r=>r.read_at).length,arr.length];};
+const favorite=id=>S.favorites.has(id);
+const favoriteButton=(id,short=false)=>{
+ const on=favorite(id),title=on?'移除最愛':'加入最愛';
+ return '<button type="button" class="tm-favorite'+(on?' active':'')+'" data-favorite="'+h(id)+'" title="'+title+
+ '" aria-label="'+title+'" aria-pressed="'+on+'">'+
+ '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="'+(on?'currentColor':'none')+
+ '" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="m12 2 3.1 6.3 7 .9-5.1 4.9 1.2 7-6.2-3.3-6.2 3.3 1.2-7-5.1-4.9 7-.9Z"/></svg>'+
+ (short?'':'<span>'+title+'</span>')+'</button>';
+};
 const isMine=m=>!m.closed_at&&activeTasks(m.id).some(t=>t.assignee_staff_id===me());
 const pending=m=>!m.closed_at&&activeTasks(m.id).some(t=>t.assignee_staff_id===me()&&!t.is_done);
 const delegated=m=>!m.closed_at&&m.created_by_staff_id===me()&&tasks(m.id).length>0;
@@ -40,6 +49,7 @@ style.textContent+='.tm-task{flex-wrap:wrap}.tm-task-actions{display:flex;align-
 style.textContent+='.tm-task-cancelled{opacity:.72;background:#f6f6f6}.tm-task-cancelled .tm-task-label{text-decoration:line-through}.tm-task-manage{flex-basis:100%;background:#fffbf8;border:1px solid #efd7c9;border-radius:9px;padding:12px}.tm-task-manage .tm-small-head{margin-bottom:7px}.tm-manage-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px;align-items:start}.tm-manage-grid select,.tm-manage-grid textarea{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:9px;padding:9px;font:inherit;background:#fff;color:#1f2937;min-height:42px}.tm-manage-grid textarea{resize:vertical;min-height:42px}.tm-voided .tm-entry-text{text-decoration:line-through;opacity:.62}.tm-voided{border-left-color:#9ca3af;background:#f6f6f6}.tm-task-manage .tm-check{margin-top:9px;font-size:13px}@media(max-width:600px){.tm-manage-grid{grid-template-columns:1fr}}';
 style.textContent+='.tm-tabs .tm-tab,.tm-tabs .tm-refresh{box-sizing:border-box;height:42px;min-height:42px}.tm-tabs .tm-tab{padding:0 13px}.tm-tabs .tm-refresh{display:inline-flex;align-items:center;justify-content:center;flex:0 0 42px;width:42px;height:42px;padding:0;border:1px solid #e9dad4;border-radius:10px;background:#fff;color:#475569;font:inherit;cursor:pointer}.tm-tabs .tm-refresh:hover{background:#fff5ee}.tm-tabs .tm-refresh:focus-visible{outline:2px solid #d9795a;outline-offset:2px}.tm-report-add{margin-top:12px}.tm-compose textarea{resize:none;min-height:42px;overflow-y:hidden;line-height:1.6}';
 style.textContent+='.tm-read-compact{padding:10px 14px;margin-top:13px}.tm-read-summary{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:13px;line-height:1.8}.tm-read-summary strong{font-size:13px}.tm-reader-mini{font-size:13px;font-weight:800;white-space:nowrap;cursor:help}.tm-reader-mini.read{color:#267448}.tm-reader-mini.unread{color:#c53f3f}.tm-read-separator{color:#9ca3af;padding:0 5px}.tm-read-ack{margin-top:5px}.tm-message-content-actions{display:flex;align-items:center;gap:9px}.tm-message-editor{margin-top:10px}.tm-message-editor textarea{min-height:80px}.tm-message-editor .tm-check{margin:10px 0}.tm-message-editor .tm-actions{margin-top:10px}';
+style.textContent+='.tm-detail-navigation{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}.tm-detail-position{color:#6b7280;font-size:12px;font-weight:650;min-width:46px;text-align:center}.tm-detail-navigation .btn:disabled{opacity:.4;cursor:not-allowed}.tm-favorite{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid #e9dad4;border-radius:9px;background:#fff;color:#6b7280;cursor:pointer;padding:6px 9px;line-height:1.2;font:inherit;font-size:13px}.tm-favorite.active{color:#c17a14;background:#fff9e8;border-color:#e9c887}.tm-favorite svg{display:block}.tm-favorite:hover{border-color:#d29278}.tm-card .tm-favorite{flex-shrink:0}.tm-detail-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}';
 document.head.appendChild(style);
 
 // 「內容」與「交辦內容」預設單行；輸入換行或自動折行時即時增高，刪字也會縮回。
@@ -53,12 +63,41 @@ function autoGrow(field){
  adjust();
 }
 
+function getTabRows(tab){
+ const rows=S.messages.filter(m=>{
+  if(tab==='unread')return !m.closed_at&&myRead(m.id)?.read_at===null;
+  if(tab==='all')return !m.closed_at;
+  if(tab==='mine')return isMine(m);
+  if(tab==='assigned')return delegated(m);
+  if(tab==='closed')return !!m.closed_at;
+  if(tab==='favorites')return favorite(m.id);
+  return false;
+ });
+ if(tab==='mine')rows.sort((a,b)=>Number(hasInstruction(b))-Number(hasInstruction(a))||Number(pending(b))-Number(pending(a)));
+ if(tab==='assigned')rows.sort((a,b)=>Number(needsHelp(b))-Number(needsHelp(a))||Number(ready(b))-Number(ready(a)));
+ if(tab==='closed')rows.sort((a,b)=>new Date(b.closed_at)-new Date(a.closed_at));
+ return rows;
+}
+const tabNames={unread:'未閱讀',all:'全部訊息',mine:'我的待辦',assigned:'我的交辦',closed:'已結案',favorites:'我的最愛'};
+function browseNavigation(id){
+ const tab=S.browseTab||S.tab,ids=S.browseIds.length?S.browseIds:getTabRows(tab).map(m=>m.id);
+ const index=ids.indexOf(id),allowed=new Set(getTabRows(tab).map(m=>m.id));
+ const seek=step=>{
+  if(index<0)return null;
+  for(let i=index+step;i>=0&&i<ids.length;i+=step){
+   if(allowed.has(ids[i]))return ids[i];
+  }
+  return null;
+ };
+ return {tab,ids,index,previous:seek(-1),next:seek(1)};
+}
 async function load(){
- const [m,s]=await Promise.all([
+ const [m,s,f]=await Promise.all([
   db.from('team_messages').select('*').order('created_at',{ascending:false}).limit(300),
-  db.from('staff_users').select('id,display_name,role,is_active').eq('is_active',true).order('display_name')
+  db.from('staff_users').select('id,display_name,role,is_active').eq('is_active',true).order('display_name'),
+  db.from('team_message_favorites').select('message_id').eq('staff_id',me()).limit(5000)
  ]);
- if(m.error)throw m.error;if(s.error)throw s.error;
+ if(m.error)throw m.error;if(s.error)throw s.error;if(f.error)throw f.error;
  const messages=m.data||[];let taskRows=[],recipientRows=[],updateRows=[];
  if(messages.length){
   const ids=messages.map(x=>x.id);
@@ -71,7 +110,7 @@ async function load(){
   taskRows=a.data||[];recipientRows=b.data||[];updateRows=c.data||[];
  }
  S.messages=messages;S.staff=(s.data||[]).filter(x=>ROLES.includes(x.role));
- S.tasks=taskRows;S.recipients=recipientRows;S.updates=updateRows;
+ S.tasks=taskRows;S.recipients=recipientRows;S.updates=updateRows;S.favorites=new Set((f.data||[]).map(x=>x.message_id));
  void sidebarCount();
 }
 async function refresh(){
