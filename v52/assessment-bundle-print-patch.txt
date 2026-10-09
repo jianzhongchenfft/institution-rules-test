@@ -501,7 +501,18 @@
       const hash=api.fingerprint(api.source(f.form_code,record));
       return sig.findings!==hash||sig.recommendations!==hash;
     });
-    const notice=updates.length?`<div style="margin-bottom:10px;padding:9px;border:1px solid #fedf89;background:#fffaeb;border-radius:9px;color:#93370d;font-size:11px">以下單項總結尚未確認最新原始評估：${updates.map(x=>escapeHTML(x.form_name)).join('、')}。仍可列印，內容以最後成功儲存的總結為準。</div>`:'';
+    const byCode=new Map((local.toolSummaries||[]).map(x=>[x.tool_code,x]));
+    const overallCheckpoint=byCode.get('overall');
+    const overallHash=api.fingerprint(local.forms.map(f=>{
+      const s=byCode.get(f.form_code);
+      return [f.form_code,f.status,s?.findings??null,s?.recommendations??null];
+    }));
+    let overallSignatures={};
+    try{overallSignatures=JSON.parse(overallCheckpoint?.source_signature||'{}')||{};}catch(_){}
+    const overallOutdated=!!local.summary&&
+      (overallSignatures.findings!==overallHash||overallSignatures.recommendations!==overallHash);
+    const notice=(updates.length?`<div style="margin-bottom:10px;padding:9px;border:1px solid #fedf89;background:#fffaeb;border-radius:9px;color:#93370d;font-size:11px">以下單項總結尚未確認最新原始評估：${updates.map(x=>escapeHTML(x.form_name)).join('、')}。仍可列印，內容以最後成功儲存的總結為準。</div>`:'')
+      +(overallOutdated?'<div style="margin-bottom:10px;padding:9px;border:1px solid #fedf89;background:#fffaeb;border-radius:9px;color:#93370d;font-size:11px">整體評估總結尚未確認最新單項總結；仍可列印最後成功儲存的版本。</div>':'');
 
     return notice+`<div style="font-size:11px;color:#667085;line-height:1.6;margin-bottom:10px">
       預設勾選本次實際使用的全部評估工具；可取消不需要列印的項目。每個工具會自新頁開始。
