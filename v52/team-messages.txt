@@ -437,17 +437,35 @@ function dirty(){
 }
 function detail(id){
  const m=S.messages.find(x=>x.id===id);if(!m){listing();return;}
- if(S.id!==id){S.composeOpen=false;S.editingMessage=false;}
+ if(S.id!==id){S.composeOpen=false;S.editingMessage=false;S.editing=null;S.taskAction=null;S.managingTask=null;S.addingTask=false;}
  S.view='detail';S.id=id;
  const jobs=tasks(id);
  const isOwner=m.created_by_staff_id===me();
  const canClose=Boolean(!m.closed_at&&jobs.length&&isOwner);
+ const browse=browseNavigation(id);
+ const position=browse.index>=0?(browse.index+1)+'／'+browse.ids.length:'—';
  html('<div class="tm-head"><div><h1>訊息詳情</h1><p>建立者：'+h(name(m.created_by_staff_id))+
- '｜'+h(stamp(m.created_at))+'</p></div><button class="btn" id="tm-back">返回列表</button></div>'+
+ '｜'+h(stamp(m.created_at))+'</p></div><div class="tm-detail-head-actions">'+favoriteButton(id)+
+ '<button class="btn" id="tm-back">返回列表</button></div></div>'+
+ '<div class="tm-detail-navigation"><span class="tm-muted">目前分類：'+h(tabNames[browse.tab]||'全部訊息')+'</span>'+
+ '<button class="btn sm" id="tm-prev" type="button"'+(browse.previous?'':' disabled')+'>‹ 上一則</button>'+
+ '<span class="tm-detail-position">'+h(position)+'</span>'+
+ '<button class="btn sm" id="tm-next" type="button"'+(browse.next?'':' disabled')+'>下一則 ›</button></div>'+
  eventContentPanel(m)+readPanel(id)+taskPanel(m)+additionalTaskPanel(m)+historyPanel(m)+
  (canClose?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-close">確認結案</button></div>':
   m.closed_at&&isOwner?'<div class="tm-actions" style="margin-top:15px"><button class="btn primary" id="tm-reopen">重新開啟</button></div>':''));
- root().querySelector('#tm-back').onclick=()=>{if(!dirty()||confirm('尚有未儲存的回報，確定返回？'))listing();};
+ root().querySelector('#tm-back').onclick=()=>{if(!dirty()||confirm('尚有未儲存的內容，確定返回？'))listing();};
+ root().querySelector('#tm-prev')?.addEventListener('click',()=>{
+  if(!browse.previous)return;
+  if(dirty()&&!confirm('尚有未儲存的內容，確定前往上一則？'))return;
+  detail(browse.previous);window.scrollTo({top:0,behavior:'auto'});
+ });
+ root().querySelector('#tm-next')?.addEventListener('click',()=>{
+  if(!browse.next)return;
+  if(dirty()&&!confirm('尚有未儲存的內容，確定前往下一則？'))return;
+  detail(browse.next);window.scrollTo({top:0,behavior:'auto'});
+ });
+ root().querySelectorAll('[data-favorite]').forEach(btn=>btn.onclick=()=>void toggleFavorite(btn.dataset.favorite));
  root().querySelector('#tm-show-add-task')?.addEventListener('click',()=>{
   if(dirty()){toast('請先處理未儲存的內容','error');return;}
   if(jobs.length>=20){toast('一則訊息最多20項分工','error');return;}
