@@ -287,8 +287,8 @@ function readPanel(id){
   '<span>'+people.map((x,i)=>'<span class="tm-reader-mini '+(x.read_at?'read':'unread')+'"'+
     ' title="'+h(name(x.staff_id))+'：'+(x.read_at?'已閱讀（'+h(stamp(x.read_at))+'）':'未閱讀')+'"'+
     ' aria-label="'+h(name(x.staff_id))+(x.read_at?'已閱讀':'未閱讀')+'">'+h(shorts[i])+'</span>').join('<span class="tm-read-separator">、</span>')+'</span></div>'+
-  (own&&!own.read_at?'<label class="tm-check tm-read-ack"><input type="checkbox" id="tm-read">我已閱讀</label>':
-   own?'':'<p class="tm-muted">你不在本次通知對象內，無須確認閱讀。</p>')+'</section>';
+  (own?'<label class="tm-check tm-read-ack"><input type="checkbox" id="tm-read"'+(own.read_at?' checked':'')+'>我已閱讀</label>':
+   '<p class="tm-muted">你不在本次通知對象內，無須確認閱讀。</p>')+'</section>';
 }
 function taskManagementForm(t){
  if(S.managingTask?.id!==t.id)return '';
@@ -631,14 +631,19 @@ async function reopenEvent(id){
 async function markRead(id){
  if(S.busy)return;
  const input=root().querySelector('#tm-read');if(!input)return;
- if(dirty()){input.checked=false;toast('請先處理未送出的回報','error');return;}
+ const checked=input.checked;
+ if(dirty()){input.checked=!checked;toast('請先處理未送出的內容','error');return;}
  input.disabled=true;S.busy=true;
  try{
-  const {data,error}=await db.from('team_message_recipients').update({read_at:new Date().toISOString()})
-   .eq('message_id',id).eq('staff_id',me()).is('read_at',null).select('staff_id');
-  if(error)throw error;if(!data?.length)throw new Error('已確認閱讀或不需確認');
-  await load();toast('已確認閱讀','success');detail(id);
- }catch(e){input.disabled=false;input.checked=false;toast('確認失敗：'+(e.message||e),'error');}
+  let request=db.from('team_message_recipients')
+   .update({read_at:checked?new Date().toISOString():null})
+   .eq('message_id',id).eq('staff_id',me());
+  request=checked?request.is('read_at',null):request.not('read_at','is',null);
+  const {data,error}=await request.select('staff_id');
+  if(error)throw error;
+  if(!data?.length)throw new Error('閱讀狀態已變更，請重新整理');
+  await load();toast(checked?'已確認閱讀':'已改為未閱讀','success');detail(id);
+ }catch(e){input.disabled=false;input.checked=!checked;toast('更新閱讀狀態失敗：'+(e.message||e),'error');}
  finally{S.busy=false;}
 }
 async function taskAction(taskId,action,note=null){
