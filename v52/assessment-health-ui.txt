@@ -365,7 +365,6 @@
     const currentFixedEntries=rebuildFixedMedicationEntries();
     const unvisitedChanges=safeArray(local.medicalInfo.unvisited_health_changes);
     const medUsage=local.medicalInfo.medication_use_status||'';
-    const hasSideEffect=local.medicalInfo.side_effect==='present';
 
     window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,title);
 
@@ -379,26 +378,42 @@
           <div class="health-subsection">
             <div class="health-subtitle"><strong>健康現況</strong></div>
             <div class="health-grid">
+              ${[
+                ['baseline_conditions_status','目前重要疾病／慢性病史','baseline_important_conditions','baseline_conditions_unknown_note','例如：高血壓、末期腎臟病'],
+                ['baseline_treatments_status','固定治療／特殊醫療安排','baseline_ongoing_treatments','baseline_treatments_unknown_note','例如：每週一、三、五固定血液透析']
+              ].map(([status,label,field,unknownNote,placeholder])=>{
+                const value=local.medicalInfo[status]||'';
+                return `<div class="health-field">
+                  <label>${label} *</label>
+                  <select data-health-medical="${status}">
+                    <option value="">請選擇</option>
+                    <option value="yes" ${value==='yes'?'selected':''}>有</option>
+                    <option value="no" ${value==='no'?'selected':''}>無</option>
+                    <option value="unknown" ${value==='unknown'?'selected':''}>無法確認</option>
+                  </select>
+                </div>
+                ${value==='yes'?`<div class="health-field">
+                  <label>${label}說明 *</label>
+                  <textarea data-health-medical="${field}" placeholder="${placeholder}">${escapeHTML(local.medicalInfo[field]||'')}</textarea>
+                </div>`:value==='unknown'?`<div class="health-field">
+                  <label>無法確認原因 *</label>
+                  <textarea data-health-medical="${unknownNote}" placeholder="請說明無法確認原因">${escapeHTML(local.medicalInfo[unknownNote]||'')}</textarea>
+                </div>`:''}`;
+              }).join('')}
               <div class="health-field">
-                <label>目前重要疾病／慢性病史</label>
-                <textarea data-health-medical="baseline_important_conditions" placeholder="例如：高血壓、末期腎臟病">${escapeHTML(local.medicalInfo.baseline_important_conditions||'')}</textarea>
-              </div>
-              <div class="health-field">
-                <label>固定治療／特殊醫療安排</label>
-                <textarea data-health-medical="baseline_ongoing_treatments" placeholder="例如：每週一、三、五固定血液透析">${escapeHTML(local.medicalInfo.baseline_ongoing_treatments||'')}</textarea>
-              </div>
-              <div class="health-field">
-                <label>是否定期回診</label>
+                <label>目前回診現況 *</label>
                 <select data-health-medical="regular_followup">
                   <option value="">請選擇</option>
-                  <option value="yes" ${local.medicalInfo.regular_followup==='yes'?'selected':''}>是</option>
-                  <option value="no" ${local.medicalInfo.regular_followup==='no'?'selected':''}>否</option>
+                  <option value="yes" ${local.medicalInfo.regular_followup==='yes'?'selected':''}>定期回診</option>
+                  <option value="no" ${local.medicalInfo.regular_followup==='no'?'selected':''}>未定期回診</option>
+                  <option value="not_needed" ${local.medicalInfo.regular_followup==='not_needed'?'selected':''}>無需定期回診</option>
+                  <option value="unknown" ${local.medicalInfo.regular_followup==='unknown'?'selected':''}>無法確認</option>
                 </select>
               </div>
-              <div class="health-field">
-                <label>未定期回診原因／現況說明</label>
+              ${['no','unknown'].includes(local.medicalInfo.regular_followup)?`<div class="health-field">
+                <label>${local.medicalInfo.regular_followup==='no'?'未定期回診原因':'無法確認回診情形的原因'} *</label>
                 <textarea data-health-medical="regular_followup_reason">${escapeHTML(local.medicalInfo.regular_followup_reason||'')}</textarea>
-              </div>
+              </div>`:''}
             </div>
           </div>
 
@@ -407,44 +422,54 @@
             ${renderMedicationUsage()}
           </div>
 
-          <div class="health-subsection">
+          <div class="health-subsection" id="healthOpeningFixedSection">
             <div class="health-subtitle">
               <strong>接案時固定用藥</strong>
-              <small>直接建立目前固定用藥清單；後續評估會自動承接並以用藥異動追蹤新增、停用或調整</small>
+              <small>此清單將作為後續評估沿用基準</small>
             </div>
-            <div class="health-field" style="margin-bottom:10px">
-              <label style="display:flex;align-items:center;gap:6px">
-                <input id="openingNoFixedMedication" type="checkbox" ${openingNoFixed?'checked':''} style="width:auto">
-                接案時無固定用藥
-              </label>
-            </div>
-            <div id="openingFixedMedicationWrap" style="${openingNoFixed||medUsage==='unknown'?'display:none':''}">
-              <div class="health-event-list">
-                ${(local.fixedMedicationBaseEntries.length
-                  ?local.fixedMedicationBaseEntries
-                  :[newOpeningFixedMedication()]).map(renderOpeningFixedMedication).join('')}
+            ${medUsage==='none'
+              ?'<div class="health-notice">目前無使用藥物，接案時固定用藥：無。</div>'
+              :`<div class="health-field" style="margin-bottom:10px">
+                <label>是否有固定用藥 *</label>
+                <select data-health-medical="opening_fixed_status">
+                  <option value="">請選擇</option>
+                  <option value="yes" ${local.medicalInfo.opening_fixed_status==='yes'?'selected':''}>有</option>
+                  <option value="no" ${local.medicalInfo.opening_fixed_status==='no'?'selected':''}>無</option>
+                  <option value="unknown" ${local.medicalInfo.opening_fixed_status==='unknown'?'selected':''}>無法確認</option>
+                </select>
               </div>
-              <button id="healthAddOpeningFixedMedication" type="button" class="btn sm" style="margin-top:8px">＋ 新增固定用藥</button>
-            </div>
+              ${local.medicalInfo.opening_fixed_status==='yes'
+                ?`<div class="health-event-list">${(local.fixedMedicationBaseEntries.length?local.fixedMedicationBaseEntries:[newOpeningFixedMedication()]).map(renderOpeningFixedMedication).join('')}</div>
+                  <button id="healthAddOpeningFixedMedication" type="button" class="btn sm" style="margin-top:8px">＋ 新增固定用藥</button>`
+                :local.medicalInfo.opening_fixed_status==='unknown'
+                  ?`<div class="health-field"><label>無法確認固定用藥原因 *</label><textarea data-health-medical="opening_fixed_unknown_note" placeholder="例如：暫未取得藥袋或藥物清單">${escapeHTML(local.medicalInfo.opening_fixed_unknown_note||'')}</textarea></div>`
+                  :''}
+              `}
           </div>
 
-          <div class="health-subsection">
+          <div class="health-subsection" id="healthOpeningTemporarySection">
             <div class="health-subtitle">
               <strong>接案時短期／臨時用藥</strong>
-              <small>例如感冒藥、短期抗生素、臨時止痛藥；不會自動延續到後續評估</small>
+              <small>例如感冒藥、臨時止痛藥；不自動延續至後續評估</small>
             </div>
-            <div class="health-field" style="margin-bottom:10px">
-              <label style="display:flex;align-items:center;gap:6px">
-                <input id="openingNoTemporaryMedication" type="checkbox" ${openingNoTemporary?'checked':''} style="width:auto">
-                接案時無短期／臨時用藥
-              </label>
-            </div>
-            <div id="openingTemporaryMedicationWrap" style="${openingNoTemporary||medUsage==='unknown'?'display:none':''}">
-              <div class="health-event-list">
-                ${(openingTemporaryMedications.length?openingTemporaryMedications:[newOpeningTemporaryMedication()]).map(renderOpeningTemporaryMedication).join('')}
+            ${medUsage==='none'
+              ?'<div class="health-notice">目前無使用藥物，接案時短期／臨時用藥：無。</div>'
+              :`<div class="health-field" style="margin-bottom:10px">
+                <label>是否有短期／臨時用藥 *</label>
+                <select data-health-medical="opening_temporary_status">
+                  <option value="">請選擇</option>
+                  <option value="yes" ${local.medicalInfo.opening_temporary_status==='yes'?'selected':''}>有</option>
+                  <option value="no" ${local.medicalInfo.opening_temporary_status==='no'?'selected':''}>無</option>
+                  <option value="unknown" ${local.medicalInfo.opening_temporary_status==='unknown'?'selected':''}>無法確認</option>
+                </select>
               </div>
-              <button id="healthAddOpeningTemporaryMedication" type="button" class="btn sm" style="margin-top:8px">＋ 新增一筆短期／臨時用藥</button>
-            </div>
+              ${local.medicalInfo.opening_temporary_status==='yes'
+                ?`<div class="health-event-list">${(openingTemporaryMedications.length?openingTemporaryMedications:[newOpeningTemporaryMedication()]).map(renderOpeningTemporaryMedication).join('')}</div>
+                  <button id="healthAddOpeningTemporaryMedication" type="button" class="btn sm" style="margin-top:8px">＋ 新增短期／臨時用藥</button>`
+                :local.medicalInfo.opening_temporary_status==='unknown'
+                  ?`<div class="health-field"><label>無法確認短期／臨時用藥原因 *</label><textarea data-health-medical="opening_temporary_unknown_note" placeholder="請說明無法確認原因">${escapeHTML(local.medicalInfo.opening_temporary_unknown_note||'')}</textarea></div>`
+                  :''}
+              `}
           </div>
 
           <div class="health-subsection">
@@ -474,18 +499,6 @@
               <div class="health-field">
                 <label>服藥異常或注意事項</label>
                 <textarea data-health-medical="medication_followup">${escapeHTML(local.medicalInfo.medication_followup||'')}</textarea>
-              </div>
-              <div class="health-field">
-                <label>是否自述或觀察到疑似用藥後不適</label>
-                <select data-health-medical="side_effect">
-                  <option value="">請選擇</option>
-                  <option value="none" ${local.medicalInfo.side_effect==='none'?'selected':''}>否</option>
-                  <option value="present" ${hasSideEffect?'selected':''}>有</option>
-                </select>
-              </div>
-              <div class="health-field" style="${hasSideEffect?'':'display:none'}">
-                <label>疑似用藥後不適情形</label>
-                <textarea data-health-medical="side_effect_note">${escapeHTML(local.medicalInfo.side_effect_note||'')}</textarea>
               </div>
             </div>
             `:`<div class="health-notice" style="background:#f9fafb;border-color:#eaecf0;color:#667085">${medUsage==='none'?'目前無使用藥物，用藥管理不適用。':medUsage==='unknown'?'目前無法確認用藥，請於上方註明原因。':'請先確認目前是否使用藥物。'}</div>`}
@@ -554,20 +567,6 @@
                   :'<div class="health-notice" style="background:#f9fafb;border-color:#eaecf0;color:#667085">本期尚無用藥異動紀錄。</div>'}
               </div>
               <button id="healthAddMedicationChange" type="button" class="btn sm" style="margin-top:8px">＋ 新增用藥異動</button>
-            </div>
-            <div class="health-grid" style="margin-top:12px">
-              <div class="health-field">
-                <label>本期是否自述或觀察到疑似用藥後不適</label>
-                <select data-health-medical="side_effect">
-                  <option value="">請選擇</option>
-                  <option value="none" ${local.medicalInfo.side_effect==='none'?'selected':''}>否</option>
-                  <option value="present" ${hasSideEffect?'selected':''}>有</option>
-                </select>
-              </div>
-              ${hasSideEffect?`<div class="health-field">
-                <label>本期疑似用藥後不適情形</label>
-                <textarea data-health-medical="side_effect_note">${escapeHTML(local.medicalInfo.side_effect_note||'')}</textarea>
-              </div>`:''}
             </div>
           </div>
 
@@ -713,7 +712,7 @@
           if(!fixed)local.medicalInfo.opening_no_fixed_medications=true;
           if(!temporary)local.medicalInfo.opening_no_temporary_medications=true;
         }
-        if(['regular_followup','medication_method','medication_use_status','side_effect'].includes(key)){
+        if(['baseline_conditions_status','baseline_treatments_status','regular_followup','medication_method','medication_use_status','opening_fixed_status','opening_temporary_status'].includes(key)){
           const y=window.scrollY;render();window.scrollTo({top:y,behavior:'auto'});
         }
       });
