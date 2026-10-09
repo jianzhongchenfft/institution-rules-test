@@ -468,7 +468,10 @@ function taskPanel(m){
   if(canceled){
    buttons.push('<span class="tm-pill">已取消</span>');
   }else if(open){
-   if(help)buttons.push('<span class="tm-task-flag">執行困難，等待建立者回覆</span>');
+   if(help){
+    buttons.push('<span class="tm-task-flag">執行困難，等待建立者回覆</span>');
+    if(assigned&&t.help_update_id)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="edit_help">修改困難說明</button>');
+   }
    else if(fresh){
      buttons.push('<span class="tm-task-flag new">有新指示</span>');
      if(assigned)buttons.push('<button class="btn sm" data-ack="'+h(t.id)+'">已知悉</button>');
@@ -481,9 +484,10 @@ function taskPanel(m){
     buttons.push('<button class="btn sm" data-manage-open="'+h(t.id)+'" data-manage-kind="cancel">取消分工</button>');
    }
   }else buttons.push('<span class="tm-pill '+(t.is_done?'closed':'')+'">'+(t.is_done?'已完成':'未完成')+'</span>');
-  const prompt=editing?(S.taskAction.kind==='request_help'?'請說明遇到的困難':S.taskAction.kind==='redo'?'請說明需要重新辦理的事項':'請輸入新的處理指示'):'';
+  const isHelpEdit=editing&&S.taskAction.kind==='edit_help';
+  const prompt=editing?(isHelpEdit?'修改執行困難說明':S.taskAction.kind==='request_help'?'請說明遇到的困難':S.taskAction.kind==='redo'?'請說明需要重新辦理的事項':'請輸入新的處理指示'):'';
   const composer=editing?'<div class="tm-task-compose"><strong>'+prompt+'</strong><div class="tm-field">'+
-   '<textarea data-task-note maxlength="1700" rows="3" placeholder="送出後會自動加入事件回報歷程"></textarea></div>'+
+   '<textarea data-task-note maxlength="1700" rows="3" placeholder="'+(isHelpEdit?'儲存後會直接更新原本的困難說明':'送出後會自動加入事件回報歷程')+'">'+(isHelpEdit?h(t.help_note||''):'')+'</textarea></div>'+
    '<div class="tm-actions"><button class="btn primary sm" data-task-save="'+h(t.id)+'">送出</button>'+
    '<button class="btn sm" data-task-cancel>取消</button></div></div>':'';
   return '<section class="tm-task'+(canceled?' tm-task-cancelled':assigned?' tm-task-mine':'')+'"><div><div class="tm-task-label">'+(i+1)+'. '+h(t.description)+'</div>'+
@@ -562,7 +566,10 @@ function dirty(){
   const notify=root().querySelector('#tm-message-notify')?.checked;
   if(input!==undefined&&(input!==current?.description||notify===false))return true;
  }
- if(root().querySelector('[data-task-note]')?.value.trim())return true;
+ if(S.taskAction?.kind==='edit_help'){
+  const previous=S.tasks.find(t=>t.id===S.taskAction.taskId)?.help_note||'';
+  if((root().querySelector('[data-task-note]')?.value||'').trim()!==previous.trim())return true;
+ }else if(root().querySelector('[data-task-note]')?.value.trim())return true;
  if(root().querySelector('#tm-extra-work')?.value.trim()||root().querySelector('#tm-extra-person')?.value)return true;
  if(S.managingTask){
   const task=S.tasks.find(t=>t.id===S.managingTask.id);
@@ -824,17 +831,18 @@ async function autoReadOnOpen(id){
 async function taskAction(taskId,action,note=null){
  if(S.busy)return;
  const job=S.tasks.find(x=>x.id===taskId);
- if(!job||!['request_help','guide','redo','ack'].includes(action))return;
+ if(!job||!['request_help','guide','redo','ack','edit_help'].includes(action))return;
  if(action!=='ack'&&!note){toast('請輸入本次處理說明','error');return;}
  if(action==='ack'&&dirty()){toast('請先處理尚未送出的內容','error');return;}
+ if(action==='edit_help'&&note===job.help_note){toast('執行困難說明沒有變更','error');return;}
  S.busy=true;
  try{
-  const {error}=await db.rpc('team_message_task_action',{
-   p_task_id:taskId,p_action:action,p_note:note
-  });
+  const {error}=action==='edit_help'
+   ?await db.rpc('team_message_edit_help',{p_task_id:taskId,p_note:note})
+   :await db.rpc('team_message_task_action',{p_task_id:taskId,p_action:action,p_note:note});
   if(error)throw error;
   S.taskAction=null;await load();
-  const success={request_help:'已回報執行困難，建立者將收到提醒',guide:'新指示已發送給承辦人',redo:'已退回重辦，承辦人將收到提醒',ack:'已確認新指示'};
+  const success={request_help:'已回報執行困難，建立者將收到提醒',edit_help:'已更新困難說明，建立者已重新標記未閱讀',guide:'新指示已發送給承辦人',redo:'已退回重辦，承辦人將收到提醒',ack:'已確認新指示'};
   toast(success[action],'success');detail(job.message_id);
  }catch(error){toast('操作失敗：'+(error.message||error),'error');}
  finally{S.busy=false;}
