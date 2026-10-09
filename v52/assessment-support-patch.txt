@@ -361,7 +361,7 @@
         <button type="button" class="btn sm" data-remove-support-resource="${escapeHTML(item.id)}">移除</button>
       </div>
       <div class="support-row-grid">
-        <div class="support-choice-detail wide"><label>資源類型</label>${renderChoiceOptions('data-support-resource-row-field','type',RESOURCE_TYPES,item.type,item.id)}</div>
+        <div class="support-choice-detail wide"><label>資源類型</label><select data-support-resource-row-field="type">${selectOptions(RESOURCE_TYPES,item.type,'請選擇資源類型')}</select></div>
         <input class="span2" data-support-resource-row-field="name" value="${escapeHTML(item.name||'')}" placeholder="單位／資源名稱">
         <input class="wide" data-support-resource-row-field="assistance" value="${escapeHTML(item.assistance||'')}" placeholder="目前提供什麼協助">
         <div class="support-choice-detail wide"><label>使用狀況</label>${renderChoiceOptions('data-support-resource-row-field','usage_status',RESOURCE_USAGE,item.usage_status,item.id)}</div>
