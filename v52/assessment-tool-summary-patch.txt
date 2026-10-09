@@ -1,0 +1,308 @@
+// TEST｜八項評估工具共用單項總結與兩層更新確認
+(()=>{
+  const TABLE='assessment_tool_summaries';
+  const TOOL_TABLE={
+    adl:'assessment_adl_records',iadl:'assessment_iadl_records',spmsq:'assessment_spmsq_records',
+    gds15:'assessment_gds15_records',health_medication:'assessment_health_records',
+    home_safety:'assessment_home_safety_records',support:'assessment_support_records',
+    caregiver_burden:'assessment_caregiver_screen_records'
+  };
+  const TITLES={adl:'ADL',iadl:'IADL',spmsq:'SPMSQ',gds15:'GDS-15',
+    health_medication:'健康與用藥',home_safety:'居家環境安全',support:'支持系統',caregiver_burden:'高負荷家庭照顧者初篩'};
+  const LABELS={
+    adl:{feeding:'進食',transfer:'移位',grooming:'個人衛生',toileting:'如廁',bathing:'洗澡',
+      walking:'平地走動',stairs:'上下樓梯',dressing:'穿衣',bowels:'大便控制',bladder:'小便控制'},
+    iadl:{telephone:'使用電話',shopping:'購物',meal_prep:'準備餐食',housekeeping:'家務清潔',
+      laundry:'洗衣',transportation:'使用交通工具',medication:'服藥管理',finances:'理財'},
+    health_medication:{consciousness:'意識狀況',eating:'進食狀況',elimination:'排泄狀況',
+      mobility:'行動能力',upper_limb:'上肢運動能力',lower_limb:'下肢運動能力',
+      daily_activity:'日常活動與休閒',sleep:'夜間睡眠狀況',appetite_weight:'食慾與體重',mood:'情緒與精神狀況'},
+    support:{daily_care:'日常生活照顧',meal_housework:'餐食與家務協助',
+      medical_transport:'就醫陪同／交通協助',medication_health:'用藥與健康管理',
+      financial:'經濟支持',emotional:'陪伴與情緒支持',decision_contact:'重要決策／緊急聯絡'},
+    caregiver_burden:{behavior_stress:'被照顧者行為／情緒造成照顧困難',older_caregiver:'高齡照顧者',
+      limited_experience:'照顧經驗或知能不足',no_relief:'缺乏替代照顧人力',
+      multiple_dependents:'同時照顧多名家人',caregiver_health:'照顧者健康影響照顧',
+      resource_financial_crisis:'資源／經濟造成照顧壓力',recent_care_change:'照顧情境改變',
+      violence_neglect_risk:'暴力／照顧疏忽風險',suicide_risk:'自殺相關風險'}
+  };
+  const MAX_ADL={feeding:10,transfer:15,grooming:5,toileting:10,bathing:5,walking:15,
+    stairs:10,dressing:10,bowels:10,bladder:10};
+  const local=new Map();
+  const esc=x=>String(x??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const obj=x=>x&&typeof x==='object'&&!Array.isArray(x)?x:{};
+  const arr=x=>Array.isArray(x)?x:[];
+  const value=x=>String(x??'').trim();
+  const label=(code,key)=>LABELS[code]?.[key]||key.replace(/_/g,' ');
+  const fromNotes=(list,notes,code)=>{
+    for(const [key,v] of Object.entries(obj(notes))){
+      if(value(v))list.push('【'+label(code,key)+'】'+value(v));
+    }
+  };
+  const unique=items=>[...new Set(items.map(value).filter(Boolean))];
+  const normalized=x=>{
+    if(Array.isArray(x))return x.map(normalized);
+    if(x&&typeof x==='object')return Object.fromEntries(Object.keys(x).sort().map(k=>[k,normalized(x[k])]));
+    return x===undefined?null:x;
+  };
+  const fingerprint=x=>{
+    const s=JSON.stringify(normalized(x));let a=2166136261,b=16777619;
+    for(let i=0;i<s.length;i++){a=Math.imul(a^s.charCodeAt(i),16777619);b=Math.imul(b^s.charCodeAt(i),2246822519);}
+    return (a>>>0).toString(16)+'-'+(b>>>0).toString(16)+'-'+s.length;
+  };
+  const source=(code,r)=>{
+    r=obj(r);
+    const keys={
+      adl:['answers','notes'],iadl:['answers','notes'],
+      spmsq:['judgments','notes','is_unable','unable_reason'],
+      gds15:['answers','notes','completion_mode','exception_reason','total_score'],
+      health_medication:['health_items','health_notes','medication_checks','medical_info','health_events','health_changes','health_change_items','medication_changes','medication_corrections'],
+      home_safety:['answers','notes','home_profile','summary'],
+      support:['household','family_members','support_domains','resources','summary'],
+      caregiver_burden:['applicability','answers','notes','summary']
+    }[code]||[];
+    return Object.fromEntries(keys.map(k=>[k,r[k]??null]));
+  };
+  function generate(code,raw){
+    const r=source(code,raw),find=[],recommend=[];
+    if(code==='adl'||code==='iadl'){
+      const answers=obj(r.answers);
+      for(const [key,n] of Object.entries(answers)){
+        if(n===null||n===undefined||n==='')continue;
+        const current=Number(n),max=code==='adl'?MAX_ADL[key]:2;
+        if(Number.isFinite(current)&&max!==undefined&&current<max)
+          find.push('【'+label(code,key)+'】'+(code==='adl'?'評估得分 '+current+'／'+max+' 分':'需協助（'+(current===0?'完全依賴':'部分協助')+'）'));
+      }
+      fromNotes(find,r.notes,code);
+    }else if(code==='spmsq'){
+      if(r.is_unable){find.push('本次無法評估');if(value(r.unable_reason))find.push('無法評估原因：'+value(r.unable_reason));}
+      for(const [key,st] of Object.entries(obj(r.judgments)))if(st==='wrong'||st==='unable_answer')
+        find.push('【'+label(code,key)+'】'+(st==='wrong'?'回答錯誤':'無法作答'));
+      fromNotes(find,r.notes,code);
+    }else if(code==='gds15'){
+      if(r.completion_mode==='unable'||r.completion_mode==='not_applicable')
+        find.push('本次'+(r.completion_mode==='unable'?'無法評估':'不適用'));
+      if(value(r.exception_reason))find.push('原因：'+value(r.exception_reason));
+      if(r.completion_mode==='completed'&&r.total_score!==null&&r.total_score!==undefined
+        &&Number(r.total_score)>6)find.push('GDS-15 評估結果：'+r.total_score+' 分（'+
+        (Number(r.total_score)<=10?'中度情緒困擾':'高度情緒困擾')+'）');
+      fromNotes(find,r.notes,code);
+    }else if(code==='health_medication'){
+      for(const [k,st] of Object.entries(obj(r.health_items))){
+        if(st==='observe'||st==='refer')find.push('【'+label(code,k)+'】'+(st==='observe'?'需觀察':'異常轉介'));
+      }
+      fromNotes(find,r.health_notes,code);
+      for(const [k,item] of Object.entries(obj(r.medication_checks))){
+        const status=typeof item==='object'?item?.status:item;
+        if(['needs_improvement','improve','not_applicable'].includes(status))
+          find.push('【用藥安全：'+label(code,k)+'】'+(status==='not_applicable'?'不適用':'需改善'));
+        if(typeof item==='object'&&value(item?.note))find.push('【用藥安全：'+label(code,k)+'】'+value(item.note));
+      }
+      const m=obj(r.medical_info);
+      const narrative=['baseline_important_conditions','baseline_ongoing_treatments','baseline_conditions_unknown_note',
+        'baseline_treatments_unknown_note','regular_followup_reason','medication_use_note',
+        'opening_fixed_unknown_note','opening_temporary_unknown_note','family_report','current_health_status',
+        'health_change_note','medication_change_note'];
+      narrative.forEach(k=>{if(value(m[k]))find.push('【'+label(code,k)+'】'+value(m[k]));});
+      // 醫療事件及異動為文字紀錄，不將整份用藥清單重複寫入總結
+      for(const key of ['health_events','health_changes','health_change_items','medication_changes','medication_corrections']){
+        arr(r[key]).forEach((entry,i)=>{
+          const e=obj(entry);
+          for(const field of ['note','description','reason','impact_note','care_impact_note','response','action_note']){
+            if(value(e[field]))find.push('【'+key+' '+(i+1)+'】'+value(e[field]));
+          }
+        });
+      }
+    }else if(code==='home_safety'){
+      for(const [k,st] of Object.entries(obj(r.answers)))if(st==='needs_improvement')
+        find.push('【'+label(code,k)+'】需改善');
+      fromNotes(find,r.notes,code);
+      for(const k of ['level_difference_note','housing_other','mobility_other']){
+        if(value(r.home_profile?.[k]))find.push('【'+label(code,k)+'】'+value(r.home_profile[k]));
+      }
+      const summary=obj(r.summary);
+      for(const k of ['risk_summary','main_risks','risk_notes','environment_summary']){
+        if(value(summary[k]))find.push('【'+label(code,k)+'】'+value(summary[k]));
+      }
+      for(const k of ['recommendations','improvement_plan','care_advice']){
+        if(value(summary[k]))recommend.push(value(summary[k]));
+      }
+    }else if(code==='support'){
+      const h=obj(r.household),rr=obj(r.resources),summary=obj(r.summary);
+      for(const k of ['living_other','family_change_note','family_summary','primary_caregiver_availability',
+        'primary_caregiver_role'])if(value(h[k]))find.push('【'+label(code,k)+'】'+value(h[k]));
+      for(const [k,d] of Object.entries(obj(r.support_domains))){
+        const st=d?.status;
+        if(['partial','insufficient'].includes(st))find.push('【'+label(code,k)+'】'+(st==='partial'?'部分不足':'明顯不足'));
+        if(value(d?.note))find.push('【'+label(code,k)+'備註】'+value(d.note));
+      }
+      for(const k of ['economic_note','economic_care_impact_note','social_interaction_note','community_participation_note'])
+        if(value(rr[k]))find.push('【'+label(code,k)+'】'+value(rr[k]));
+      arr(rr.social_resources).forEach(x=>{if(value(x.insufficiency_note))find.push('【社會資源：'+value(x.name||x.type)+'】'+value(x.insufficiency_note));});
+      arr(rr.unmet_needs).forEach(x=>{if(value(x.need))find.push('【尚缺資源】'+value(x.need));if(value(x.action))recommend.push('【尚缺資源處理】'+value(x.action));});
+      arr(r.family_members).forEach(x=>{if(value(x.note))find.push('【重要支持者】'+value(x.note));});
+      if(value(summary.key_issues))find.push(value(summary.key_issues));
+      if(value(summary.support_plan))recommend.push(value(summary.support_plan));
+    }else if(code==='caregiver_burden'){
+      for(const [k,st] of Object.entries(obj(r.answers)))if(st==='yes')
+        find.push('【'+label(code,k)+'】符合');
+      fromNotes(find,r.notes,code);
+      const summary=obj(r.summary);
+      if(value(summary.unable_reason))find.push('無法評估原因：'+value(summary.unable_reason));
+      if(value(summary.professional_reason))find.push('專業判斷理由：'+value(summary.professional_reason));
+      if(value(summary.general_note))find.push('其他補充：'+value(summary.general_note));
+      if(value(summary.action_note))recommend.push('處理紀錄：'+value(summary.action_note));
+    }
+    return {findings:unique(find).join('\n'),recommendations:unique(recommend).join('\n')};
+  }
+  const key=(id,code)=>id+':'+code;
+  const hashes=v=>{
+    try{const p=JSON.parse(v||'{}');return {findings:p.findings||'',recommendations:p.recommendations||''};}
+    catch(_){return {findings:v||'',recommendations:v||''};}
+  };
+  async function load(eventId,code,record){
+    const {data,error}=await db.from(TABLE).select('*').eq('assessment_event_id',eventId).eq('tool_code',code).maybeSingle();
+    if(error)throw error;
+    const src=source(code,record),gen=generate(code,src),hash=fingerprint(src);
+    const state={
+      eventId,code,savedSource:src,source:src,
+      findings:data?.findings??gen.findings,
+      recommendations:data?.recommendations??gen.recommendations,
+      sig:data?hashes(data.source_signature):{findings:hash,recommendations:hash},
+      generated:!!data?.has_generated,exists:!!data,edited:false,preview:false
+    };
+    local.set(key(eventId,code),state);return state;
+  }
+  function get(eventId,code,record){
+    const k=key(eventId,code),state=local.get(k);
+    if(!state)return null;
+    if(record)state.source=source(code,record);
+    if(!state.exists&&!state.edited){
+      const gen=generate(code,state.source),h=fingerprint(state.source);
+      state.findings=gen.findings;state.recommendations=gen.recommendations;
+      state.sig={findings:h,recommendations:h};
+    }
+    return state;
+  }
+  const isStale=(s,field)=>!!s&&!!s.exists&&fingerprint(s.savedSource)!==s.sig[field];
+  function render(eventId,code,record){
+    const s=get(eventId,code,record);if(!s)return '';
+    const editing=window.v52AssessmentApi?.canEditCase?.(
+      (state.assessmentEvents||[]).find(x=>x.id===eventId)?.case_id);
+    const stale=isStale(s,'findings')||isStale(s,'recommendations');
+    const suggested=generate(code,s.source);
+    const html=`<section class="ats-panel" data-ats-root="${esc(code)}">
+      <div class="ats-head"><strong>本項評估總結</strong><small>依本表備註及重要評估結果整理；可自由修改，不自動新增專業建議。</small></div>
+      ${stale?'<div class="ats-alert">原始評估內容已有更新，請確認原總結是否仍適用；不影響儲存或列印。</div>':''}
+      <div class="ats-body">
+        <label>重要評估發現／問題與需求</label>
+        <textarea data-ats-input="findings" ${editing?'':'readonly'} placeholder="本項沒有需整理的紀錄，可留空">${esc(s.findings)}</textarea>
+        <label>照顧服務重點／建議</label>
+        <textarea data-ats-input="recommendations" ${editing?'':'readonly'} placeholder="原表單沒有明確照顧建議時可留空，由督導自行補充">${esc(s.recommendations)}</textarea>
+        ${editing?`<div class="ats-buttons">
+          ${stale?'<button type="button" class="btn sm" data-ats-ack>保留目前內容並確認</button>':''}
+          <button type="button" class="btn sm" data-ats-preview>重新整理並預覽</button>
+        </div>`:''}
+        ${s.preview?`<div class="ats-compare">
+          <strong>重新整理預覽（兩個欄位可分別取代）</strong>
+          ${[['findings','重要評估發現／問題與需求'],['recommendations','照顧服務重點／建議']].map(([f,title])=>`
+            <div class="ats-compare-row"><label><input type="checkbox" data-ats-replace="${f}" checked> ${title}</label>
+            <div><span>目前內容</span><pre>${esc(s[f]||'—')}</pre></div>
+            <div><span>重新整理後</span><pre>${esc(suggested[f]||'—')}</pre></div></div>`).join('')}
+          <div class="ats-buttons"><button type="button" class="btn sm" data-ats-cancel>取消</button>
+            <button type="button" class="btn sm primary" data-ats-confirm>確認取代所選欄位</button></div>
+          </div>`:''}
+        <div class="ats-tip">完成後請使用本表原有「儲存草稿／完成本次確認」儲存總結。</div>
+      </div>
+    </section>`;
+    return html;
+  }
+  function bind(eventId,code,record){
+    const root=document.querySelector('[data-ats-root="'+code+'"]');if(!root)return;
+    const s=get(eventId,code,record);if(!s)return;
+    const refresh=()=>{
+      root.outerHTML=render(eventId,code,s.source);
+      bind(eventId,code,s.source);
+    };
+    root.querySelectorAll('[data-ats-input]').forEach(el=>el.addEventListener('input',()=>{
+      s[el.dataset.atsInput]=el.value;s.edited=true;s.generated=true;
+    }));
+    root.querySelector('[data-ats-preview]')?.addEventListener('click',()=>{s.preview=true;refresh();});
+    root.querySelector('[data-ats-cancel]')?.addEventListener('click',()=>{s.preview=false;refresh();});
+    root.querySelector('[data-ats-confirm]')?.addEventListener('click',()=>{
+      const suggested=generate(code,s.source),h=fingerprint(s.source);
+      root.querySelectorAll('[data-ats-replace]:checked').forEach(el=>{
+        const f=el.dataset.atsReplace;s[f]=suggested[f];s.sig[f]=h;
+      });
+      s.generated=true;s.edited=true;s.preview=false;refresh();
+      toast('已更新選取的總結欄位，請儲存本項評估','success');
+    });
+    root.querySelector('[data-ats-ack]')?.addEventListener('click',async()=>{
+      // 只確認已成功儲存的來源，避免未儲存的修改被誤認為已確認。
+      const h=fingerprint(s.savedSource);
+      s.sig={findings:h,recommendations:h};s.preview=false;s.generated=true;
+      try{await persist(s,(state.assessmentEvents||[]).find(x=>x.id===eventId)?.case_id);refresh();
+        toast('已確認保留目前總結','success');
+      }catch(e){toast('確認失敗：'+(e?.message||e),'error');}
+    });
+  }
+  async function persist(s,caseId){
+    if(!s||!caseId)throw new Error('缺少評估事件或個案資料');
+    const payload={assessment_event_id:s.eventId,tool_code:s.code,case_id:caseId,
+      findings:s.findings,recommendations:s.recommendations,source_signature:JSON.stringify(s.sig),has_generated:true};
+    const {error}=await db.from(TABLE).upsert(payload,{onConflict:'assessment_event_id,tool_code'});
+    if(error)throw error;s.exists=true;s.generated=true;s.edited=false;
+  }
+  async function saveAfterTool(eventId,code,record,caseId){
+    let s=get(eventId,code,record);
+    if(!s)throw new Error('本項評估總結尚未載入，請重新開啟表單');
+    const normalizedSource=source(code,record);
+    if(!s.exists&&!s.edited){const g=generate(code,normalizedSource),h=fingerprint(normalizedSource);
+      s.findings=g.findings;s.recommendations=g.recommendations;s.sig={findings:h,recommendations:h};}
+    await persist(s,caseId);s.savedSource=normalizedSource;
+  }
+  function merged(rows,forms){
+    const byCode=new Map(arr(rows).map(x=>[x.tool_code,x]));
+    const parts={findings:[],recommendations:[]};
+    const missing=[];
+    for(const form of arr(forms)){
+      if(!['completed','unable','not_applicable'].includes(form.status))continue;
+      const code=form.form_code,row=byCode.get(code);
+      if(!row){missing.push(TITLES[code]||form.form_name);continue;}
+      for(const f of ['findings','recommendations']){
+        if(value(row[f]))parts[f].push('【'+(TITLES[code]||form.form_name)+'】\n'+value(row[f]));
+      }
+    }
+    return {findings:parts.findings.join('\n\n'),recommendations:parts.recommendations.join('\n\n'),missing};
+  }
+  const list=async eventId=>{
+    const {data,error}=await db.from(TABLE).select('*').eq('assessment_event_id',eventId);
+    if(error)throw error;return arr(data);
+  };
+  function printBlock(row){
+    return '<h2>本項評估總結</h2><table><tbody>'+
+      '<tr><th>重要評估發現／問題與需求</th><td>'+esc(row?.findings||'—').replace(/\n/g,'<br>')+'</td></tr>'+
+      '<tr><th>照顧服務重點／建議</th><td>'+esc(row?.recommendations||'—').replace(/\n/g,'<br>')+'</td></tr>'+
+      '</tbody></table>';
+  }
+  const style=document.createElement('style');style.id='v52-assessment-tool-summary-style';
+  style.textContent=`
+    .ats-panel{margin:14px 0;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+    .ats-head{padding:11px 13px;background:#faf8f7;border-bottom:1px solid var(--line)}
+    .ats-head strong{display:block;font-size:13px;color:#344054}
+    .ats-head small{display:block;font-size:10.5px;color:#667085;margin-top:4px}
+    .ats-body{padding:13px}.ats-body>label{display:block;font-size:11px;font-weight:850;color:#475467;margin:9px 0 5px}
+    .ats-body>textarea{width:100%;box-sizing:border-box;min-height:94px;resize:vertical}
+    .ats-buttons{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px}
+    .ats-alert{background:#fffaeb;border-bottom:1px solid #fedf89;color:#93370d;padding:10px 13px;font-size:11px}
+    .ats-tip{font-size:10px;color:#667085;margin-top:10px}
+    .ats-compare{margin-top:12px;padding:12px;border:1px solid #d0d5dd;border-radius:10px}
+    .ats-compare>strong{font-size:12px}.ats-compare-row{margin-top:10px;border-top:1px solid #eaecf0;padding-top:9px}
+    .ats-compare-row>label{font-size:11px;font-weight:850}
+    .ats-compare-row>div{display:inline-block;width:48%;vertical-align:top;margin:8px 1% 0 0}
+    .ats-compare-row span{font-size:10px;color:#667085}
+    .ats-compare-row pre{white-space:pre-wrap;word-break:break-word;min-height:70px;background:#f8f9fb;border-radius:8px;padding:9px;font-size:11px;font-family:inherit}
+    @media(max-width:720px){.ats-compare-row>div{display:block;width:100%}}
+  `;document.head.appendChild(style);
+  window.v52AssessmentToolSummary={load,get,render,bind,saveAfterTool,list,merged,printBlock,fingerprint,generate,source,TOOL_TABLE,TITLES};
+})();
