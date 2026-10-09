@@ -743,7 +743,7 @@
     const rows=payrollBuildRows();
     if(!rows.length){toast('本月尚無可結算資料','warn');return;}
     const totals=payrollTotals(rows);
-    if(!confirm(`確定將「${payrollMonthLabel(state.overtimeMonth)}」標記為已結算嗎？\n\n結算後會保存目前報表快照並鎖定，不再因後續補登資料而改變本次結算結果。`)) return;
+    if(!confirm(`確定結算「${payrollMonthLabel(state.overtimeMonth)}」的加班費嗎？\n\n系統將計算本月應付加班費，並鎖定該月份的加班及換休紀錄。如需修改，須先撤銷月結。`)) return;
 
     const payload={
       settlement_month:start,
