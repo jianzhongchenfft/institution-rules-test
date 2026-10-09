@@ -578,6 +578,7 @@
   }
 
   function bindHomeSafetyEvents(row){
+    window.v52AssessmentToolSummary?.mount(local.eventId,'home_safety',currentToolSummarySource(),'.hs-page','.hs-actions');
     $('homeSafetyBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
     document.querySelectorAll('[data-hs-profile]').forEach(el=>{
@@ -678,6 +679,8 @@
     return null;
   }
 
+  function currentToolSummarySource(){return ({home_profile:local.homeProfile,answers:local.answers,notes:local.notes,summary:local.summary});}
+
   async function saveHomeSafety(finalize){
     const row=eventById(local.eventId);
     if(!row||!canEditEvent(row))return toast('您沒有此個案的評估編輯權限','error');
@@ -703,6 +706,7 @@
         p_copied_from_id:local.pendingCopyFromId||local.record?.copied_from_id||null
       });
       if(error)throw error;
+      await window.v52AssessmentToolSummary.saveAfterTool(row.id,'home_safety',currentToolSummarySource(),row.case_id);
 
       await window.v52AssessmentApi?.loadAssessmentData?.(false);
       if(finalize){
@@ -733,6 +737,7 @@
     showLoading(true);
     try{
       await loadHomeSafety(eventId);
+      await window.v52AssessmentToolSummary.load(eventId,'home_safety',currentToolSummarySource());
       renderHomeSafetyPage();
       window.scrollTo({top:0,behavior:'auto'});
     }catch(err){
