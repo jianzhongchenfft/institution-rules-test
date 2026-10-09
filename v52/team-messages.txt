@@ -3,7 +3,7 @@
 'use strict';
 if(window.teamMessagesModule)return;
 const ROLES=['admin','organization_manager','business_manager','supervisor'];
-const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false};
+const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',view:'list',id:null,editing:null,chosen:new Set(),busy:false,taskAction:null};
 const root=()=>document.getElementById('tm-root');
 const h=v=>escapeHTML(String(v==null?'':v));
 const name=id=>S.staff.find(x=>x.id===id)?.display_name||'原使用者';
@@ -18,6 +18,9 @@ const isMine=m=>!m.closed_at&&tasks(m.id).some(t=>t.assignee_staff_id===me());
 const pending=m=>!m.closed_at&&tasks(m.id).some(t=>t.assignee_staff_id===me()&&!t.is_done);
 const delegated=m=>!m.closed_at&&m.created_by_staff_id===me()&&tasks(m.id).length>0;
 const ready=m=>delegated(m)&&tasks(m.id).every(t=>t.is_done);
+const needsHelp=m=>delegated(m)&&tasks(m.id).some(t=>t.assistance_needed);
+const needsCreatorAction=m=>needsHelp(m)||ready(m);
+const hasInstruction=m=>tasks(m.id).some(t=>t.assignee_staff_id===me()&&t.instruction_pending);
 const status=m=>m.closed_at?'closed':!tasks(m.id).length?'notice':tasks(m.id).every(t=>t.is_done)?'ready':'working';
 const labels={closed:'已結案',notice:'一般訊息',ready:'待結案',working:'處理中'};
 const html=markup=>{$('content').innerHTML='<div class="tm" id="tm-root">'+markup+'</div>';};
@@ -32,6 +35,7 @@ style.textContent=
 '.tm-reader{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:9px;border:1px solid #e5e7eb;background:#f8fafc;font-size:13px}.tm-reader.read{background:#effaf3;color:#267448}.tm-reader.unread{background:#fff4f4;border-color:#ffd4d4;font-weight:750}.tm-check{display:flex;align-items:center;gap:8px;font-weight:750;cursor:pointer}.tm-section{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 9px}.tm-section h3{font-size:17px;margin:0}.tm-task{display:flex;justify-content:space-between;align-items:center;gap:13px}.tm-task-label{font-weight:750;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}.tm-events{display:grid;gap:9px}.tm-entry{background:#fff;padding:9px 12px;border-left:3px solid #d69a80;border-radius:0 10px 10px 0}.tm-entry-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}.tm-entry-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65}.tm-compose{border:1px solid #f0ded7;background:#faf8f7;border-radius:12px;padding:13px;margin-top:12px}.tm-summary{border:1px solid #f0ded7;background:#fff7f3;border-radius:12px;padding:14px;margin-top:15px}.tm-empty{text-align:center;padding:30px 14px;border:1px dashed #e8d9d1;border-radius:12px;color:#6b7280}.tm-nav-count{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;background:#d92d20;color:white;font-weight:850;font-size:12px;border-radius:999px;min-width:22px;height:22px;padding:0 5px;box-sizing:border-box}'+
 '@media(max-width:700px){.tm-head{flex-direction:column}.tm-options,.tm-reader-grid{grid-template-columns:1fr}.tm-task{align-items:flex-start}.tm-meta{gap:2px 8px}.tm-item{padding:10px 11px}}@media(max-width:600px){.tm-work-row{grid-template-columns:24px minmax(0,1fr) 38px;gap:7px}.tm-work-number{grid-column:1;grid-row:1}.tm-work-row [data-person]{grid-column:2;grid-row:1}.tm-work-row [data-work]{grid-column:2/4;grid-row:2}.tm-work-remove{grid-column:3;grid-row:1}}';
 style.textContent+=' .tm-recipient-details{margin:13px 0}.tm-recipient-details>summary{font-size:13px;font-weight:800;cursor:pointer;list-style:revert;user-select:none;line-height:1.6}.tm-recipient-details>summary:focus-visible{outline:2px solid #dc9479;outline-offset:3px;border-radius:3px}.tm-recipient-body{padding:10px 0 0}.tm-recipient-body>.tm-line{margin-bottom:8px}';
+style.textContent+='.tm-task{flex-wrap:wrap}.tm-task-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.tm-task-compose{flex:0 0 100%;background:#fff8f3;border:1px solid #f0ded7;border-radius:9px;padding:10px}.tm-task-compose textarea{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:9px;padding:10px;font:inherit;resize:vertical;min-height:74px;line-height:1.6}.tm-task-flag{font-size:12px;padding:4px 8px;background:#fff3d5;color:#885a03;border-radius:7px;font-weight:750}.tm-task-flag.new{background:#ffe7d9;color:#a14926}';
 document.head.appendChild(style);
 
 // 「內容」與「交辦內容」預設單行；輸入換行或自動折行時即時增高，刪字也會縮回。
@@ -74,8 +78,10 @@ async function refresh(){
 }
 function card(m){
  const ts=tasks(m.id),count=readCount(m.id),own=myRead(m.id);
- const urgency=S.tab==='mine'&&pending(m)?'action':S.tab==='assigned'&&ready(m)?'closing':own&&!own.read_at?'unread':own?'read':'';
- const tag=S.tab==='mine'&&pending(m)?'待我辦理':S.tab==='assigned'&&ready(m)?'待我結案':'';
+ const difficult=S.tab==='assigned'&&needsHelp(m),close=S.tab==='assigned'&&ready(m);
+ const mine=S.tab==='mine'&&pending(m);
+ const urgency=mine||difficult?'action':close?'closing':own&&!own.read_at?'unread':own?'read':'';
+ const tag=difficult?'執行困難':close?'待我結案':mine?(hasInstruction(m)?'有新指示':'待我辦理'):'';
  const progress=ts.length?'分工完成 '+ts.filter(x=>x.is_done).length+'／'+ts.length:'無分工事項';
  return '<article class="tm-card tm-item '+urgency+'" role="button" tabindex="0" data-open="'+h(m.id)+'" aria-label="查看訊息：'+h(m.description.slice(0,60))+'">'+
   '<div class="tm-line"><div class="tm-meta"><span>建立者：'+h(name(m.created_by_staff_id))+'｜'+h(stamp(m.created_at))+'</span>'+
@@ -86,7 +92,7 @@ function card(m){
 }
 function listing(){
  S.view='list';S.id=null;S.editing=null;
- const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(ready).length;
+ const pendingCount=S.messages.filter(pending).length,closeCount=S.messages.filter(needsCreatorAction).length;
  const rows=S.messages.filter(m=>{
   if(S.tab==='unread')return myRead(m.id)?.read_at===null;
   if(S.tab==='all')return true;
@@ -95,8 +101,8 @@ function listing(){
   if(S.tab==='closed')return !!m.closed_at;
   return false;
  });
- if(S.tab==='mine')rows.sort((a,b)=>Number(pending(b))-Number(pending(a)));
- if(S.tab==='assigned')rows.sort((a,b)=>Number(ready(b))-Number(ready(a)));
+ if(S.tab==='mine')rows.sort((a,b)=>Number(hasInstruction(b))-Number(hasInstruction(a))||Number(pending(b))-Number(pending(a)));
+ if(S.tab==='assigned')rows.sort((a,b)=>Number(needsHelp(b))-Number(needsHelp(a))||Number(ready(b))-Number(ready(a)));
  if(S.tab==='closed')rows.sort((a,b)=>new Date(b.closed_at)-new Date(a.closed_at));
  const tabs=[['unread','未閱讀'],['all','全部訊息'],['mine','我的待辦'],['assigned','我的交辦'],['closed','已結案']];
  html('<div class="tm-head"><div><h1>訊息交辦</h1><p>消息集中管理，事件回報依時間保留完整歷程。</p></div>'+
@@ -221,13 +227,32 @@ function readPanel(id){
 function taskPanel(m){
  const list=tasks(m.id);
  if(!list.length)return '<div class="tm-summary">一般訊息沒有分工事項，不需要結案。</div>';
+ const creator=m.created_by_staff_id===me(),open=!m.closed_at;
  return '<div class="tm-section"><h3>分工事項（'+list.filter(t=>t.is_done).length+'／'+list.length+' 已完成）</h3></div>'+
  '<div class="tm-tasks">'+list.map((t,i)=>{
-  const editable=t.assignee_staff_id===me()&&!m.closed_at;
+  const assigned=t.assignee_staff_id===me();
+  const editing=S.taskAction?.taskId===t.id;
+  const help=t.assistance_needed&&!m.closed_at;
+  const fresh=t.instruction_pending&&!m.closed_at;
+  const buttons=[];
+  if(open&&assigned){
+   if(help)buttons.push('<span class="tm-task-flag">執行困難，等待建立者回覆</span>');
+   else if(fresh)buttons.push('<span class="tm-task-flag new">有新指示</span><button class="btn sm" data-ack="'+h(t.id)+'">已知悉</button>');
+   else buttons.push('<label class="tm-check"><input type="checkbox" data-done="'+h(t.id)+'"'+(t.is_done?' checked':'')+'>已完成</label>');
+   if(!t.is_done&&!help&&!fresh)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="request_help">執行困難</button>');
+  }else buttons.push('<span class="tm-pill '+(t.is_done?'closed':'')+'">'+(t.is_done?'已完成':'未完成')+'</span>');
+  if(open&&creator){
+   if(help)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="guide">給予新指示</button>');
+   else if(t.is_done)buttons.push('<button class="btn sm" data-task-action="'+h(t.id)+'" data-kind="redo">退回重辦</button>');
+  }
+  const prompt=editing?(S.taskAction.kind==='request_help'?'請說明遇到的困難':S.taskAction.kind==='redo'?'請說明需要重新辦理的事項':'請輸入新的處理指示'):'';
+  const composer=editing?'<div class="tm-task-compose"><strong>'+prompt+'</strong><div class="tm-field">'+
+   '<textarea data-task-note maxlength="1700" rows="3" placeholder="送出後會自動加入事件回報歷程"></textarea></div>'+
+   '<div class="tm-actions"><button class="btn primary sm" data-task-save="'+h(t.id)+'">送出</button>'+
+   '<button class="btn sm" data-task-cancel>取消</button></div></div>':'';
   return '<section class="tm-task"><div><div class="tm-task-label">'+(i+1)+'. '+h(t.description)+'</div>'+
    '<p class="tm-muted">承辦人：'+h(name(t.assignee_staff_id))+'</p></div>'+
-   (editable?'<label class="tm-check"><input type="checkbox" data-done="'+h(t.id)+'"'+(t.is_done?' checked':'')+'>已完成</label>':
-   '<span class="tm-pill '+(t.is_done?'closed':'')+'">'+(t.is_done?'已完成':'未完成')+'</span>')+'</section>';
+   '<div class="tm-task-actions">'+buttons.join('')+'</div>'+composer+'</section>';
  }).join('')+'</div>';
 }
 function historyPanel(m){
