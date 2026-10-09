@@ -271,6 +271,13 @@
       s.findings=g.findings;s.recommendations=g.recommendations;s.sig={findings:h,recommendations:h};}
     await persist(s,caseId);s.savedSource=normalizedSource;
   }
+  async function trackOverall(eventId,caseId,findings,recommendations,signature){
+    const payload={assessment_event_id:eventId,case_id:caseId,tool_code:'overall',
+      findings:findings||'',recommendations:recommendations||'',
+      source_signature:JSON.stringify(signature),has_generated:true};
+    const {error}=await db.from(TABLE).upsert(payload,{onConflict:'assessment_event_id,tool_code'});
+    if(error)throw error;
+  }
   function merged(rows,forms){
     const byCode=new Map(arr(rows).map(x=>[x.tool_code,x]));
     const parts={findings:[],recommendations:[]};
@@ -314,5 +321,5 @@
     .ats-compare-row pre{white-space:pre-wrap;word-break:break-word;min-height:70px;background:#f8f9fb;border-radius:8px;padding:9px;font-size:11px;font-family:inherit}
     @media(max-width:720px){.ats-compare-row>div{display:block;width:100%}}
   `;document.head.appendChild(style);
-  window.v52AssessmentToolSummary={load,get,render,mount,bind,saveAfterTool,list,merged,printBlock,fingerprint,generate,source,TOOL_TABLE,TITLES};
+  window.v52AssessmentToolSummary={load,get,render,mount,bind,saveAfterTool,list,merged,trackOverall,printBlock,fingerprint,generate,source,TOOL_TABLE,TITLES};
 })();
