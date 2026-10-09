@@ -487,10 +487,8 @@
           const id=rowEl.dataset.openingFixedMed||newOpeningFixedMedication().id;
           const existing=entryById(local.fixedMedicationBaseEntries,id);
           const medication=rowEl.querySelector('[data-opening-fixed-med-field="medication"]')?.value||'';
-          if(String(medication).trim()){
-            openingFixed.push(existing?{...existing,medication:String(medication).trim()}:
-              {...newOpeningFixedMedication(),id,medication:String(medication).trim()});
-          }
+          openingFixed.push(existing?{...existing,medication:String(medication).trim()}:
+            {...newOpeningFixedMedication(),id,medication:String(medication).trim()});
         });
         local.fixedMedicationBaseEntries=openingFixed;
       }else local.fixedMedicationBaseEntries=[];
@@ -505,7 +503,7 @@
         document.querySelectorAll('[data-opening-temp-med]').forEach(rowEl=>{
           const item={id:rowEl.dataset.openingTempMed||newOpeningTemporaryMedication().id};
           rowEl.querySelectorAll('[data-opening-temp-med-field]').forEach(el=>item[el.dataset.openingTempMedField]=el.value);
-          if(Object.entries(item).some(([k,v])=>k!=='id'&&String(v||'').trim()!==''))openingTemporary.push(item);
+          openingTemporary.push(item);
         });
       }
       local.medicalInfo.opening_temporary_medications=openingTemporary;
