@@ -444,7 +444,7 @@
       <table class="meta"><tbody>
         <tr><th>個案姓名</th><td>${html(c.case_name)}</td><th>個案編號</th><td>${html(c.case_no)}</td></tr>
         <tr><th>評估日期</th><td>${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}</td><th>評估類型</th><td>${html(TYPE_LABELS[row.assessment_type]||row.assessment_type)}</td></tr>
-        <tr><th>負責督導</th><td>${html(staffName(row.responsible_staff_id||c.supervisor_id))}</td><th>與家訪同日</th><td>${row.combined_with_home_visit?'是':'否'}</td></tr>
+        <tr><th>負責督導</th><td colspan="3">${html(staffName(row.responsible_staff_id||c.supervisor_id))}</td></tr>
         <tr><th>評估原因</th><td colspan="3">${html(reason)}</td></tr>
       </tbody></table>
     </header>`;
