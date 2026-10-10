@@ -403,6 +403,7 @@
             </label>
           `).join('')}
         </div>
+        ${window.v52AssessmentToolSummary?.previousNote(local.previous?.notes?.[key])||''}
         ${!showNote&&!disabled&&!['needs_improvement','not_applicable'].includes(current)
           ?`<button type="button" class="btn sm" data-hs-add-note="${key}">＋ 補充備註</button>`
           :''}
