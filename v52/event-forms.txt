@@ -1,3 +1,24 @@
+// 共用民國日期：畫面民國年，事件資料保持西元 ISO 日期。
+function eventBindRocDate(id,value,required=true){
+  const host=$(id+'Host');
+  if(!host||!window.rocDateKit)throw new Error('民國日期共用元件尚未載入');
+  host.__eventDateWidget=window.rocDateKit.mountDate(host,{
+    id:id,value:value||'',required:required
+  });
+  return host.__eventDateWidget;
+}
+function eventCheckedDate(id){
+  return $(id+'Host')?.__eventDateWidget?.getISO()??null;
+}
+function eventBindFilledAt(prefix,value=null){
+  eventBindRocDate(prefix+'Date',eventFormDateTimeParts(value).date,true);
+}
+function eventRequiredDates(ids){
+  for(const [id,label] of ids){
+    if(!eventCheckedDate(id))return '請填寫有效的'+label;
+  }
+  return null;
+}
 const eventFormDateTimeParts=value=>{
   let d=value?new Date(value):new Date();
   if(Number.isNaN(d.getTime()))d=new Date();
@@ -11,7 +32,7 @@ function eventFillTimeFields(prefix,value=null){
   return `
     <div class="event-field">
       <label>填表日期 *</label>
-      <input id="${prefix}Date" type="date" value="${p.date}">
+      <div id="${prefix}DateHost" class="event-roc-date"></div>
     </div>
     <div class="event-field">
       <label>填表時間 *</label>
@@ -20,7 +41,7 @@ function eventFillTimeFields(prefix,value=null){
   `;
 }
 function readEventFormFilledAt(prefix){
-  const date=fieldValue(prefix+'Date');
+  const date=eventCheckedDate(prefix+'Date');
   const time=fieldValue(prefix+'Time');
   if(!date||!time)return null;
   const d=new Date(`${date}T${time}:00`);
@@ -65,7 +86,7 @@ function openInitialReportForm(e=null,presetCaseId=null){
 
           <div class="event-field">
             <label>事件發生日期 *</label>
-            <input id="d" type="date" value="${e?.event_date||isoDate(new Date())}">
+            <div id="dHost" class="event-roc-date"></div>
           </div>
           <div class="event-field">
             <label>事件發生時間</label>
@@ -162,6 +183,9 @@ function openInitialReportForm(e=null,presetCaseId=null){
       </div>
     </div>`;
 
+  eventBindRocDate('d',e?.event_date||isoDate(new Date()),true);
+  eventBindFilledAt('ifill',i?.form_filled_at||i?.submitted_at||i?.created_at);
+  eventBindRocDate('srDate',sd?.external_reported_at?isoDate(new Date(sd.external_reported_at)):'',false);
   eventInitialFormSetDirty(false);
   const root=$('eventInitialFormBody');
   const mark=()=>eventInitialFormSetDirty(true);
@@ -187,6 +211,7 @@ async function saveInitialReport(e,a){
   const formFilledAt=readEventFormFilledAt('ifill');
   if(!formFilledAt)return toast('請填妥填表日期與時間','warn');
 
+  const dateError=eventRequiredDates([['d','事件發生日期']]);if(dateError)return toast(dateError,'warn');
   const nextDays=Number(fieldValue('nday'));
   if(a!=='pending_close'&&(!Number.isInteger(nextDays)||nextDays<1))return toast('請填正確的追蹤天數','warn');
 
@@ -197,7 +222,7 @@ async function saveInitialReport(e,a){
   const reportingStatus=sensitive?fieldValue('srs'):null;
   let reportedAt=null;
   if(sensitive&&reportingStatus==='reported'){
-    const rd=fieldValue('srDate'),rh=fieldValue('srHour'),rm=fieldValue('srMin');
+    const rd=eventCheckedDate('srDate'),rh=fieldValue('srHour'),rm=fieldValue('srMin');
     if(!rd||!rh||!fieldValue('srAgency'))return toast('請填妥外部通報日期、時間與通報單位','warn');
     reportedAt=new Date(`${rd}T${rh}:${rm||'00'}:00`).toISOString();
   }
@@ -213,7 +238,7 @@ async function saveInitialReport(e,a){
 
   const p={
     event_id:e?.id||null,
-    event_date:fieldValue('d'),
+    event_date:eventCheckedDate('d'),
     event_time:eventTime,
     category:cat,
     subject:fieldValue('sub'),
@@ -270,6 +295,7 @@ async function saveInitialReport(e,a){
 }
 
 async function updateInitialReport(e){
+  const dateError=eventRequiredDates([['d','事件發生日期']]);if(dateError)return toast(dateError,'warn');
   const eventTime=readOptionalTime('th','tmin');
   const formFilledAt=readEventFormFilledAt('ifill');
   if(!formFilledAt)return toast('請填妥填表日期與時間','warn');
@@ -282,7 +308,7 @@ async function updateInitialReport(e){
   let reportedAt=null;
 
   if(sensitive&&reportingStatus==='reported'){
-    const rd=fieldValue('srDate'),rh=fieldValue('srHour'),rm=fieldValue('srMin');
+    const rd=eventCheckedDate('srDate'),rh=fieldValue('srHour'),rm=fieldValue('srMin');
     if(!rd||!rh||!fieldValue('srAgency'))return toast('請填妥外部通報日期、時間與通報單位','warn');
     reportedAt=new Date(`${rd}T${rh}:${rm||'00'}:00`).toISOString();
   }
@@ -293,7 +319,7 @@ async function updateInitialReport(e){
 
   const p={
     event_id:e.id,
-    event_date:fieldValue('d'),
+    event_date:eventCheckedDate('d'),
     event_time:eventTime,
     category:cat,
     subject:fieldValue('sub'),
