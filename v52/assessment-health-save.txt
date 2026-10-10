@@ -1,5 +1,17 @@
 // 評估管理／健康儲存與開啟流程
-  function currentToolSummarySource(){return ({medical_info:local.medicalInfo,medication_checks:local.medicationChecks,health_items:local.healthItems,health_notes:local.healthNotes});}
+  function currentToolSummarySource(){
+    // 本項總結的「生成／重新生成」可在尚未儲存表單時操作。
+    // 先讀取目前畫面所有文字欄位（含用藥安全備註、健康備註、就醫結果、
+    // 本期用藥異動與修正等動態欄位），避免只拿到上次儲存的 local 狀態。
+    // 沿用原儲存流程的同一支同步函式，避免另外維護兩套欄位映射。
+    if(document.querySelector('.health-page'))syncInputs();
+    return {
+      medical_info:local.medicalInfo,
+      medication_checks:local.medicationChecks,
+      health_items:local.healthItems,
+      health_notes:local.healthNotes
+    };
+  }
 
   async function save(finalize){
     const row=eventById(local.eventId);
