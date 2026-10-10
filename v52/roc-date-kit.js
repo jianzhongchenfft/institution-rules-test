@@ -1,4 +1,4 @@
-/* 劉信子內部管理系統：共用民國日期工具 V1.1（獨立測試，尚未接入既有表單） */
+/* 劉信子內部管理系統：共用民國日期工具 V1.2（獨立測試，尚未接入既有表單） */
 (function(root){
  'use strict';
  if(root.rocDateKit)return;
@@ -10,11 +10,13 @@
  function isoDate(s){var a=/^(\d{4})-(\d{2})-(\d{2})$/.exec(text(s));return a&&valid(+a[1],+a[2],+a[3])?{y:+a[1],m:+a[2],d:+a[3]}:null;}
  function isoMonth(s){var a=/^(\d{4})-(\d{2})$/.exec(text(s));return a&&+a[1]>=1&&+a[1]<=9999&&+a[2]>=1&&+a[2]<=12?{y:+a[1],m:+a[2]}:null;}
  function yText(y){return y>=1912?String(y-1911):'民前'+String(1912-y);}
- function fromRocYear(s){if(/^民前[1-9]\d{0,3}$/.test(s))return 1912-Number(s.slice(2));return /^[1-9]\d{0,2}$/.test(s)?Number(s)+1911:null;}
+ function fromRocYear(s){if(/^民前[1-9]\d{0,3}$/.test(s))return 1912-Number(s.slice(2));return /^(?:[1-9]\d{0,2}|0[0-9]{2})$/.test(s)&&Number(s)>0?Number(s)+1911:null;}
  function parse(s,month){
    var raw=text(s).replace(/\s/g,'').replace(/[.\-．]/g,'/').replace(/年/g,'/').replace(/月/g,month?'':'/').replace(/日$/,'').replace(/\/$/,'');
-   // 僅日期接受七碼連續數字：民國年三碼＋月兩碼＋日兩碼（例如1151010）。
-   var compact=!month?/^(\d{3})(\d{2})(\d{2})$/.exec(raw):null;
+   // 無分隔符號時，最末2碼為月份；日期則再往前取2碼為日。
+   // 民國年可以是2碼(84)或3碼(084、115)，避免猜測不完整月份/日期。
+   var compact=month?/^(\d{2,3})(\d{2})$/.exec(raw):
+     /^(\d{2,3})(\d{2})(\d{2})$/.exec(raw);
    var a=compact||(month?/^(民前\d{1,4}|\d{1,3})\/(\d{1,2})$/:/^(民前\d{1,4}|\d{1,3})\/(\d{1,2})\/(\d{1,2})$/).exec(raw);
    if(!a)return null;
    var y=fromRocYear(a[1]),m=Number(a[2]),d=month?1:Number(a[3]);
@@ -78,7 +80,7 @@
    if(min&&max&&min>max)throw Error('日期範圍起日不得晚於迄日');
    css();
    var wrap=node('div','rdk'+(month?' month':''));
-   var input=node('input','rdk-text');input.type='text';input.inputMode='numeric';input.autocomplete='off';input.placeholder=month?'115年10月':'1151010 或 115/10/10';
+   var input=node('input','rdk-text');input.type='text';input.inputMode='numeric';input.autocomplete='off';input.placeholder=month?'11510 或 115年10月':'1151010 或 840306';
    if(opt.id)input.id=opt.id;
    if(opt.disabled)input.disabled=true;
    if(opt.required)input.required=true;
