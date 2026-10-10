@@ -49,7 +49,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       ];
       let assessmentModuleCode='';
       for(const path of assessmentModuleFiles){
-        const res=await fetch(`${path}?v=assessment-proxy-void-v1-20261005`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=roc-assessment-dates-v1-20261011`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         assessmentModuleCode+='\n'+await res.text();
       }
@@ -127,7 +127,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       }
       eval(eventTrackingCode);
 
-      const carePlanRes=await fetch('v52/individual-care-plan-core.txt?v=review-description-required-20261008',{cache:'no-store'});
+      const carePlanRes=await fetch('v52/individual-care-plan-core.txt?v=roc-care-plan-dates-v1-20261011',{cache:'no-store'});
       if(!carePlanRes.ok) throw new Error('照顧計畫模組載入失敗（'+carePlanRes.status+'）');
       eval(await carePlanRes.text());
 
