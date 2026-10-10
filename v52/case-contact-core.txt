@@ -27,6 +27,8 @@
     '.cc-case-table .cc-case-link,.cc-case-table .cc-case-name-btn{font:inherit;color:#a75b44;text-decoration:none;cursor:pointer}'+
     '.cc-case-table .cc-case-link:hover,.cc-case-table .cc-case-name-btn:hover{text-decoration:underline;text-underline-offset:2px}'+
     '.cc-case-table .cc-case-name-btn{font-weight:900;background:none;border:0;padding:0;white-space:nowrap;vertical-align:middle}'+
+    '.cc-case-sort-btn{display:inline-flex;align-items:center;justify-content:center;gap:3px;width:100%;min-height:20px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}'+
+    '.cc-case-sort-btn:hover{color:#a75b44}.cc-case-sort-btn:focus-visible{outline:2px solid #dc9479;outline-offset:2px;border-radius:3px}.cc-case-sort-indicator{font-size:10px;line-height:1;color:#a75b44}'+
     '.cc-sex{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:2px 5px;margin-right:5px}.cc-sex.male{color:#245cb0;background:#dcebff}.cc-sex.female{color:#a63569;background:#fce3eb}'+
     '@media(max-width:900px){.cc-stats{grid-template-columns:1fr 1fr}.cc-recent-grid{grid-template-columns:1fr}.cc-check-grid{grid-template-columns:1fr}.cc-sat-options{gap:5px}.cc-sat-choice span{padding:5px 8px;font-size:10px}.cc-other-person-row{grid-template-columns:1fr}.cc-other-person-row .btn{justify-self:start}}';
   document.head.appendChild(ccStyle);
@@ -38,6 +40,8 @@
     caseAssessmentEvents:[],
     caseContactDataLoaded:false,
     caseDirectoryContacts:[],
+    caseDirectorySortKey:null,
+    caseDirectorySortDirection:'asc',
     caseDashboardFilter:''
   });
 
@@ -188,6 +192,39 @@
   }
   function ccDateText(v){return v?rocDate(v+'T00:00:00'):'—';}
 
+  function ccDirectorySortValue(c,key){
+    switch(key){
+      case 'case_name':return c.case_name||'';
+      case 'open_date':return c.open_date||'';
+      case 'case_no':return c.case_no||'';
+      case 'supervisor':return c.supervisor_id?ccStaffName(c.supervisor_id):'';
+      case 'case_manager':return c.case_manager_name||'';
+      case 'identity':return c.welfare_identity||'';
+      case 'cms':{
+        var value=String(c.cms_level||'').trim();
+        var level=value.match(/\d+(?:\.\d+)?/);
+        return level?Number(level[0]):value;
+      }
+      case 'last_home':return ccLatest(c.id,'home_visit')?.record_date||'';
+      case 'last_phone':return ccLatest(c.id,'formal_phone')?.record_date||'';
+      default:return '';
+    }
+  }
+  function ccDirectoryCompare(a,b,key,direction){
+    var aValue=ccDirectorySortValue(a,key),bValue=ccDirectorySortValue(b,key);
+    var aEmpty=aValue===null||aValue===undefined||aValue==='';
+    var bEmpty=bValue===null||bValue===undefined||bValue==='';
+    if(aEmpty!==bEmpty)return aEmpty?1:-1; // 未填資料放在最後，升降序皆相同
+    var comparison=0;
+    if(typeof aValue==='number'&&typeof bValue==='number'){
+      comparison=aValue-bValue;
+    }else{
+      comparison=String(aValue).localeCompare(String(bValue),'zh-Hant',{numeric:true,sensitivity:'base'});
+    }
+    if(comparison!==0)return direction==='desc'?-comparison:comparison;
+    return String(a.case_no||a.case_name||'').localeCompare(String(b.case_no||b.case_name||''),'zh-Hant',{numeric:true});
+  }
+
   function ccRenderPage(){
     if(state.page!=='cases')return;
     var supervisors=(state.caseStaff||[]).filter(function(s){return s.can_supervise||s.role==='supervisor';});
@@ -209,11 +246,15 @@
         return true;
       });
     }
-    rows.sort(function(a,b){
-      var rank={overdue:0,due:1,followup:2,normal:3,muted:4};
-      var sa=ccWorstStatus(a),sb=ccWorstStatus(b);
-      return rank[sa.key]-rank[sb.key]||String(a.case_no||a.case_name).localeCompare(String(b.case_no||b.case_name),'zh-Hant');
-    });
+    if(state.caseDirectorySortKey){
+      rows.sort(function(a,b){return ccDirectoryCompare(a,b,state.caseDirectorySortKey,state.caseDirectorySortDirection);});
+    }else{
+      rows.sort(function(a,b){
+        var rank={overdue:0,due:1,followup:2,normal:3,muted:4};
+        var sa=ccWorstStatus(a),sb=ccWorstStatus(b);
+        return rank[sa.key]-rank[sb.key]||String(a.case_no||a.case_name).localeCompare(String(b.case_no||b.case_name),'zh-Hant');
+      });
+    }
     var overdue=scope.filter(function(c){return ccWorstStatus(c).key==='overdue';}).length;
     var due=scope.filter(function(c){return ccWorstStatus(c).key==='due';}).length;
     var phoneDue=scope.filter(function(c){return ['overdue','due'].includes(ccCycle(c,'formal_phone').key);}).length;
@@ -284,9 +325,33 @@
       }catch(_){}
       return '';
     }
-    var headers=['案名','開案日期','個案編號','責任督導','個管師','身分別','CMS','地址','Google定位','主要聯絡人','主要聯絡人電話','案主電話'];
+    var headers=[
+      {label:'案名',key:'case_name'},
+      {label:'開案日期',key:'open_date'},
+      {label:'個案編號',key:'case_no'},
+      {label:'責任督導',key:'supervisor'},
+      {label:'個管師',key:'case_manager'},
+      {label:'身分別',key:'identity'},
+      {label:'CMS',key:'cms'},
+      {label:'地址'},
+      {label:'Google定位'},
+      {label:'主要聯絡人'},
+      {label:'主要聯絡人電話'},
+      {label:'案主電話'},
+      {label:'最近家訪',key:'last_home'},
+      {label:'最近電訪',key:'last_phone'}
+    ];
     list.innerHTML='<div class="cc-case-table-shell" role="region" aria-label="個案資料表，可左右捲動" tabindex="0">'+
-      '<table class="cc-case-table"><thead><tr>'+headers.map(function(label){return '<th scope="col">'+escapeHTML(label)+'</th>';}).join('')+
+      '<table class="cc-case-table"><thead><tr>'+headers.map(function(item){
+        if(!item.key)return '<th scope="col">'+escapeHTML(item.label)+'</th>';
+        var current=state.caseDirectorySortKey===item.key;
+        var dir=state.caseDirectorySortDirection;
+        var nextDir=current&&dir==='asc'?'desc':'asc';
+        var icon=current?(dir==='asc'?'↑':'↓'):'↕';
+        var ariaSort=current?(dir==='asc'?'ascending':'descending'):'none';
+        return '<th scope="col" aria-sort="'+ariaSort+'"><button type="button" class="cc-case-sort-btn" data-cc-sort="'+item.key+'" aria-label="依'+escapeHTML(item.label)+(nextDir==='asc'?'升序':'降序')+'排序">'+
+          escapeHTML(item.label)+'<span aria-hidden="true" class="cc-case-sort-indicator">'+icon+'</span></button></th>';
+      }).join('')+
       '</tr></thead><tbody>'+
       rows.map(function(c){
         var contact=(state.caseDirectoryContacts||[]).find(function(x){return x.case_id===c.id&&x.is_primary_contact;})||null;
@@ -305,12 +370,31 @@
           plainCell(contact?.contact_name)+
           phoneCell(contact?.phone)+
           phoneCell(c.phone)+
+          plainCell(ccDateText(ccLatest(c.id,'home_visit')?.record_date))+
+          plainCell(ccDateText(ccLatest(c.id,'formal_phone')?.record_date))+
         '</tr>';
       }).join('')+
       '</tbody></table></div>';
     list.querySelectorAll('[data-case-id]').forEach(function(btn){
       btn.addEventListener('click',function(){
         if(typeof window.openCaseDetailPage==='function')window.openCaseDetailPage(btn.dataset.caseId,'basic');
+      });
+    });
+    list.querySelectorAll('[data-cc-sort]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var key=btn.dataset.ccSort;
+        var previousScroll=list.querySelector('.cc-case-table-shell')?.scrollLeft||0;
+        if(state.caseDirectorySortKey===key){
+          state.caseDirectorySortDirection=state.caseDirectorySortDirection==='asc'?'desc':'asc';
+        }else{
+          state.caseDirectorySortKey=key;
+          state.caseDirectorySortDirection='asc';
+        }
+        ccRenderPage();
+        var shell=$('caseList')?.querySelector('.cc-case-table-shell');
+        if(shell)shell.scrollLeft=previousScroll;
+        var currentBtn=$('caseList')?.querySelector('[data-cc-sort="'+key+'"]');
+        if(currentBtn)currentBtn.focus({preventScroll:true});
       });
     });
   }
