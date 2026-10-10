@@ -171,9 +171,13 @@
         ['opening_temporary_unknown_note','臨時用藥無法確認原因'],
         ['medication_followup','服藥異常或注意事項'],
         ['health_change_note','健康變化說明'],
-        ['medication_change_note','用藥變化說明']
+        ['care_impact_note','對照顧需求的影響說明']
       ];
       for(const [key,title] of narratives)add(find,title,m[key]);
+      // 舊資料若只有摘要文字仍可顯示；一般用藥異動以個別備註為主，
+      // 避免將儲存時自動組成的「藥物/用法/異動」文字再重複匯入。
+      if(!arr(m.medication_changes).length)add(find,'用藥變化說明',m.medication_change_note);
+      if(!arr(m.medication_corrections).length)add(find,'既有用藥修正說明',m.medication_correction_note);
       const blocks=[
         ['healthcare_events','就醫事件'],
         ['unvisited_health_changes','非例行健康變化'],
@@ -184,7 +188,10 @@
       const entryFields=['note','reason','description','impact_note','care_impact_note','response','action_note'];
       for(const [field,title] of blocks){
         arr(m[field]).forEach((item,index)=>{
-          for(const k of entryFields)add(find,title+' '+(index+1)+'（'+(COMMON_LABELS[k]||'補充說明')+'）',obj(item)[k]);
+          const info=obj(item);
+          for(const k of entryFields)add(find,title+' '+(index+1)+'（'+(COMMON_LABELS[k]||'補充說明')+'）',info[k]);
+          // 「就醫結果／處置」是獨立的敘述欄位，並非醫療數值或選項。
+          if(field==='healthcare_events')add(find,title+' '+(index+1)+'（結果／處置）',info.result);
         });
       }
     }else if(code==='home_safety'){
@@ -217,17 +224,24 @@
         ['primary_caregiver_availability','主要照顧者可提供時間'],
         ['primary_caregiver_role','主要照顧者協助內容']
       ])add(find,title,h[k]);
-      arr(r.family_members).forEach((m,i)=>add(find,'重要支持者 '+(i+1),obj(m).note));
+      arr(r.family_members).forEach((m,i)=>{
+        const person=obj(m);
+        add(find,'重要支持者 '+(i+1)+'（協助內容）',person.support_role);
+        add(find,'重要支持者 '+(i+1)+'（其他備註）',person.note);
+      });
       const domains=obj(r.support_domains);
       for(const key of Object.keys(LABELS.support))add(find,label(code,key),obj(domains[key]).note);
       for(const [k,title] of [
         ['economic_note','經濟狀況說明'],
+        ['income_sources','主要生活／經濟來源'],
         ['economic_care_impact_note','經濟因素影響照顧的情形'],
         ['social_interaction_note','社會互動說明'],
         ['community_participation_note','活動參與補充']
       ])add(find,title,rr[k]);
       arr(rr.social_resources).forEach((item,i)=>{
-        const x=obj(item);add(find,'社會資源 '+(i+1)+'（不足原因）',x.insufficiency_note);
+        const x=obj(item);
+        add(find,'社會資源 '+(i+1)+'（提供協助）',x.assistance);
+        add(find,'社會資源 '+(i+1)+'（不足原因）',x.insufficiency_note);
       });
       arr(rr.unmet_needs).forEach((item,i)=>{
         const x=obj(item);add(find,'尚缺資源／轉介需求 '+(i+1),x.need);
