@@ -128,7 +128,7 @@
   function generate(code,raw){
     const r=source(code,raw),find=[],recommend=[];
     const add=(to,title,note)=>{
-      if(value(note))to.push(title+'－'+value(note));
+      if(value(note))to.push('【'+title+'】'+value(note));
     };
     const noteItems=(to,notes,kind)=>{
       const n=obj(notes),order=Object.keys(LABELS[kind]||{});
@@ -289,13 +289,13 @@
       ${stale?'<div class="ats-alert">原始評估內容已有更新，請確認原總結是否仍適用；不影響儲存或列印。</div>':''}
       <div class="ats-body">
         <label>重要評估發現／問題與需求</label>
+        ${editing?`<div class="ats-generate-actions">
+          <button type="button" class="btn sm" data-ats-preview>${s.generated||s.edited?'重新生成並預覽':'生成本項總結'}</button>
+        </div>`:''}
         <textarea data-ats-input="findings" ${editing?'':'readonly'} placeholder="本項沒有需整理的紀錄，可留空">${esc(s.findings)}</textarea>
         <label>照顧服務重點／建議</label>
         <textarea data-ats-input="recommendations" ${editing?'':'readonly'} placeholder="原表單沒有明確照顧建議時可留空，由督導自行補充">${esc(s.recommendations)}</textarea>
-        ${editing?`<div class="ats-buttons">
-          ${stale?'<button type="button" class="btn sm" data-ats-ack>保留目前內容並確認</button>':''}
-          <button type="button" class="btn sm" data-ats-preview>${s.generated||s.edited?'重新生成並預覽':'生成本項總結'}</button>
-        </div>`:''}
+        ${editing&&stale?'<div class="ats-buttons"><button type="button" class="btn sm" data-ats-ack>保留目前內容並確認</button></div>':''}
         ${s.preview?`<div class="ats-compare">
           <strong>重新整理預覽（兩個欄位可分別取代）</strong>
           ${[['findings','重要評估發現／問題與需求'],['recommendations','照顧服務重點／建議']].map(([f,title])=>`
@@ -371,7 +371,7 @@
       findings:s.findings,recommendations:s.recommendations,source_signature:JSON.stringify(s.sig),has_generated:!!s.generated,
       updated_at:new Date().toISOString()};
     const {error}=await db.from(TABLE).upsert(payload,{onConflict:'assessment_event_id,tool_code'});
-    if(error)throw error;s.exists=true;s.generated=true;s.edited=false;
+    if(error)throw error;s.exists=true;s.edited=false;
   }
   async function saveAfterTool(eventId,code,record,caseId){
     const s=get(eventId,code,record);
@@ -426,6 +426,8 @@
     .ats-head small{display:block;font-size:10.5px;color:#667085;margin-top:4px}
     .ats-body{padding:13px}.ats-body>label{display:block;font-size:11px;font-weight:850;color:#475467;margin:9px 0 5px}
     .ats-body>textarea{width:100%;box-sizing:border-box;min-height:94px;resize:vertical}
+    .ats-generate-actions{display:flex;justify-content:flex-start;margin:0 0 9px}
+    .ats-generate-actions .btn{white-space:nowrap}
     .ats-buttons{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px}
     .ats-alert{background:#fffaeb;border-bottom:1px solid #fedf89;color:#93370d;padding:10px 13px;font-size:11px}
     .ats-tip{font-size:10px;color:#667085;margin-top:10px}
