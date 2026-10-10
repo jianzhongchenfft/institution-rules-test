@@ -154,3 +154,14 @@ const month = rocDateKit.mountMonth(monthContainer, {
 - 共用 `roc-date-kit.js` 加入 `mountLinkedDate`、`mountLinkedMonth` 及 `linkedISO`，將原先分散在出勤模組的西元隱藏欄位同步規則集中至單一元件，並回收既有加班／換休日期的重複 helper 邏輯。
 - 已驗證完整出勤／特休／薪資前端組合 JS 語法、7個相連日期／月份欄位、民國日期轉西元、日期變更觸發監聽、無效日期拒絕、遞延最大日期限制傳入、既有薪資 RPC 日期欄位未變更。登入後實際操作驗收尚待使用者確認。
 - 僅修改 GitHub TEST 前端，無正式版 GitHub、Supabase DB/Function/RPC/SQL、權限或計薪公式變動。
+
+## 全系統最後四項日期收尾（測試版 V20，2026-10-11）
+
+- **內規文件**（`v51/part06.txt`、`v51/regulations-list-patch.txt`、`v51/part07-clean.txt`）：新規定／新版本的生效日期以共用民國日期元件輸入；沿用 ISO `effective_date`，仍可清除選填日期，無效日期上傳前阻止；列表、文件詳細資訊及版本歷史採 `115/10/11`。
+- **照管平台計畫編輯**（`v52/case-html-import.txt`）：計畫日期、電聯日期、家訪日期共三欄改用民國日期，編輯資料仍以 ISO 傳給 `update_care_plan_version`；選填欄位清空仍傳原有空字串，無效日期禁止送出，計畫版本／最新版本判斷不變。
+- **一般電話聯繫列印**（`v52/case-contact-detail.txt`）：自訂列印開始日與結束日改用民國日期元件；仍以 ISO 比較並保留起日不可晚於迄日的限制，「本月」功能與正式列印版面不變。
+- **訊息交辦**（`v52/team-messages.txt`）：共用 `stamp` 改用 `rocDateKit.formatDateTimeCompact`，涵蓋建立、已讀、分工、回報等歷程，顯示 `115/10/11 14:30`；原儲存時間戳及排序不變。
+- 修改既有模組原始碼而非新增修補模組，六個日期欄位共用既有的 `mountLinkedDate`／`linkedISO`；不重複建立日期元件或轉換函式。
+- 版本：測試版 `5.2-roc-final-cleanup-v20-test-20261011`，變更相關快取版本。
+- 驗證：V5.1 主程式七片段重組語法、四模組腳本語法與家電訪三片段合併語法、日期元件解析／時區轉換、六欄 ISO 雙向同步、列印日期區間及無效輸入模擬，共用模組載入順序。
+- 僅修改 TEST GitHub，**未變更正式版、Supabase 資料庫、權限或計算公式**。實際登入 UI 新增／編輯／列印需經使用者最後驗收。
