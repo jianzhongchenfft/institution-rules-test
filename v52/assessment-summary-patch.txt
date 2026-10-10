@@ -323,7 +323,7 @@
     const stale=overallNeedsReview();
     return `<div class="asum-help" style="margin-bottom:12px">
       <strong>兩階段評估總結：</strong>依本次已完成工具的單項總結，分別整理到下方兩個文字欄位；保留【工具名稱】段落，由督導自由修改。
-      ${local.toolMerged.missing.length?`<div style="margin-top:6px;color:#93370d">以下工具尚未儲存本項總結，匯整時不會自動編造內容：${escapeHTML(local.toolMerged.missing.join('、'))}</div>`:''}
+      ${local.toolMerged.missing.length?`<div style="margin-top:6px;color:#93370d">以下工具尚未生成本項總結，暫不會匯入文字：${escapeHTML(local.toolMerged.missing.join('、'))}</div>`:''}
     </div>
     ${stale?'<div class="asum-help" style="background:#fffaeb;border-color:#fedf89;color:#93370d">單項評估總結已有更新或尚未確認匯整版本。原本整體總結不會被自動覆蓋；仍可儲存或列印。</div>':''}
     <div class="asum-actions" style="position:static;background:transparent;margin:0 0 12px;padding:0">
