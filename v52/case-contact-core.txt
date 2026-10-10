@@ -24,11 +24,12 @@
     '.cc-case-table tr:last-child td{border-bottom:none}.cc-case-table tbody tr:hover td{background:#fff8f5}'+
     '.cc-case-table th:first-child,.cc-case-table td:first-child{position:sticky;left:0;z-index:3;box-shadow:1px 0 0 var(--line);background:#fff}'+
     '.cc-case-table th:first-child{z-index:4;background:#f9fafb}.cc-case-table tbody tr:hover td:first-child{background:#fff8f5}'+
-    '.cc-case-table .cc-case-link,.cc-case-table .cc-case-name-btn{font:inherit;color:#a75b44;text-decoration:none;cursor:pointer}'+
+    '.cc-case-table .cc-case-link{font:inherit;color:#a75b44;text-decoration:none;cursor:pointer}'+
+    '.cc-case-table .cc-case-name-btn{font:inherit;color:#111827;text-decoration:none;cursor:pointer}'+
     '.cc-case-table .cc-case-link:hover,.cc-case-table .cc-case-name-btn:hover{text-decoration:underline;text-underline-offset:2px}'+
     '.cc-case-table .cc-case-name-btn{font-weight:900;background:none;border:0;padding:0;white-space:nowrap;vertical-align:middle}'+
     '.cc-case-sort-btn{display:inline-flex;align-items:center;justify-content:center;gap:3px;width:100%;min-height:20px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;white-space:nowrap;cursor:pointer}'+
-    '.cc-case-sort-btn:hover{color:#a75b44}.cc-case-sort-btn:focus-visible{outline:2px solid #dc9479;outline-offset:2px;border-radius:3px}.cc-case-sort-indicator{font-size:10px;line-height:1;color:#a75b44}'+
+    '.cc-case-sort-btn:hover{color:#a75b44}.cc-case-sort-btn:focus-visible{outline:2px solid #dc9479;outline-offset:2px;border-radius:3px}.cc-case-sort-indicator{font-size:10px;line-height:1;color:inherit}'+
     '.cc-sex{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:2px 5px;margin-right:5px}.cc-sex.male{color:#245cb0;background:#dcebff}.cc-sex.female{color:#a63569;background:#fce3eb}'+
     '@media(max-width:900px){.cc-stats{grid-template-columns:1fr 1fr}.cc-recent-grid{grid-template-columns:1fr}.cc-check-grid{grid-template-columns:1fr}.cc-sat-options{gap:5px}.cc-sat-choice span{padding:5px 8px;font-size:10px}.cc-other-person-row{grid-template-columns:1fr}.cc-other-person-row .btn{justify-self:start}}';
   document.head.appendChild(ccStyle);
@@ -347,10 +348,10 @@
         var current=state.caseDirectorySortKey===item.key;
         var dir=state.caseDirectorySortDirection;
         var nextDir=current&&dir==='asc'?'desc':'asc';
-        var icon=current?(dir==='asc'?'↑':'↓'):'↕';
+        var icon=current?(dir==='asc'?'↑':'↓'):'';
         var ariaSort=current?(dir==='asc'?'ascending':'descending'):'none';
         return '<th scope="col" aria-sort="'+ariaSort+'"><button type="button" class="cc-case-sort-btn" data-cc-sort="'+item.key+'" aria-label="依'+escapeHTML(item.label)+(nextDir==='asc'?'升序':'降序')+'排序">'+
-          escapeHTML(item.label)+'<span aria-hidden="true" class="cc-case-sort-indicator">'+icon+'</span></button></th>';
+          escapeHTML(item.label)+(current?'<span aria-hidden="true" class="cc-case-sort-indicator">'+icon+'</span>':'')+'</button></th>';
       }).join('')+
       '</tr></thead><tbody>'+
       rows.map(function(c){
