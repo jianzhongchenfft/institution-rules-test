@@ -331,6 +331,7 @@
         ${prev.status?`<span class="support-tag prev">前次：${escapeHTML(statusLabel(prev.status))}</span>`:''}${change?`<span class="support-tag ${change.kind}">${escapeHTML(change.label)}</span>`:''}
       </div></div>
       <div class="support-options">${DOMAIN_STATUS.map(([v,l])=>`<label class="support-option ${cur.status===v?'selected':''}"><input type="radio" name="support_domain_${key}" value="${v}" ${cur.status===v?'checked':''}>${l}</label>`).join('')}</div>
+      ${window.v52AssessmentToolSummary?.previousNote(prev.note)||''}
       ${!showNote&&!['partial','insufficient','not_applicable'].includes(cur.status)?`<div class="support-note"><button type="button" class="btn sm" data-support-domain-add-note="${key}">＋ 補充備註</button></div>`:''}
       ${showNote?`<div class="support-note"><label>備註${noteRequired?' *':''}</label><textarea data-support-domain-note="${key}" placeholder="${escapeHTML(placeholder)}">${escapeHTML(noteValue)}</textarea></div>`:''}
     </div>`;
