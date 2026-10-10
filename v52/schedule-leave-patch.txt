@@ -34,6 +34,13 @@
   `;
   document.head.appendChild(leaveStyle);
 
+  function leaveMountRocDate(id,value){
+    const host=$(id+'Host');
+    if(!host)throw new Error('找不到請假日期欄位：'+id);
+    host.__rocDate=window.rocDateKit.mountDate(host,{id,value:value||'',required:true});
+  }
+  function leaveRocDate(id){return $(id+'Host')?.__rocDate?.getISO()??null;}
+
   let leaveDraft = null;
   let pendingDraft = null;
 
@@ -109,9 +116,9 @@
               <select id="leaveWorker"><option value="">請選擇居服員</option>${workers.map(w=>`<option value="${w.id}">${escapeHTML(w.worker_name)}</option>`).join('')}</select>
             </div>
 
-            <div class="field"><label>請假開始日期 *</label><input id="leaveStartDate" type="date" value="${today}"></div>
+            <div class="field"><label>請假開始日期 *</label><div id="leaveStartDateHost" class="roc-inline-date"></div></div>
             <div class="field"><label>請假開始時間 *</label><input id="leaveStartTime" type="time" value="08:00"></div>
-            <div class="field"><label>請假結束日期 *</label><input id="leaveEndDate" type="date" value="${today}"></div>
+            <div class="field"><label>請假結束日期 *</label><div id="leaveEndDateHost" class="roc-inline-date"></div></div>
             <div class="field"><label>請假結束時間 *</label><input id="leaveEndTime" type="time" value="18:00"></div>
 
             <div class="field full">
@@ -125,6 +132,8 @@
         onConfirm:findAffectedSchedules
       });
 
+      leaveMountRocDate('leaveStartDate',today);
+      leaveMountRocDate('leaveEndDate',today);
       $('leaveAllDay').addEventListener('change',toggleLeaveAllDay);
       toggleLeaveAllDay();
     }catch(err){
@@ -137,9 +146,9 @@
 
   async function findAffectedSchedules(){
     const workerId = $('leaveWorker')?.value;
-    const startDate = $('leaveStartDate')?.value;
+    const startDate = leaveRocDate('leaveStartDate');
     const startTime = $('leaveStartTime')?.value;
-    const endDate = $('leaveEndDate')?.value;
+    const endDate = leaveRocDate('leaveEndDate');
     const endTime = $('leaveEndTime')?.value;
     const isAllDay = !!$('leaveAllDay')?.checked;
     const reason = $('leaveReason')?.value?.trim() || null;
