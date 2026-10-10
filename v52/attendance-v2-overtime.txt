@@ -65,26 +65,10 @@
 
   // 相容既有薪資／換休判斷：可見輸入為共用民國元件，原欄位 ID 持續提供 ISO。
   function otMountRocField(id,value,month=false){
-    const source=$(id),host=$(id+'Host');
-    if(!source||!host||!window.rocDateKit)throw new Error('民國日期欄位未準備完成：'+id);
-    const mount=month?window.rocDateKit.mountMonth:window.rocDateKit.mountDate;
-    host.__otRocDate=mount(host,{
-      id:id+'Roc',value:value||'',required:true,
-      onChange:iso=>{
-        source.value=iso;
-        source.dispatchEvent(new Event('change',{bubbles:true}));
-      }
-    });
-    return host.__otRocDate;
+    const mount=month?window.rocDateKit.mountLinkedMonth:window.rocDateKit.mountLinkedDate;
+    return mount(id,{value:value||'',required:true});
   }
-  function otRocISO(id){
-    const source=$(id),field=$(id+'Host')?.__otRocDate;
-    if(!source||!field)return null;
-    const iso=field.getISO();
-    if(!iso){source.value='';return null;}
-    source.value=iso;
-    return iso;
-  }
+  function otRocISO(id){return window.rocDateKit.linkedISO(id);}
 
   const regIndex = modules.findIndex(m=>m.id==='regulations');
   if(!modules.some(m=>m.id==='overtime')){
