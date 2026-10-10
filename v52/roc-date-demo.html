@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>民國日期共用元件｜劉信子測試版</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#faf8f7;font:14px/1.6 "Microsoft JhengHei",system-ui,sans-serif;color:#344054}
+main{max-width:850px;margin:32px auto;padding:0 20px 50px}
+h1{font-size:25px;margin:0 0 10px}
+h2{font-size:16px;margin:0 0 16px}
+p{margin:6px 0 15px}
+.note{color:#667085}
+.notice{border:1px solid #e6bbab;background:#fff8f5;border-radius:10px;padding:12px 14px;margin:15px 0 20px}
+.card{background:white;border:1px solid #eedbd4;border-radius:13px;padding:20px;margin:15px 0}
+.demo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.demo-field{min-width:0}
+.demo-field>label{font-size:12px;font-weight:700;display:block;margin-bottom:7px}
+small{display:block;color:#667085;margin-top:5px}
+pre{padding:15px;border-radius:9px;overflow:auto;background:#f2f4f7;color:#344054;font:13px/1.6 Consolas,monospace}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.actions button{background:#fff;border:1px solid #dc9479;color:#814835;padding:8px 12px;border-radius:8px;cursor:pointer}
+.actions button.primary{background:#dc9479;color:#fff}
+.output{margin-top:16px}
+.status{font-size:13px;font-weight:600}
+a{color:#a35e44}
+@media(max-width:600px){.demo-grid{grid-template-columns:1fr}main{padding:0 12px}}
+</style>
+</head>
+<body>
+<main>
+<h1>民國日期共用元件｜獨立測試頁</h1>
+<p class="note">劉信子居家長照機構內部管理系統｜測試用途，不涉及登入個案或儲存資料。</p>
+<div class="notice">
+<strong>本頁不會修改既有系統或Supabase資料。</strong>
+這是共用元件的獨立操作測試，驗證通過後才會逐模組導入正式表單。
+</div>
+<section class="card">
+<h2>一、民國日期與月份輸入</h2>
+<div class="demo-grid">
+<div class="demo-field">
+<label for="rocOpeningDate">開案日期（必填）</label>
+<div id="date-required"></div>
+<small>可以鍵入115/10/10，或點右側日曆挑選。</small>
+</div>
+<div class="demo-field">
+<label for="rocFollowupDate">後續追蹤日期（選填）</label>
+<div id="date-optional"></div>
+<small>可清除、直接輸入，亦可選擇日期。</small>
+</div>
+<div class="demo-field">
+<label for="rocSalaryMonth">薪資月份</label>
+<div id="month-required"></div>
+<small>輸入115年10月，或使用月份選擇器。</small>
+</div>
+<div class="demo-field">
+<label for="rocLimitDate">允許區間內的日期</label>
+<div id="date-limited"></div>
+<small>示範設定日期界限：僅允許115年10月。</small>
+</div>
+</div>
+<div class="actions">
+<button id="check" class="primary">驗證輸入與ISO儲存值</button>
+<button id="invalid">測試無效日期115/02/29</button>
+<button id="restore">恢復範例</button>
+</div>
+<div class="output"><strong>當前欄位值</strong><pre id="values">載入中…</pre></div>
+</section>
+<section class="card">
+<h2>二、五種統一格式範例</h2>
+<pre id="formats"></pre>
+<h2>三、程式驗證結果</h2>
+<p class="status" id="test-status">正在執行…</p>
+<pre id="test-detail"></pre>
+</section>
+<p class="note">此獨立測試頁的輸入不會傳送至伺服器。完成後可返回原本的測試版首頁。</p>
+</main>
+<script src="roc-date-kit.js?v=roc-kit-v1-20261010"></script>
+<script>
+(function(){
+'use strict';
+var kit=window.rocDateKit;
+if(!kit){document.getElementById('test-status').textContent='元件載入失敗';return;}
+var openDate=kit.mountDate('#date-required',{id:'rocOpeningDate',name:'open_date',value:'2026-10-10',required:true,onChange:render});
+var followDate=kit.mountDate('#date-optional',{id:'rocFollowupDate',name:'followup_date',onChange:render});
+var salary=kit.mountMonth('#month-required',{id:'rocSalaryMonth',name:'salary_month',value:'2026-10',required:true,onChange:render});
+var limited=kit.mountDate('#date-limited',{id:'rocLimitDate',min:'2026-10-01',max:'2026-10-31',value:'2026-10-10',onChange:render});
+function render(){
+  var current={open_date:openDate.input.value,open_date_iso:openDate.getISO(),
+    followup_date:followDate.input.value,followup_date_iso:followDate.getISO(),
+    salary_month:salary.input.value,salary_month_iso:salary.getISO(),
+    limited_date:limited.input.value,limited_date_iso:limited.getISO()};
+  document.getElementById('values').textContent=JSON.stringify(current,null,2);
+}
+function formats(){
+ document.getElementById('formats').textContent=
+ '一般列表、日期輸入：'+kit.formatDate('2026-10-10')+'\n'+
+ '月份與薪資結算：　　'+kit.formatMonth('2026-10')+'\n'+
+ '正式列印文件：　　　'+kit.formatPrintDate('2026-10-10')+'\n'+
+ '含時間紀錄：　　　　'+kit.formatDateTime('2026-10-10T14:30:00')+'\n'+
+ '資料庫ISO日期：　　　2026-10-10';
+}
+var specs=[
+ ['一般日期',kit.parseDate('115/10/10'),'2026-10-10'],
+ ['自動補零',kit.parseDate('115/1/2'),'2026-01-02'],
+ ['中文輸入',kit.parseDate('115年10月10日'),'2026-10-10'],
+ ['西元誤輸入拒絕',kit.parseDate('2026/10/10'),null],
+ ['平年2月29日拒絕',kit.parseDate('115/02/29'),null],
+ ['閏年2月29日',kit.parseDate('113/02/29'),'2024-02-29'],
+ ['月份輸入',kit.parseMonth('115年10月'),'2026-10'],
+ ['西元月份誤輸入拒絕',kit.parseMonth('2026年10月'),null],
+ ['一般列表顯示',kit.formatDate('2026-10-10'),'115/10/10'],
+ ['月份顯示',kit.formatMonth('2026-10'),'115年10月'],
+ ['列印日期',kit.formatPrintDate('2026-10-10'),'115年10月10日'],
+ ['日期時間',kit.formatDateTime('2026-10-10T14:30:00'),'115/10/10 14:30'],
+ ['UTC轉臺灣',kit.formatDateTime('2026-10-10T23:30:00Z'),'115/10/11 07:30']
+];
+var passed=0;
+var lines=specs.map(function(row){var ok=row[1]===row[2];if(ok)passed++;return (ok?'✓ ':'✗ ')+row[0]+': '+String(row[1]);});
+document.getElementById('test-status').textContent='日期格式與轉換測試：'+passed+'/'+specs.length+' 項通過';
+document.getElementById('test-detail').textContent=lines.join('\n');
+document.getElementById('check').addEventListener('click',render);
+document.getElementById('invalid').addEventListener('click',function(){
+ openDate.input.value='115/02/29';
+ openDate.validate();
+ document.getElementById('values').textContent='無效日期測試：'+(openDate.input.getAttribute('aria-invalid')==='true'?'正確拒絕':'未正確拒絕')+'\n輸入：'+openDate.input.value+'\n錯誤提示：'+openDate.element.querySelector('[role="alert"]').textContent;
+});
+document.getElementById('restore').addEventListener('click',function(){
+ openDate.setISO('2026-10-10');followDate.setISO('');salary.setISO('2026-10');limited.setISO('2026-10-10');render();
+});
+formats();render();
+window.rocDemo={openDate:openDate,followDate:followDate,salary:salary,limited:limited,tests:{passed:passed,total:specs.length}};
+})();
+</script>
+</body>
+</html>
