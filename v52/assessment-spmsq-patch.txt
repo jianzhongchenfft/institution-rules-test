@@ -167,7 +167,6 @@
 
   async function open(eventId){
     const row=eventById(eventId);if(!row)return toast('找不到評估事件','error');
-    if(row.status==='pending')return toast('請先開始本次評估','warn');
     if(!formById(eventId))return toast('本次評估未選用SPMSQ','warn');
     showLoading(true);try{await load(eventId);
       await window.v52AssessmentToolSummary.load(eventId,'spmsq',currentToolSummarySource());render();}catch(err){console.error(err);toast('讀取SPMSQ失敗：'+(err?.message||err),'error');}finally{showLoading(false);}
