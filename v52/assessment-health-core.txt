@@ -82,6 +82,12 @@
     .health-event-grid label{display:block;font-size:9.5px;font-weight:900;color:#667085;margin-bottom:4px}
     .health-event-grid input,.health-event-grid select,.health-event-grid textarea{width:100%;box-sizing:border-box}
     .health-event-grid textarea{min-height:58px}
+    .health-roc-date .rdk{display:flex;width:100%;flex-wrap:wrap}
+    .health-roc-date .rdk .rdk-text{flex:1 1 86px;min-width:0;width:calc(100% - 46px)}
+    .health-roc-date .rdk .rdk-toggle{flex:0 0 38px;min-width:38px;padding:0 6px}
+    .health-roc-date .rdk .rdk-year{width:67px;flex:0 0 67px}
+    .health-roc-date .rdk .rdk-month-select{width:58px;flex:0 0 58px}
+    .health-roc-date .rdk input[type="hidden"]{display:none}
     .health-med-checks,.health-items{display:grid;gap:9px}
     .health-card{overflow:hidden}
     .health-card.changed{border-color:#e7a98e;box-shadow:0 0 0 2px rgba(220,148,121,.10)}
@@ -468,6 +474,19 @@
     }
   }
 
+  function healthDateError(){
+    for(const host of document.querySelectorAll('[data-health-event-date]')){
+      if(host.__healthDate?.getISO()===null)return '就醫事件日期格式不正確';
+    }
+    for(const host of document.querySelectorAll('[data-health-temp-med-date]')){
+      if(host.__healthDate?.getISO()===null)return '短期／臨時用藥預計結束日期格式不正確';
+    }
+    return '';
+  }
+  function healthDateISO(host,fallback){
+    const value=host?.__healthDate?.getISO();
+    return value===null?(fallback||''):(value||'');
+  }
   function syncInputs(){
     document.querySelectorAll('[data-health-medical]').forEach(el=>{
       if(el.type==='radio'&&!el.checked)return;
@@ -478,6 +497,8 @@
     document.querySelectorAll('[data-health-event]').forEach(row=>{
       const item={};
       row.querySelectorAll('[data-health-event-field]').forEach(el=>item[el.dataset.healthEventField]=el.value);
+      const old=safeArray(local.medicalInfo.healthcare_events)[Number(row.dataset.healthEvent)];
+      item.date=healthDateISO(row.querySelector('[data-health-event-date]'),old?.date);
       events.push(item);
     });
     local.medicalInfo.healthcare_events=events;
@@ -512,6 +533,8 @@
         document.querySelectorAll('[data-opening-temp-med]').forEach(rowEl=>{
           const item={id:rowEl.dataset.openingTempMed||newOpeningTemporaryMedication().id};
           rowEl.querySelectorAll('[data-opening-temp-med-field]').forEach(el=>item[el.dataset.openingTempMedField]=el.value);
+          const old=safeArray(local.medicalInfo.opening_temporary_medications).find(x=>x.id===item.id);
+          item.planned_end_date=healthDateISO(rowEl.querySelector('[data-health-temp-med-date]'),old?.planned_end_date);
           openingTemporary.push(item);
         });
       }
