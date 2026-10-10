@@ -786,6 +786,8 @@ async function htmlViewOriginal(path,fileName){
         '<div class="import-section">機構管理資料</div>',
         '<div class="import-preview-grid">',
           '<div class="field"><label>個案編號 *</label><input id="editCaseNo" value="'+escapeHTML(c.case_no||'')+'"></div>',
+          '<div class="field"><label>開案日期</label><input id="editOpenDate" type="date" value="'+escapeHTML(c.open_date||'')+'"><div class="help">舊案可補登正式受理日期。</div></div>',
+          '<div class="field full"><label>Google定位（選填）</label><input id="editGoogleMaps" type="url" placeholder="貼上 Google Maps 分享連結" value="'+escapeHTML(c.google_maps_url||'')+'"></div>',
           '<div class="field"><label>負責督導 *</label><select id="editSupervisor" '+(lockSupervisor?'disabled':'')+'>'+htmlSupervisorOptions(c.supervisor_id||'')+'</select></div>',
           '<div class="field"><label>服務類別 *</label><select id="editUsage">',
             '<option value="">請選擇</option>',
@@ -840,6 +842,7 @@ async function htmlViewOriginal(path,fileName){
         $('editCaseNo').value=caseNo;
         var payload={
           case_id:caseId,case_no:caseNo,case_name:$('editName').value.trim(),
+          open_date:$('editOpenDate').value,google_maps_url:$('editGoogleMaps').value.trim(),
           supervisor_id:lockSupervisor?c.supervisor_id:$('editSupervisor').value,
           service_usage_type:$('editUsage').value,payment_method:$('editPayment').value,
           service_status:$('editStatus').value,national_id:$('editNational').value.trim().toUpperCase(),
@@ -860,6 +863,9 @@ async function htmlViewOriginal(path,fileName){
         }
         if(payload.has_dementia===''||payload.lives_alone===''){
           toast('失智及獨居狀態為必填','warn');return false;
+        }
+        if(!htmlValidMapsUrl(payload.google_maps_url)){
+          toast('請輸入有效的 Google Maps 分享連結','warn');return false;
         }
         showLoading(true);
         try{
@@ -1254,14 +1260,14 @@ async function htmlViewOriginal(path,fileName){
     return [
       '<div class="case-panel-card"><div class="case-panel-head"><strong>基本資料</strong>'+(htmlCanEditCase(c)?'<button id="caseEditProfile" class="btn sm primary">編輯個案</button>':'')+'</div>',
         '<div class="case-data-grid">',
-          htmlCaseField('個案編號',c.case_no),htmlCaseField('姓名',c.case_name),htmlCaseField('身分證字號',c.national_id),
+          htmlCaseField('個案編號',c.case_no),htmlCaseField('姓名',c.case_name),htmlCaseField('開案日期',c.open_date?rocDate(c.open_date+'T00:00:00'):'—'),htmlCaseField('身分證字號',c.national_id),
           htmlCaseField('出生日期',c.birth_date?rocDate(c.birth_date+'T00:00:00'):'—'),htmlCaseField('性別',c.gender),htmlCaseField('CMS',c.cms_level),
           htmlCaseField('失智',c.has_dementia===true?'是':c.has_dementia===false?'否':'—'),htmlCaseField('獨居',c.lives_alone===true?'是':c.lives_alone===false?'否':'—'),
           htmlCaseField('電話',c.phone),htmlCaseField('服務狀態',status.text),htmlCaseField('服務類別',c.service_usage_type),
           htmlCaseField('繳款方式',c.payment_method||'未設定'),htmlCaseField('負責督導',htmlGetCaseVisitsApi().caseStaffName(c.supervisor_id)),htmlCaseField('身分類別／長照資格',c.identity_type),
           htmlCaseField('是否身障',c.has_disability===true?'是':c.has_disability===false?'否':'—'),htmlCaseField('是否原住民',c.is_indigenous===true?'是':c.is_indigenous===false?'否':'—'),htmlCaseField('原住民族別',c.indigenous_group),
           htmlCaseField('長照福利身分',c.welfare_identity),htmlCaseField('自負擔比例',c.copay_rate!=null?c.copay_rate+'%':'—'),
-          htmlCaseField('地址',c.address,true),
+          htmlCaseField('地址',c.address,true),htmlGoogleMapsField(c.google_maps_url),
           htmlCaseField('目前重要疾病／慢性病史',c.important_conditions,true),
           htmlCaseField('固定治療／特殊醫療安排',c.ongoing_treatments,true),
           htmlCaseField('A單位',c.a_unit_name),htmlCaseField('A個管',c.case_manager_name),htmlCaseField('A個管電話',c.case_manager_phone),
