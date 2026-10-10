@@ -135,6 +135,7 @@
     }
     const c=caseById(row.case_id);
     const savedMedical=safe(local.record?.medical_info);
+    // 新表單以個案主檔為預設；已存檔的評估先保留該次文字，避免無故改寫歷史評估。
     const baselineReference=local.record?{
       important_conditions:savedMedical.baseline_important_conditions||'',
       ongoing_treatments:savedMedical.baseline_ongoing_treatments||''
@@ -142,21 +143,28 @@
       important_conditions:c?.important_conditions||'',
       ongoing_treatments:c?.ongoing_treatments||''
     };
-    const healthMasterFieldsChanged=
-      String(medicalInfoForSave.baseline_important_conditions||'').trim()!==String(baselineReference.important_conditions||'').trim()
-      ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(baselineReference.ongoing_treatments||'').trim();
-
-    if(local.hasLaterCompleted&&healthMasterFieldsChanged){
-      const ok=window.confirm('你正在修改較早日期的健康評估，此項修改也會同步更新目前個案主檔，確定儲存嗎？');
-      if(!ok)return;
-    }
-
-    const masterWillChange=
-      healthMasterFieldsChanged
-      &&(
-        String(medicalInfoForSave.baseline_important_conditions||'').trim()!==String(c?.important_conditions||'').trim()
-        ||String(medicalInfoForSave.baseline_ongoing_treatments||'').trim()!==String(c?.ongoing_treatments||'').trim()
+    const normalizedText=v=>String(v||'').trim();
+    const healthBaselineEdited=
+      normalizedText(medicalInfoForSave.baseline_important_conditions)!==normalizedText(baselineReference.important_conditions)
+      ||normalizedText(medicalInfoForSave.baseline_ongoing_treatments)!==normalizedText(baselineReference.ongoing_treatments);
+    const currentMasterDiffers=
+      normalizedText(medicalInfoForSave.baseline_important_conditions)!==normalizedText(c?.important_conditions)
+      ||normalizedText(medicalInfoForSave.baseline_ongoing_treatments)!==normalizedText(c?.ongoing_treatments);
+    let masterWillChange=false;
+    if(healthBaselineEdited&&currentMasterDiffers){
+      const dateCaution=local.hasLaterCompleted?'\n注意：本次正在修正較早日期的評估。':'';
+      masterWillChange=window.confirm(
+        '是否將本次「重要疾病／慢性病史」與「固定治療／特殊醫療安排」同步更新個案主檔？'
+        +'\n\n按「確定」：以新內容取代主檔現值，不另建立主檔舊版。'
+        +'\n按「取消」：只儲存本次評估，個案主檔不變。'+dateCaution
       );
+    }
+    // 僅作為儲存指令，後端會移除本欄位，不寫入評估資料。
+    medicalInfoForSave.__update_case_health_master=masterWillChange;
+    if(masterWillChange){
+      medicalInfoForSave.__expected_case_conditions=c?.important_conditions||'';
+      medicalInfoForSave.__expected_case_treatments=c?.ongoing_treatments||'';
+    }
 
     if(mode==='baseline'){
       const fixedEntries=rebuildFixedMedicationEntries().filter(x=>String(x.medication||'').trim());
