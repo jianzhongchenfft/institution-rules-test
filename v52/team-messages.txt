@@ -7,7 +7,7 @@ const S={messages:[],tasks:[],recipients:[],updates:[],staff:[],tab:'unread',vie
 const root=()=>document.getElementById('tm-root');
 const h=v=>escapeHTML(String(v==null?'':v));
 const name=id=>S.staff.find(x=>x.id===id)?.display_name||'原使用者';
-const stamp=v=>v?new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
+const stamp=v=>window.rocDateKit.formatDateTimeCompact(v);
 const me=()=>state.profile?.id;
 const tasks=id=>S.tasks.filter(t=>t.message_id===id).sort((a,b)=>a.sort_order-b.sort_order);
 const activeTasks=id=>tasks(id).filter(t=>!t.cancelled_at);
