@@ -92,6 +92,9 @@
     .health-tag.prev{background:#eff8ff;color:#175cd3}.health-tag.change{background:#fff1eb;color:#a45d49}
     .health-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:10px 11px}
     .health-opening-options-four{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .health-options.health-choice-two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .health-field.health-choice-wide{grid-column:1/-1}
+    .health-field .health-options{padding:4px 0 0}
     .health-opening-choice{margin-bottom:10px}
     .health-opening-choice:last-child{margin-bottom:0}
     .health-opening-choice .health-note{padding-top:2px}
@@ -103,7 +106,7 @@
     .health-actions{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding:11px 0;background:linear-gradient(to bottom,rgba(250,248,247,0),#faf8f7 24%)}
     @media(max-width:900px){.health-event-grid{grid-template-columns:1fr 1fr}.health-event-grid .wide{grid-column:span 2}}
     @media(max-width:720px){
-      .health-summary{grid-template-columns:1fr}.health-grid{grid-template-columns:1fr}.health-options{grid-template-columns:1fr}
+      .health-summary{grid-template-columns:1fr}.health-grid{grid-template-columns:1fr}.health-options,.health-opening-options-four,.health-options.health-choice-two{grid-template-columns:1fr}
       .health-copy{flex-direction:column;align-items:flex-start}.health-copy .btn{width:100%}.health-actions .btn{flex:1}
       .health-event-grid{grid-template-columns:1fr}.health-event-grid .wide{grid-column:auto}
     }
