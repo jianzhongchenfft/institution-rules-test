@@ -960,9 +960,9 @@ async function htmlViewOriginal(path,fileName){
         var raw=Object.keys(sec).filter(function(k){return sec[k];}).map(function(k){return k+'\n'+sec[k];}).join('\n\n');
         var payload={
           plan_id:planId,
-          plan_date:window.rocDateKit.linkedISO('editPlanDate')||null,
-          phone_contact_date:window.rocDateKit.linkedISO('editPhoneDate')||null,
-          home_visit_date:window.rocDateKit.linkedISO('editHomeDate')||null,
+          plan_date:window.rocDateKit.linkedISO('editPlanDate')||'',
+          phone_contact_date:window.rocDateKit.linkedISO('editPhoneDate')||'',
+          home_visit_date:window.rocDateKit.linkedISO('editHomeDate')||'',
           visit_with:$('editVisitWith').value.trim(),
           sections:sec,
           raw_plan_text:raw,
