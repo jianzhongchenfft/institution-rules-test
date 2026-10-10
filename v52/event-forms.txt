@@ -378,7 +378,7 @@ function openFollowupForm(e){
 
       <div class="event-field">
         <label>追蹤日期 *</label>
-        <input id="fd" type="date" value="${isoDate(new Date())}">
+        <div id="fdHost" class="event-roc-date"></div>
       </div>
 
       <div class="event-field">
@@ -444,6 +444,8 @@ function openFollowupForm(e){
   });
 
   document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
+  eventBindRocDate('fd',isoDate(new Date()),true);
+  eventBindFilledAt('ffill');
   const followFoot=document.querySelector('#modalRoot .modal-foot');
   const followCancel=$('modalCancel');
   if(followFoot&&followCancel){
@@ -470,16 +472,17 @@ function openFollowupForm(e){
     const days=Number(fieldValue('fday'));
     if(fieldValue('fo')==='continue'&&(!Number.isInteger(days)||days<1))return toast('請填正確的追蹤天數','warn');
 
+    const dateError=eventRequiredDates([['fd','追蹤日期']]);if(dateError)return toast(dateError,'warn');
     const p={
       event_id:e.id,
-      followup_date:fieldValue('fd'),
+      followup_date:eventCheckedDate('fd'),
       followup_time:followTime,
       followup_method:fieldValue('fm'),
       latest_status:fieldValue('fn'),
       completed_actions:fieldValue('ff'),
       pending_tasks:fieldValue('ft'),
       outcome:fieldValue('fo'),
-      next_followup_date:fieldValue('fo')==='continue'?addDays(fieldValue('fd'),days):null,
+      next_followup_date:fieldValue('fo')==='continue'?addDays(eventCheckedDate('fd'),days):null,
       form_filled_at:formFilledAt,
       line_notify:$('fl').checked
     };
@@ -514,7 +517,7 @@ function openEditFollowupForm(e,f){
 
       <div class="event-field">
         <label>追蹤日期 *</label>
-        <input id="efd" type="date" value="${f.followup_date||''}">
+        <div id="efdHost" class="event-roc-date"></div>
       </div>
       <div class="event-field">
         <label>追蹤時間</label>
@@ -563,6 +566,8 @@ function openEditFollowupForm(e,f){
   });
 
   document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
+  eventBindRocDate('efd',f.followup_date||'',true);
+  eventBindFilledAt('efill',f.form_filled_at||f.created_at);
   const foot=document.querySelector('#modalRoot .modal-foot');
   const cancel=$('modalCancel');
   if(foot&&cancel){
@@ -577,9 +582,10 @@ function openEditFollowupForm(e,f){
     const formFilledAt=readEventFormFilledAt('efill');
     if(!formFilledAt)return toast('請填妥填表日期與時間','warn');
 
+    const dateError=eventRequiredDates([['efd','追蹤日期']]);if(dateError)return toast(dateError,'warn');
     const p={
       followup_id:f.id,
-      followup_date:fieldValue('efd'),
+      followup_date:eventCheckedDate('efd'),
       followup_time:readOptionalTime('efth','eftmin'),
       followup_method:fieldValue('efm'),
       latest_status:fieldValue('efn'),
@@ -643,7 +649,7 @@ function openClosureForm(e){
 
       <div class="event-field">
         <label>結報日期 *</label>
-        <input id="cd" type="date" value="${isoDate(new Date())}">
+        <div id="cdHost" class="event-roc-date"></div>
       </div>
 
       ${eventFillTimeFields('cfill')}
@@ -688,6 +694,8 @@ function openClosureForm(e){
 
   document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
 
+  eventBindRocDate('cd',isoDate(new Date()),true);
+  eventBindFilledAt('cfill');
   const closeFoot=document.querySelector('#modalRoot .modal-foot');
   const closeCancel=$('modalCancel');
   if(closeFoot&&closeCancel){
@@ -711,9 +719,10 @@ function openClosureForm(e){
     const formFilledAt=readEventFormFilledAt('cfill');
     if(!formFilledAt)return toast('請填妥填表日期與時間','warn');
 
+    const dateError=eventRequiredDates([['cd','結報日期']]);if(dateError)return toast(dateError,'warn');
     const p={
       event_id:e.id,
-      close_date:fieldValue('cd'),
+      close_date:eventCheckedDate('cd'),
       closure_decision:decision,
       final_status:fieldValue('cf'),
       form_filled_at:formFilledAt,
@@ -759,7 +768,7 @@ function openEditClosureForm(e,c){
       <div class="event-section-title">結報基本資料</div>
       <div class="event-field">
         <label>結報日期 *</label>
-        <input id="ecd" type="date" value="${c.close_date||''}">
+        <div id="ecdHost" class="event-roc-date"></div>
       </div>
       ${eventFillTimeFields('ecfill',c.form_filled_at||c.created_at)}
 
@@ -789,6 +798,8 @@ function openEditClosureForm(e,c){
   });
 
   document.querySelector('#modalRoot .modal')?.classList.add('event-modal');
+  eventBindRocDate('ecd',c.close_date||'',true);
+  eventBindFilledAt('ecfill',c.form_filled_at||c.created_at);
   const foot=document.querySelector('#modalRoot .modal-foot');
   const cancel=$('modalCancel');
   if(foot&&cancel){
@@ -812,9 +823,10 @@ function openEditClosureForm(e,c){
     const formFilledAt=readEventFormFilledAt('ecfill');
     if(!formFilledAt)return toast('請填妥填表日期與時間','warn');
 
+    const dateError=eventRequiredDates([['ecd','結報日期']]);if(dateError)return toast(dateError,'warn');
     const p={
       closure_id:c.id,
-      close_date:fieldValue('ecd'),
+      close_date:eventCheckedDate('ecd'),
       closure_decision:decision,
       final_status:fieldValue('ecf'),
       form_filled_at:formFilledAt
