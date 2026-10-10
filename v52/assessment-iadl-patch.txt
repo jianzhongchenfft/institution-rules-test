@@ -173,7 +173,7 @@
         <div class="iadl-summary-card">
           <label>前次得分</label>
           <strong>${prevTotal??'—'}</strong>
-          <small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small>
+          <small>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):'無前次完成紀錄'}</small>
         </div>
         <div class="iadl-summary-card">
           <label>與前次差異</label>
@@ -190,7 +190,7 @@
       <div class="iadl-copy-box">
         <div>
           <strong>前次 IADL：${local.previous.total_score??'—'} 分</strong>
-          <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'已完成紀錄'}</span>
+          <span>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):'已完成紀錄'}</span>
         </div>
         <button id="iadlCopyPrevious" class="btn sm">帶入前次結果</button>
       </div>
@@ -253,7 +253,7 @@
         <div class="page-head">
           <div>
             <h1>${escapeHTML(c.case_name)}｜Lawton IADL</h1>
-            <p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}</p>
+            <p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}</p>
           </div>
           <div class="assessment-head-actions">
             <button id="iadlBack" class="btn">← 返回評估事件</button>
