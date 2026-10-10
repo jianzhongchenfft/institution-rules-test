@@ -539,7 +539,7 @@ async function htmlLoadExistingSnapshot(caseId){
     return note+'<div class="html-import-status" style="margin:0 0 8px">左側為目前使用資料，右側為本次 HTML 辨識資料。</div><div class="import-diff">'+rows.map(function(r){return '<div class="diff-row"><div class="diff-label">'+escapeHTML(r.label)+'</div><div class="diff-value">'+escapeHTML(r.oldValue)+'</div><div class="diff-arrow">→</div><div class="diff-value">'+escapeHTML(r.newValue)+'</div></div>';}).join('')+'</div>';
   }
   function htmlPlanPreview(plan){const entries=Object.entries(plan?.sections||{});return `<div class="html-plan-preview">${entries.length?entries.map(([k,v])=>`<details><summary>${escapeHTML(k)}</summary><pre>${escapeHTML(v)}</pre></details>`).join(''):'<div class="html-import-status">未辨識到照管平台照顧計畫文字區塊。</div>'}</div>`;}
-  function htmlBindOpenDate(hostId,inputId,value,required){
+  function htmlBindRocDate(hostId,inputId,value,required){
     if(!window.rocDateKit||typeof window.rocDateKit.mountDate!=='function')throw new Error('民國日期共用元件尚未載入');
     return window.rocDateKit.mountDate($(hostId),{id:inputId,value:value||'',required:!!required});
   }
@@ -564,13 +564,14 @@ async function htmlLoadExistingSnapshot(caseId){
         <div class="field"><label>獨居 *</label><select id="hiLivesAlone"><option value="">請選擇</option><option value="true" ${d.lives_alone===true?'selected':''}>是</option><option value="false" ${d.lives_alone===false?'selected':''}>否</option></select></div>
         ${potential.length?`<div class="field full"><label>可能相同個案</label><select id="hiPotentialMatch"><option value="">建立為新個案</option>${potential.map(x=>`<option value="${x.id}">更新：${escapeHTML(x.case_no||'未編號')}｜${escapeHTML(x.case_name)}</option>`).join('')}</select></div>`:''}
       </div>
-      <div class="import-section">基本資料</div><div class="import-preview-grid"><div class="field"><label>姓名 *</label><input id="hiName" value="${escapeHTML(d.case_name||'')}"></div><div class="field"><label>身分證字號</label><input id="hiNational" value="${escapeHTML(d.national_id||'')}"></div><div class="field"><label>出生日期</label><input id="hiBirth" type="date" value="${escapeHTML(d.birth_date||'')}"></div><div class="field"><label>性別</label><select id="hiGender"><option value="">未辨識</option><option value="男" ${d.gender==='男'?'selected':''}>男</option><option value="女" ${d.gender==='女'?'selected':''}>女</option></select></div><div class="field full"><label>地址</label><input id="hiAddress" value="${escapeHTML(d.address||'')}"></div><div class="field"><label>個案電話</label><input id="hiPhone" value="${escapeHTML(d.phone||'')}"></div><div class="field"><label>CMS</label><input id="hiCms" value="${escapeHTML(d.cms_level||'')}"></div><div class="field"><label>身分類別／長照資格</label><input id="hiIdentity" value="${escapeHTML(d.identity_type||'')}"></div><div class="field"><label>是否身障</label><select id="hiDisability"><option value="">未辨識</option><option value="true" ${d.has_disability===true?'selected':''}>是</option><option value="false" ${d.has_disability===false?'selected':''}>否</option></select></div><div class="field"><label>是否原住民</label><select id="hiIndigenous"><option value="">未辨識</option><option value="true" ${d.is_indigenous===true?'selected':''}>是</option><option value="false" ${d.is_indigenous===false?'selected':''}>否</option></select></div><div class="field"><label>原住民族別</label><input id="hiIndigenousGroup" value="${escapeHTML(d.indigenous_group||'')}"></div><div class="field"><label>長照福利身分</label><select id="hiWelfareIdentity">${htmlWelfareOptions(d.welfare_identity||'')}</select></div><div class="field"><label>自負擔比例（%）</label><input id="hiCopayRate" type="number" readonly value="${d.copay_rate??''}"><div class="help">依長照福利身分自動帶入</div></div><div class="field"><label>A單位</label><input id="hiAUnit" value="${escapeHTML(d.a_unit_name||'')}"></div><div class="field"><label>A個管</label><input id="hiManager" value="${escapeHTML(d.case_manager_name||'')}"></div><div class="field"><label>A個管電話</label><input id="hiManagerPhone" value="${escapeHTML(d.case_manager_phone||'')}"></div><div class="field"><label>照專／評估人員</label><input id="hiAssessor" value="${escapeHTML(d.assessor_name||'')}"></div></div>
+      <div class="import-section">基本資料</div><div class="import-preview-grid"><div class="field"><label>姓名 *</label><input id="hiName" value="${escapeHTML(d.case_name||'')}"></div><div class="field"><label>身分證字號</label><input id="hiNational" value="${escapeHTML(d.national_id||'')}"></div><div class="field"><label for="hiBirth">出生日期</label><div id="hiBirthHost"></div></div><div class="field"><label>性別</label><select id="hiGender"><option value="">未辨識</option><option value="男" ${d.gender==='男'?'selected':''}>男</option><option value="女" ${d.gender==='女'?'selected':''}>女</option></select></div><div class="field full"><label>地址</label><input id="hiAddress" value="${escapeHTML(d.address||'')}"></div><div class="field"><label>個案電話</label><input id="hiPhone" value="${escapeHTML(d.phone||'')}"></div><div class="field"><label>CMS</label><input id="hiCms" value="${escapeHTML(d.cms_level||'')}"></div><div class="field"><label>身分類別／長照資格</label><input id="hiIdentity" value="${escapeHTML(d.identity_type||'')}"></div><div class="field"><label>是否身障</label><select id="hiDisability"><option value="">未辨識</option><option value="true" ${d.has_disability===true?'selected':''}>是</option><option value="false" ${d.has_disability===false?'selected':''}>否</option></select></div><div class="field"><label>是否原住民</label><select id="hiIndigenous"><option value="">未辨識</option><option value="true" ${d.is_indigenous===true?'selected':''}>是</option><option value="false" ${d.is_indigenous===false?'selected':''}>否</option></select></div><div class="field"><label>原住民族別</label><input id="hiIndigenousGroup" value="${escapeHTML(d.indigenous_group||'')}"></div><div class="field"><label>長照福利身分</label><select id="hiWelfareIdentity">${htmlWelfareOptions(d.welfare_identity||'')}</select></div><div class="field"><label>自負擔比例（%）</label><input id="hiCopayRate" type="number" readonly value="${d.copay_rate??''}"><div class="help">依長照福利身分自動帶入</div></div><div class="field"><label>A單位</label><input id="hiAUnit" value="${escapeHTML(d.a_unit_name||'')}"></div><div class="field"><label>A個管</label><input id="hiManager" value="${escapeHTML(d.case_manager_name||'')}"></div><div class="field"><label>A個管電話</label><input id="hiManagerPhone" value="${escapeHTML(d.case_manager_phone||'')}"></div><div class="field"><label>照專／評估人員</label><input id="hiAssessor" value="${escapeHTML(d.assessor_name||'')}"></div></div>
       <div class="import-section">聯絡人／照顧者</div>${htmlContactsEditor(d.contacts||[])}
       <div class="import-section">核定服務</div>${htmlServiceEditor(d.services||[])}
       <div class="import-section">額度資料</div>${htmlBudgetEditor(d.budgets||[])}
       <div class="import-section">照管平台照顧計畫</div><div class="html-import-status">計畫日期：${d.care_plan?.plan_date?rocDate(d.care_plan.plan_date+'T00:00:00'):'未辨識'}　家訪：${d.care_plan?.home_visit_date?rocDate(d.care_plan.home_visit_date+'T00:00:00'):'—'}　電聯：${d.care_plan?.phone_contact_date?rocDate(d.care_plan.phone_contact_date+'T00:00:00'):'—'}</div>${htmlPlanPreview(d.care_plan)}`,
-      onConfirm:()=>htmlSavePreview(d,exact?.id||null,hiOpenDateField)});
-    const hiOpenDateField=htmlBindOpenDate('hiOpenDateHost','hiOpenDate',d._existing?.caseData?.open_date||htmlTodayLocal(),false);
+      onConfirm:()=>htmlSavePreview(d,exact?.id||null,hiOpenDateField,hiBirthField)});
+    const hiOpenDateField=htmlBindRocDate('hiOpenDateHost','hiOpenDate',d._existing?.caseData?.open_date||htmlTodayLocal(),false);
+    const hiBirthField=htmlBindRocDate('hiBirthHost','hiBirth',d.birth_date||'',false);
     htmlBindCaseNoInput('hiCaseNo');
     htmlBindContactEditControls();
     htmlBindServiceEditControls();
@@ -599,7 +600,7 @@ async function htmlLoadExistingSnapshot(caseId){
     }
   }
 
-async function htmlSavePreview(d,exactMatchId,openDateField){
+async function htmlSavePreview(d,exactMatchId,openDateField,birthDateField){
     const caseNo=htmlNormalizeCaseNo($('hiCaseNo').value), name=$('hiName').value.trim();
     $('hiCaseNo').value=caseNo;
     const supervisor=state.profile?.role==='supervisor'?state.profile.id:$('hiSupervisor').value;
@@ -615,6 +616,8 @@ async function htmlSavePreview(d,exactMatchId,openDateField){
     const matchId=exactMatchId||potential||'';
     const openDateISO=openDateField.getISO();
     if(openDateISO===null){toast('請輸入有效的開案日期','warn');return false;}
+    const birthDateISO=birthDateField.getISO();
+    if(birthDateISO===null){toast('請輸入有效的出生日期','warn');return false;}
     if(!matchId&&!openDateISO){toast('新案必須填寫開案日期','warn');return false;}
     if(!htmlValidMapsUrl($('hiGoogleMaps').value)){toast('請輸入有效的 Google Maps 分享連結','warn');return false;}
     const file=d._file; showLoading(true); let path='';
@@ -624,7 +627,7 @@ async function htmlSavePreview(d,exactMatchId,openDateField){
       path=`${safeNo}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
       const up=await db.storage.from(CASE_HTML_BUCKET).upload(path,file,{contentType:'text/html',upsert:false}); if(up.error)throw up.error;
       const payload={
-        case_no:caseNo,open_date:openDateISO,google_maps_url:$('hiGoogleMaps').value.trim(),case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,
+        case_no:caseNo,open_date:openDateISO,google_maps_url:$('hiGoogleMaps').value.trim(),case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:birthDateISO,gender:$('hiGender').value,
         address:$('hiAddress').value.trim(),phone:$('hiPhone').value.trim(),cms_level:$('hiCms').value.trim(),
         lives_alone:livesAlone==='true',has_dementia:dementia==='true',
         identity_type:$('hiIdentity').value.trim(),has_disability:$('hiDisability').value,is_indigenous:$('hiIndigenous').value,
@@ -662,7 +665,7 @@ function htmlOpenManualModal(){
         <div class="field"><label>獨居 *</label><select id="hmLivesAlone"><option value="">請選擇</option><option value="true">是</option><option value="false">否</option></select></div>
         <div class="field"><label>姓名 *</label><input id="hmName"></div>
         <div class="field"><label>身分證字號</label><input id="hmNational"></div>
-        <div class="field"><label>出生日期</label><input id="hmBirth" type="date"></div>
+        <div class="field"><label for="hmBirth">出生日期</label><div id="hmBirthHost"></div></div>
         <div class="field"><label>性別</label><select id="hmGender"><option value=""></option><option>男</option><option>女</option></select></div>
         <div class="field full"><label>地址</label><input id="hmAddress"></div>
         <div class="field"><label>電話</label><input id="hmPhone"></div>
@@ -687,13 +690,15 @@ function htmlOpenManualModal(){
         if(dementia===''||livesAlone===''){toast('失智及獨居狀態為必填','warn');return false;}
         const openDateISO=hmOpenDateField.getISO();
         if(!openDateISO){toast('請填寫有效的開案日期','warn');return false;}
+        const birthDateISO=hmBirthField.getISO();
+        if(birthDateISO===null){toast('請輸入有效的出生日期','warn');return false;}
         if(!htmlValidMapsUrl($('hmGoogleMaps').value)){toast('請輸入有效的 Google Maps 分享連結','warn');return false;}
         showLoading(true);
         try{
           const r=await db.rpc('create_case_profile',{payload:{
             case_no:caseNo,case_name:name,supervisor_id:supervisor,
             open_date:openDateISO,google_maps_url:$('hmGoogleMaps').value.trim(),
-            national_id:$('hmNational').value.trim().toUpperCase(),birth_date:$('hmBirth').value,gender:$('hmGender').value,
+            national_id:$('hmNational').value.trim().toUpperCase(),birth_date:birthDateISO,gender:$('hmGender').value,
             address:$('hmAddress').value.trim(),phone:$('hmPhone').value.trim(),cms_level:$('hmCms').value.trim(),
             case_manager_name:$('hmManager').value.trim(),case_manager_phone:$('hmManagerPhone').value.trim(),
             lives_alone:livesAlone,has_dementia:dementia,
@@ -708,7 +713,8 @@ function htmlOpenManualModal(){
           toast('建立個案失敗：'+(err?.message||err),'error');return false;
         }finally{showLoading(false);}
       }});
-    const hmOpenDateField=htmlBindOpenDate('hmOpenDateHost','hmOpenDate',htmlTodayLocal(),true);
+    const hmOpenDateField=htmlBindRocDate('hmOpenDateHost','hmOpenDate',htmlTodayLocal(),true);
+    const hmBirthField=htmlBindRocDate('hmBirthHost','hmBirth','',false);
     htmlBindCaseNoInput('hmCaseNo');
     htmlBindWelfareCopay('hmWelfareIdentity','hmCopayRate');
     htmlBindPaymentRules('hmWelfareIdentity','hmPaymentMethod');
@@ -827,7 +833,7 @@ async function htmlViewOriginal(path,fileName){
         '<div class="import-preview-grid">',
           '<div class="field"><label>姓名 *</label><input id="editName" value="'+escapeHTML(c.case_name||'')+'"></div>',
           '<div class="field"><label>身分證字號</label><input id="editNational" value="'+escapeHTML(c.national_id||'')+'"></div>',
-          '<div class="field"><label>出生日期</label><input id="editBirth" type="date" value="'+escapeHTML(c.birth_date||'')+'"></div>',
+          '<div class="field"><label for="editBirth">出生日期</label><div id="editBirthHost"></div></div>',
           '<div class="field"><label>性別</label><select id="editGender"><option value=""></option><option value="男"'+htmlSelected('男',c.gender)+'>男</option><option value="女"'+htmlSelected('女',c.gender)+'>女</option></select></div>',
           '<div class="field"><label>電話</label><input id="editPhone" value="'+escapeHTML(c.phone||'')+'"></div>',
           '<div class="field"><label>CMS</label><input id="editCms" value="'+escapeHTML(c.cms_level||'')+'"></div>',
@@ -857,13 +863,15 @@ async function htmlViewOriginal(path,fileName){
         $('editCaseNo').value=caseNo;
         var openDateISO=editOpenDateField.getISO();
         if(openDateISO===null){toast('請輸入有效的開案日期','warn');return false;}
+        var birthDateISO=editBirthField.getISO();
+        if(birthDateISO===null){toast('請輸入有效的出生日期','warn');return false;}
         var payload={
           case_id:caseId,case_no:caseNo,case_name:$('editName').value.trim(),
           open_date:openDateISO,google_maps_url:$('editGoogleMaps').value.trim(),
           supervisor_id:lockSupervisor?c.supervisor_id:$('editSupervisor').value,
           service_usage_type:$('editUsage').value,payment_method:$('editPayment').value,
           service_status:$('editStatus').value,national_id:$('editNational').value.trim().toUpperCase(),
-          birth_date:$('editBirth').value,gender:$('editGender').value,address:$('editAddress').value.trim(),
+          birth_date:birthDateISO,gender:$('editGender').value,address:$('editAddress').value.trim(),
           phone:$('editPhone').value.trim(),cms_level:$('editCms').value.trim(),
           lives_alone:$('editLivesAlone').value,has_dementia:$('editDementia').value,
           identity_type:$('editIdentity').value.trim(),has_disability:$('editDisability').value,is_indigenous:$('editIndigenous').value,indigenous_group:$('editIndigenousGroup').value.trim(),welfare_identity:$('editWelfareIdentity').value.trim(),copay_rate:$('editCopayRate').value,a_unit_name:$('editAUnit').value.trim(),
@@ -894,7 +902,8 @@ async function htmlViewOriginal(path,fileName){
           toast('更新個案失敗：'+(err&&err.message?err.message:err),'error');return false;
         }finally{showLoading(false);}
       }});
-      const editOpenDateField=htmlBindOpenDate('editOpenDateHost','editOpenDate',c.open_date||'',false);
+      const editOpenDateField=htmlBindRocDate('editOpenDateHost','editOpenDate',c.open_date||'',false);
+      const editBirthField=htmlBindRocDate('editBirthHost','editBirth',c.birth_date||'',false);
       htmlBindCaseNoInput('editCaseNo');
       htmlBindWelfareCopay('editWelfareIdentity','editCopayRate');
       htmlBindPaymentRules('editWelfareIdentity','editPayment');
