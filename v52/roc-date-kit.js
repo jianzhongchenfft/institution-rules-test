@@ -180,9 +180,34 @@
    setISO(current,false);
    return Object.freeze({input:input,element:wrap,getISO:()=>commit()?current:null,validate:commit,setISO:v=>setISO(v,false),open:flip,destroy:()=>{close();host.replaceChildren();}});
  }
+ // 相容既有以原欄位 ID 讀取 ISO 日期的出勤與薪資流程。
+ function mountLinked(sourceId,options,month){
+   var source=document.getElementById(sourceId),host=document.getElementById(sourceId+'Host');
+   if(!source||!host)throw Error('找不到相連日期欄位：'+sourceId);
+   var opt=options||{},initial=opt.value!==undefined?opt.value:source.value||'',changed=opt.onChange;
+   var widget=mount(host,Object.assign({},opt,{
+     id:sourceId+'Roc',value:initial,
+     onChange:function(iso){
+       source.value=iso;
+       source.dispatchEvent(new Event('change',{bubbles:true}));
+       if(typeof changed==='function')changed(iso);
+     }
+   }),month);
+   source.value=initial;
+   host.__rocLinkedPicker=widget;
+   return widget;
+ }
+ function linkedISO(sourceId){
+   var source=document.getElementById(sourceId),widget=document.getElementById(sourceId+'Host')?.__rocLinkedPicker;
+   if(!source||!widget)return null;
+   var iso=widget.getISO();
+   source.value=iso||'';
+   return iso;
+ }
  root.rocDateKit=Object.freeze({
    parseDate:s=>parse(s,false),parseMonth:s=>parse(s,true),
    formatDate:formatDate,formatDateCompact:formatDateCompact,formatMonth:formatMonth,formatPrintDate:formatPrintDate,formatDateTime:formatDateTime,formatDateTimeCompact:formatDateTimeCompact,formatPrintDateTime:formatPrintDateTime,
-   mountDate:(el,opt)=>mount(el,opt,false),mountMonth:(el,opt)=>mount(el,opt,true),todayISO:today
+   mountDate:(el,opt)=>mount(el,opt,false),mountMonth:(el,opt)=>mount(el,opt,true),
+   mountLinkedDate:(id,opt)=>mountLinked(id,opt,false),mountLinkedMonth:(id,opt)=>mountLinked(id,opt,true),linkedISO:linkedISO,todayISO:today
  });
 })(typeof window!=='undefined'?window:globalThis);
