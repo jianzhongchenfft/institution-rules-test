@@ -214,7 +214,7 @@
     var follow=scope.reduce(function(n,c){return n+ccPendingFollowups(c.id).length;},0);
 
     $('content').innerHTML=
-      '<div class="page-head"><div><h1>👤 個案管理</h1><p>家、電訪採正式家訪、正式電訪與一般電話聯繫分流；一般電話不計入正式電訪週期。</p></div><div class="actions"><button id="addCaseBtn" class="btn primary">＋ 新增個案</button></div></div>'+
+      '<div class="page-head"><div><h1>👤 個案管理</h1><p>查詢個案基本資料、聯絡方式與Google定位；上方保留家、電訪、評估及追蹤提醒。</p></div><div class="actions"><button id="addCaseBtn" class="btn primary">＋ 新增個案</button></div></div>'+
       '<section class="cc-stats">'+
         '<article class="stat-card cc-stat-filter '+(state.caseDashboardFilter==='overdue'?'active':'')+'" role="button" tabindex="0" data-cc-dashboard-filter="overdue" aria-pressed="'+(state.caseDashboardFilter==='overdue')+'"><div class="stat-head"><span>逾期項目</span><span class="stat-icon">⚠️</span></div><div class="stat-value">'+overdue+'</div><div class="stat-foot">家訪、正式電訪、評估或追蹤逾期</div></article>'+
         '<article class="stat-card cc-stat-filter '+(state.caseDashboardFilter==='due'?'active':'')+'" role="button" tabindex="0" data-cc-dashboard-filter="due" aria-pressed="'+(state.caseDashboardFilter==='due')+'"><div class="stat-head"><span>即將到期</span><span class="stat-icon">📅</span></div><div class="stat-value">'+due+'</div><div class="stat-foot">家訪／評估14天、電訪7天內</div></article>'+
@@ -227,7 +227,7 @@
           '<option value="all" '+(state.caseSupervisorFilter==='all'?'selected':'')+'>全部個案</option>'+
           supervisors.map(function(s){return '<option value="'+s.id+'" '+(state.caseSupervisorFilter===s.id?'selected':'')+'>'+escapeHTML(s.display_name)+'</option>';}).join('')+
         '</select>'+
-        '<div class="searchbox"><input id="caseSearch" placeholder="搜尋個案編號、姓名、地址、督導或服務碼" value="'+escapeHTML(state.caseQuery||'')+'"></div>'+
+        '<div class="searchbox"><input id="caseSearch" placeholder="搜尋案號、姓名、地址、督導、個管師或聯絡人" value="'+escapeHTML(state.caseQuery||'')+'"></div>'+
         '<select id="caseStatusFilter"><option value="all">全部狀態</option><option value="active" '+(state.caseStatusFilter==='active'?'selected':'')+'>服務中</option><option value="suspended" '+(state.caseStatusFilter==='suspended'?'selected':'')+'>暫停</option><option value="closed" '+(state.caseStatusFilter==='closed'?'selected':'')+'>已結案</option></select>'+
         '<button id="reloadCases" class="btn">↻ 重新整理</button>'+
       '</div><div id="caseList"></div>';
