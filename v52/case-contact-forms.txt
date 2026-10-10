@@ -36,6 +36,9 @@
       '.cc-page-form-status{display:inline-flex;align-items:center;gap:5px;margin-top:7px;border-radius:999px;padding:4px 8px;background:#f2f4f7;color:#667085;font-size:10px;font-weight:900}.cc-page-form-status.dirty{background:#fffaeb;color:#b54708}.cc-page-form-status.restored{background:#eff8ff;color:#175cd3}'+
       '.cc-page-form-footer{position:sticky;bottom:10px;z-index:20;display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.96);box-shadow:0 8px 24px rgba(16,24,40,.10);backdrop-filter:blur(8px)}'+
       '.cc-page-form-footer .spacer{flex:1}.cc-page-form-back{white-space:nowrap}'+
+      '.cc-plan-date-host .rdk{display:flex;width:100%;flex-wrap:wrap}'+
+      '.cc-plan-date-host .rdk-text{flex:1;min-width:0;width:calc(100% - 46px)}'+
+      '.cc-plan-date-host .rdk input[type="hidden"]{display:none}'+
       '@media(max-width:760px){.cc-page-form-head{display:block}.cc-page-form-title-wrap{display:block}.cc-page-form-back{margin-bottom:10px}.cc-page-form-card{padding:12px}.cc-page-form-footer{bottom:6px;flex-wrap:wrap}.cc-page-form-footer .spacer{display:none}}';
     document.head.appendChild(ccPageStyle);
   }
@@ -810,8 +813,8 @@
 
   async function ccSetRoutinePlan(c,planType){
     var old=api.currentPlan(c.id,planType);
-    openModal({title:planType==='quarterly_bundle'?'安排3個月例行工作':'安排正式電訪',confirmText:'儲存安排',html:'<div class="form-grid"><div class="field"><label>預定執行日 *</label><input id="ccPlannedDate" type="date" value="'+escapeHTML(old?.planned_date||'')+'"></div><div class="field full"><label>備註</label><textarea id="ccPlanNote" rows="3">'+escapeHTML(old?.note||'')+'</textarea></div></div>',onConfirm:async function(){
-      var d=$('ccPlannedDate').value;if(!d)return toast('請選擇預定執行日','warn');
+    openModal({title:planType==='quarterly_bundle'?'安排3個月例行工作':'安排正式電訪',confirmText:'儲存安排',html:'<div class="form-grid"><div class="field"><label for="ccPlannedDate">預定執行日 *</label><div id="ccPlannedDateHost" class="cc-plan-date-host"></div></div><div class="field full"><label>備註</label><textarea id="ccPlanNote" rows="3">'+escapeHTML(old?.note||'')+'</textarea></div></div>',onConfirm:async function(){
+      var d=planDateField.getISO();if(!d)return toast('請輸入有效的預定執行日','warn');
       showLoading(true);try{
         if(old){
           var u=await db.from('case_routine_plans').update({planned_date:d,note:$('ccPlanNote').value.trim()||null,updated_at:new Date().toISOString()}).eq('id',old.id);if(u.error)throw u.error;
@@ -821,6 +824,9 @@
         closeModal();await api.loadData(true);if(window.refreshCaseDetailPage)await window.refreshCaseDetailPage(c.id,'預定執行日已更新','success','visits');
       }catch(e){toast('儲存安排失敗：'+(e?.message||e),'error');}finally{showLoading(false);}
     }});
+    var planDateField=window.rocDateKit.mountDate($('ccPlannedDateHost'),{
+      id:'ccPlannedDate',value:old?.planned_date||'',required:true
+    });
   }
 
   var ccFormBaseNavigate=navigate;
