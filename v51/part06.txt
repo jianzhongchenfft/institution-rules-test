@@ -3,7 +3,7 @@ nt?.status||'draft';
     const card=el('article',{class:'reg-card'});
     card.innerHTML=`
       <div class="reg-top"><div><div class="reg-title">${escapeHTML(reg.title)}</div><span class="reg-cat">${escapeHTML(reg.category||'未分類')}</span></div><span class="status ${status}">${statusText}</span></div>
-      <div class="reg-meta"><div><div class="meta-label">目前版本</div><div class="meta-value">${current?'V'+escapeHTML(current.version_label):'—'}</div></div><div><div class="meta-label">生效日期</div><div class="meta-value">${current?.effective_date?rocDate(current.effective_date+'T00:00:00'):'—'}</div></div><div><div class="meta-label">檔案</div><div class="meta-value">${current?.file_name?escapeHTML(current.file_name):'尚未上傳檔案'}</div></div><div><div class="meta-label">版本數</div><div class="meta-value">${versions.length} 個版本${drafts.length?`・${drafts.length} 草稿`:''}</div></div></div>
+      <div class="reg-meta"><div><div class="meta-label">目前版本</div><div class="meta-value">${current?'V'+escapeHTML(current.version_label):'—'}</div></div><div><div class="meta-label">生效日期</div><div class="meta-value">${current?.effective_date?window.rocDateKit.formatDateCompact(current.effective_date):'—'}</div></div><div><div class="meta-label">檔案</div><div class="meta-value">${current?.file_name?escapeHTML(current.file_name):'尚未上傳檔案'}</div></div><div><div class="meta-label">版本數</div><div class="meta-value">${versions.length} 個版本${drafts.length?`・${drafts.length} 草稿`:''}</div></div></div>
       <div class="reg-actions"></div>`;
     const actions=card.querySelector('.reg-actions');
     if(current?.file_path) actions.append(el('button',{class:'btn sm primary',text:'下載最新版',onClick:()=>downloadVersion(current)}));
