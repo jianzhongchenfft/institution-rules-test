@@ -1,4 +1,4 @@
-/* 劉信子內部管理系統：共用民國日期工具 V1（獨立測試，尚未接入既有表單） */
+/* 劉信子內部管理系統：共用民國日期工具 V1.1（獨立測試，尚未接入既有表單） */
 (function(root){
  'use strict';
  if(root.rocDateKit)return;
@@ -13,7 +13,9 @@
  function fromRocYear(s){if(/^民前[1-9]\d{0,3}$/.test(s))return 1912-Number(s.slice(2));return /^[1-9]\d{0,2}$/.test(s)?Number(s)+1911:null;}
  function parse(s,month){
    var raw=text(s).replace(/\s/g,'').replace(/[.\-．]/g,'/').replace(/年/g,'/').replace(/月/g,month?'':'/').replace(/日$/,'').replace(/\/$/,'');
-   var a=(month?/^(民前\d{1,4}|\d{1,3})\/(\d{1,2})$/:/^(民前\d{1,4}|\d{1,3})\/(\d{1,2})\/(\d{1,2})$/).exec(raw);
+   // 僅日期接受七碼連續數字：民國年三碼＋月兩碼＋日兩碼（例如1151010）。
+   var compact=!month?/^(\d{3})(\d{2})(\d{2})$/.exec(raw):null;
+   var a=compact||(month?/^(民前\d{1,4}|\d{1,3})\/(\d{1,2})$/:/^(民前\d{1,4}|\d{1,3})\/(\d{1,2})\/(\d{1,2})$/).exec(raw);
    if(!a)return null;
    var y=fromRocYear(a[1]),m=Number(a[2]),d=month?1:Number(a[3]);
    return y!==null&&valid(y,m,d)?makeISO(y,m,month?null:d):null;
@@ -76,7 +78,7 @@
    if(min&&max&&min>max)throw Error('日期範圍起日不得晚於迄日');
    css();
    var wrap=node('div','rdk'+(month?' month':''));
-   var input=node('input','rdk-text');input.type='text';input.inputMode='numeric';input.autocomplete='off';input.placeholder=month?'115年10月':'115/10/10';
+   var input=node('input','rdk-text');input.type='text';input.inputMode='numeric';input.autocomplete='off';input.placeholder=month?'115年10月':'1151010 或 115/10/10';
    if(opt.id)input.id=opt.id;
    if(opt.disabled)input.disabled=true;
    if(opt.required)input.required=true;
