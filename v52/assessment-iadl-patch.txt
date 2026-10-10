@@ -284,7 +284,7 @@
       </div>
     `;
 
-    window.v52AssessmentToolSummary?.mount(local.eventId,'iadl',currentToolSummarySource(),'.iadl-page','.iadl-actions');
+    window.v52AssessmentToolSummary?.mount(local.eventId,'iadl',currentToolSummarySource,'.iadl-page','.iadl-actions');
     $('iadlBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
     document.querySelectorAll('input[name^="iadl_"]').forEach(input=>{
