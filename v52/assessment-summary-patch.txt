@@ -131,6 +131,21 @@
     .asum-track-source{border:1px solid #e4e7ec;border-radius:9px;background:#fff;padding:9px 10px;font-size:10.5px;color:#475467;line-height:1.6;white-space:pre-wrap;margin-bottom:9px}
     .asum-track-hint{font-size:10px;color:#667085;line-height:1.5;margin-top:6px}
     .asum-complete{border:1px solid #abefc6;background:#ecfdf3;color:#027a48;border-radius:10px;padding:10px 11px;font-size:11px;font-weight:850;margin-bottom:12px}
+    /* 整體評估總結：彈出式新內容預覽（不沿用舊版 ats-compare 排版） */
+    .asum-merge-overlay{position:fixed;inset:0;z-index:10060;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:16px;background:rgba(16,24,40,.56)}
+    .asum-merge-dialog{display:flex;flex-direction:column;width:min(680px,100%);max-height:min(85vh,860px);overflow:hidden;background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(16,24,40,.25);outline:none}
+    .asum-merge-head{flex:0 0 auto;padding:16px 19px 12px;border-bottom:1px solid #eaecf0}
+    .asum-merge-head strong{font-size:15px;color:#344054}
+    .asum-merge-head p{margin:6px 0 0;color:#667085;font-size:11px;line-height:1.6}
+    .asum-merge-body{min-height:0;overflow-y:auto;padding:8px 19px}
+    .asum-merge-item{padding:12px 0;border-bottom:1px solid #eaecf0}
+    .asum-merge-item:last-child{border-bottom:none}
+    .asum-merge-option{display:flex;align-items:center;gap:8px;color:#344054;font-size:12px;cursor:pointer}
+    .asum-merge-option input[type="checkbox"]{width:16px!important;height:16px;flex:0 0 auto;margin:0;accent-color:#dc9479}
+    .asum-merge-text{margin-top:9px;border:1px solid #eaecf0;border-radius:9px;background:#f8f9fb;padding:11px;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;max-height:32vh;overflow-y:auto}
+    .asum-merge-text.is-empty{color:#98a2b3}
+    .asum-merge-footer{display:flex;justify-content:flex-end;gap:9px;padding:13px 19px;border-top:1px solid #eaecf0;flex:0 0 auto}
+    @media(max-width:540px){.asum-merge-dialog{max-height:90vh}.asum-merge-head,.asum-merge-body,.asum-merge-footer{padding-left:12px;padding-right:12px}.asum-merge-footer .btn{flex:1}}
     .asum-actions{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding:11px 0;background:linear-gradient(to bottom,rgba(250,248,247,0),#faf8f7 24%)}
     @media(max-width:760px){.asum-grid,.asum-form-grid,.asum-track-grid{grid-template-columns:1fr}.asum-field.full{grid-column:1}.asum-actions .btn{flex:1}}
   `;
@@ -146,7 +161,7 @@
     previousSummaryEvent:null,
     toolSummaryRows:[],toolMerged:{findings:'',recommendations:'',missing:[]},
     overallSourceHash:'',overallSignature:{findings:'',recommendations:''},
-    overallPreview:false,lastSavedOverall:null,savedOverallSnapshot:null
+    lastSavedOverall:null,savedOverallSnapshot:null
   };
 
   const safeObj=v=>(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
@@ -292,7 +307,6 @@
     local.overallSignature={
       findings:checkpointSig.findings||'',recommendations:checkpointSig.recommendations||''
     };
-    local.overallPreview=false;
     local.lastSavedOverall=summary.data?{
       findings:String(summary.data.key_findings||''),
       recommendations:String(summary.data.care_recommendations||'')
@@ -329,18 +343,69 @@
     <div class="asum-actions" style="position:static;background:transparent;margin:0 0 12px;padding:0">
       ${stale?'<button id="asumKeepMerge" type="button" class="btn sm">保留目前總結並確認</button>':''}
       <button id="asumMergePreview" type="button" class="btn sm">重新匯整並預覽</button>
-    </div>
-    ${local.overallPreview?`<section class="ats-compare">
-      <strong>整體總結重新匯整預覽（可分別選擇取代）</strong>
-      ${[['findings','主要評估發現／問題與需求','key_findings'],['recommendations','照顧服務重點／建議','care_recommendations']].map(([k,title,target])=>`
-        <div class="ats-compare-row">
-          <label><input data-asum-replace="${k}" type="checkbox" checked> ${title}</label>
-          <div><span>目前內容</span><pre>${escapeHTML(local.summary?.[target]||'—')}</pre></div>
-          <div><span>本次工具總結匯整後</span><pre>${escapeHTML(local.toolMerged[k]||'—')}</pre></div>
-        </div>`).join('')}
-      <div class="ats-buttons"><button id="asumMergeCancel" type="button" class="btn sm">取消</button>
-        <button id="asumMergeApply" type="button" class="btn sm primary">確認取代所選欄位</button></div>
-    </section>`:''}`;
+    </div>`;
+  }
+
+  // 預覽視窗直接掛在 body，避免被本頁表單的 .asum-field 與 overflow 樣式干擾。
+  // 只顯示本次新匯整結果；原有內容留在背景表單，不重複顯示。
+  function showOverallMergePreview(){
+    if(document.getElementById('asumMergeOverlay'))return;
+    const overlay=document.createElement('div');
+    overlay.id='asumMergeOverlay';
+    overlay.className='asum-merge-overlay';
+    overlay.innerHTML=`<div class="asum-merge-dialog" role="dialog" aria-modal="true" aria-labelledby="asumMergeTitle" tabindex="-1">
+      <div class="asum-merge-head"><strong id="asumMergeTitle">重新匯整整體評估總結</strong>
+        <p>以下僅顯示本次新匯整的內容。勾選要更新的欄位，再決定是否取代。</p></div>
+      <div class="asum-merge-body">
+        ${[['findings','主要評估發現／問題與需求'],['recommendations','照顧服務重點／建議']].map(([k,title])=>{
+          const suggestion=String(local.toolMerged[k]||'');
+          const nonempty=!!suggestion.trim();
+          return `<div class="asum-merge-item">
+            <label class="asum-merge-option"><input type="checkbox" data-asum-replace="${k}" ${nonempty?'checked':''}><strong>${title}</strong></label>
+            <div class="asum-merge-text${nonempty?'':' is-empty'}">${nonempty?escapeHTML(suggestion):'本次沒有可匯入的內容。'}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="asum-merge-footer">
+        <button id="asumMergeCancel" type="button" class="btn">不取代</button>
+        <button id="asumMergeApply" type="button" class="btn primary">取代目前內容</button>
+      </div>
+    </div>`;
+    const openingButton=$('asumMergePreview');
+    const oldOverflow=document.body.style.overflow;
+    document.body.appendChild(overlay);
+    document.body.style.overflow='hidden';
+    const close=()=>{
+      overlay.remove();
+      document.body.style.overflow=oldOverflow;
+      openingButton?.focus();
+    };
+    overlay.querySelector('#asumMergeCancel')?.addEventListener('click',close);
+    overlay.querySelector('#asumMergeApply')?.addEventListener('click',()=>{
+      const selected=[...overlay.querySelectorAll('[data-asum-replace]:checked')].map(x=>x.dataset.asumReplace);
+      if(!selected.length)return toast('請至少勾選一項再確認取代','warn');
+      if(selected.includes('findings')){
+        local.summary.key_findings=local.toolMerged.findings;
+        local.overallSignature.findings=local.overallSourceHash;
+        const input=$('asumFindings');if(input)input.value=local.summary.key_findings;
+      }
+      if(selected.includes('recommendations')){
+        local.summary.care_recommendations=local.toolMerged.recommendations;
+        local.overallSignature.recommendations=local.overallSourceHash;
+        const input=$('asumRecommendations');if(input)input.value=local.summary.care_recommendations;
+      }
+      close();
+      toast('已匯入勾選的欄位，請儲存草稿或完成本次評估以正式儲存','success');
+    });
+    overlay.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){e.preventDefault();close();}
+      if(e.key!=='Tab')return;
+      const focusable=[...overlay.querySelectorAll('input[type="checkbox"],button')].filter(el=>!el.disabled);
+      if(!focusable.length)return;
+      if(e.shiftKey&&document.activeElement===focusable[0]){e.preventDefault();focusable[focusable.length-1].focus();}
+      else if(!e.shiftKey&&document.activeElement===focusable[focusable.length-1]){e.preventDefault();focusable[0].focus();}
+    });
+    overlay.querySelector('#asumMergeCancel')?.focus();
   }
 
   function gdsResult(score){
@@ -681,25 +746,8 @@
     });
     $('asumPrint')?.addEventListener('click',()=>openPrintPreview());
     $('asumMergePreview')?.addEventListener('click',()=>{
-      captureText();local.overallPreview=true;rerenderWithScroll();
-    });
-    $('asumMergeCancel')?.addEventListener('click',()=>{
-      captureText();local.overallPreview=false;rerenderWithScroll();
-    });
-    $('asumMergeApply')?.addEventListener('click',()=>{
       captureText();
-      const selected=[...document.querySelectorAll('[data-asum-replace]:checked')].map(x=>x.dataset.asumReplace);
-      if(!selected.length)return toast('請至少勾選一項再確認取代','warn');
-      if(selected.includes('findings')){
-        local.summary.key_findings=local.toolMerged.findings;
-        local.overallSignature.findings=local.overallSourceHash;
-      }
-      if(selected.includes('recommendations')){
-        local.summary.care_recommendations=local.toolMerged.recommendations;
-        local.overallSignature.recommendations=local.overallSourceHash;
-      }
-      local.overallPreview=false;rerenderWithScroll();
-      toast('已匯入選取的內容，請按儲存草稿或完成本次評估','success');
+      showOverallMergePreview();
     });
     $('asumKeepMerge')?.addEventListener('click',async()=>{
       captureText();
