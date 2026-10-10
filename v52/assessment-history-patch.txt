@@ -119,16 +119,7 @@
   const eventById=id=>state.assessmentEvents?.find(x=>x.id===id)||null;
   const caseById=id=>state.assessmentCases?.find(x=>x.id===id)||null;
 
-  function dateTime(value){
-    if(!value)return '—';
-    const d=new Date(value);
-    if(Number.isNaN(d.getTime()))return String(value);
-    return d.toLocaleString('zh-TW',{
-      timeZone:'Asia/Taipei',
-      year:'numeric',month:'2-digit',day:'2-digit',
-      hour:'2-digit',minute:'2-digit',hour12:false
-    });
-  }
+  function dateTime(value){return window.rocDateKit.formatDateTimeCompact(value);}
 
   function staffLabel(id){
     if(!id)return '—';
@@ -347,7 +338,7 @@
       <div class="page-head">
         <div>
           <h1>${escapeHTML(c.case_name)}｜評估修改歷程</h1>
-          <p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　僅顯示已儲存後再次修改所留下的歷程。</p>
+          <p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}　僅顯示已儲存後再次修改所留下的歷程。</p>
         </div>
         <div><button id="ahBack" type="button" class="btn">← 返回評估事件</button></div>
       </div>
