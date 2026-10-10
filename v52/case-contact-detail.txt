@@ -215,20 +215,22 @@
       confirmText:'開啟列印',
       html:'<div class="form-grid">'+
         '<div class="field"><label>列印期間 *</label><select id="ccGeneralPrintMode"><option value="month">本月</option><option value="custom">自訂期間</option></select></div>'+
-        '<div class="field full" id="ccGeneralPrintCustom" style="display:none"><div class="form-grid"><div class="field"><label>開始日期 *</label><input id="ccGeneralPrintStart" type="date" value="'+range.start+'"></div><div class="field"><label>結束日期 *</label><input id="ccGeneralPrintEnd" type="date" value="'+range.end+'"></div></div></div>'+
+        '<div class="field full" id="ccGeneralPrintCustom" style="display:none"><div class="form-grid"><div class="field"><label>開始日期 *</label><input id="ccGeneralPrintStart" type="hidden" value="'+range.start+'"><div id="ccGeneralPrintStartHost" class="roc-inline-date"></div></div><div class="field"><label>結束日期 *</label><input id="ccGeneralPrintEnd" type="hidden" value="'+range.end+'"><div id="ccGeneralPrintEndHost" class="roc-inline-date"></div></div></div></div>'+
         '<div class="field full"><div class="case-panel-note">「本月」會列印本月1日至月底的一般電話聯繫；正式電訪不會列入此明細。</div></div>'+
       '</div>',
       onConfirm:function(){
         var mode=$('ccGeneralPrintMode')?.value||'month',start=range.start,end=range.end;
         if(mode==='custom'){
-          start=$('ccGeneralPrintStart')?.value||'';
-          end=$('ccGeneralPrintEnd')?.value||'';
+          start=window.rocDateKit.linkedISO('ccGeneralPrintStart');
+          end=window.rocDateKit.linkedISO('ccGeneralPrintEnd');
           if(!start||!end){toast('請選擇開始與結束日期','warn');return false;}
           if(start>end){toast('開始日期不可晚於結束日期','warn');return false;}
         }
         return ccGeneralPhonePrint(data,start,end);
       }
     });
+    window.rocDateKit.mountLinkedDate('ccGeneralPrintStart',{value:range.start,required:true});
+    window.rocDateKit.mountLinkedDate('ccGeneralPrintEnd',{value:range.end,required:true});
     $('ccGeneralPrintMode')?.addEventListener('change',function(e){
       var box=$('ccGeneralPrintCustom');if(box)box.style.display=e.target.value==='custom'?'':'none';
     });
