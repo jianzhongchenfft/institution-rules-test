@@ -661,7 +661,7 @@ function htmlOpenManualModal(){
         <div class="field"><label>原住民族別</label><input id="hmIndigenousGroup"></div>
         <div class="field"><label>長照福利身分</label><select id="hmWelfareIdentity">${htmlWelfareOptions('')}</select></div>
         <div class="field"><label>自負擔比例（%）</label><input id="hmCopayRate" type="number" readonly><div class="help">依長照福利身分自動帶入</div></div>
-      </div>`,
+      </div><div class="import-section">聯絡人／照顧者</div>${htmlContactsEditor([])}`,
       onConfirm:async()=>{
         const caseNo=htmlNormalizeCaseNo($('hmCaseNo').value),name=$('hmName').value.trim();
         const supervisor=me?state.profile.id:$('hmSupervisor').value;
@@ -672,22 +672,23 @@ function htmlOpenManualModal(){
         $('hmCaseNo').value=caseNo;
         if(!caseNo||!name||!supervisor||!usageType){toast('個案編號、姓名、負責督導與服務類別為必填','warn');return false;}
         if(dementia===''||livesAlone===''){toast('失智及獨居狀態為必填','warn');return false;}
+        if(!$('hmOpenDate').value){toast('開案日期為必填','warn');return false;}
+        if(!htmlValidMapsUrl($('hmGoogleMaps').value)){toast('請輸入有效的 Google Maps 分享連結','warn');return false;}
         showLoading(true);
         try{
-          const r=await db.from('care_cases').insert({
+          const r=await db.rpc('create_case_profile',{payload:{
             case_no:caseNo,case_name:name,supervisor_id:supervisor,
-            national_id:$('hmNational').value.trim().toUpperCase()||null,birth_date:$('hmBirth').value||null,gender:$('hmGender').value||null,
-            address:$('hmAddress').value.trim()||null,phone:$('hmPhone').value.trim()||null,cms_level:$('hmCms').value.trim()||null,
-            lives_alone:livesAlone==='true',has_dementia:dementia==='true',
-            has_disability:$('hmDisability').value===''?null:$('hmDisability').value==='true',
-            is_indigenous:$('hmIndigenous').value===''?null:$('hmIndigenous').value==='true',
-            indigenous_group:$('hmIndigenousGroup').value.trim()||null,
-            welfare_identity:welfare||null,copay_rate:$('hmCopayRate').value===''?null:Number($('hmCopayRate').value),
-            service_usage_type:usageType,payment_method:paymentMethod||null,service_status:'active',created_by:state.user.id
-          }).select('id').single();
+            open_date:$('hmOpenDate').value,google_maps_url:$('hmGoogleMaps').value.trim(),
+            national_id:$('hmNational').value.trim().toUpperCase(),birth_date:$('hmBirth').value,gender:$('hmGender').value,
+            address:$('hmAddress').value.trim(),phone:$('hmPhone').value.trim(),cms_level:$('hmCms').value.trim(),
+            case_manager_name:$('hmManager').value.trim(),case_manager_phone:$('hmManagerPhone').value.trim(),
+            lives_alone:livesAlone,has_dementia:dementia,
+            has_disability:$('hmDisability').value,is_indigenous:$('hmIndigenous').value,
+            indigenous_group:$('hmIndigenousGroup').value.trim(),welfare_identity:welfare,
+            copay_rate:$('hmCopayRate').value,service_usage_type:usageType,payment_method:paymentMethod,
+            contacts:htmlReadContacts()
+          }});
           if(r.error)throw r.error;
-          const a=await db.from('case_supervisor_assignments').insert({case_id:r.data.id,supervisor_id:supervisor,assigned_from:new Date().toISOString().slice(0,10),is_current:true,created_by:state.user.id});
-          if(a.error)throw a.error;
           closeModal();toast('個案已建立','success');navigate('cases');return true;
         }catch(err){
           toast('建立個案失敗：'+(err?.message||err),'error');return false;
@@ -697,6 +698,7 @@ function htmlOpenManualModal(){
     htmlBindWelfareCopay('hmWelfareIdentity','hmCopayRate');
     htmlBindPaymentRules('hmWelfareIdentity','hmPaymentMethod');
     htmlBindIndigenousGroup('hmIndigenous','hmIndigenousGroup');
+    htmlBindContactEditControls();
   }
 
 async function htmlViewOriginal(path,fileName){
