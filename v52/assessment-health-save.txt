@@ -21,6 +21,8 @@
     const mode=healthSectionMode(row);
     if(!row||!canEdit(row))return toast('您沒有此個案的評估編輯權限','error');
 
+    const dateError=healthDateError();
+    if(dateError)return toast(dateError,'warn');
     syncInputs();
     const medicationUsage=local.medicalInfo.medication_use_status||'';
     if(finalize){
