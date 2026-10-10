@@ -73,6 +73,13 @@
     scheduleModule.crumb = '每週服務班表';
   }
 
+  function scheduleMountRocDate(value){
+    const host=$('scheduleAddDateHost');
+    if(!host)throw new Error('服務日期欄位尚未建立');
+    host.__rocDate=window.rocDateKit.mountDate(host,{id:'scheduleAddDate',value:value||'',required:true});
+  }
+  function scheduleRocDate(){return $('scheduleAddDateHost')?.__rocDate?.getISO()??null;}
+
   function scheduleMonday(date){
     const d = new Date(date);
     d.setHours(0,0,0,0);
@@ -298,7 +305,7 @@
         large:true,
         html:`
           <div class="form-grid">
-            <div class="field"><label>服務日期 *</label><input id="scheduleAddDate" type="date" value="${defaultDate}"></div>
+            <div class="field"><label>服務日期 *</label><div id="scheduleAddDateHost" class="roc-inline-date"></div></div>
             <div class="field"><label>班表狀態 *</label><select id="scheduleAddStatus"><option value="confirmed">已確認</option><option value="unnotified">尚未照會</option><option value="planned">已排定</option></select></div>
 
             <div class="field"><label>開始時間 *</label><input id="scheduleAddStart" type="time" value="09:00"></div>
@@ -323,6 +330,7 @@
         onConfirm: saveNewSchedule
       });
 
+      scheduleMountRocDate(defaultDate);
       addScheduleServiceRow();
       $('scheduleAddStart').addEventListener('change',updateScheduleEndTime);
       $('scheduleAddStart').addEventListener('input',updateScheduleEndTime);
@@ -355,11 +363,13 @@
 
   function updateScheduleEditScopeUI(){
     const scope=$('scheduleEditScope')?.value || 'single';
-    const dateInput=$('scheduleAddDate');
-    if(!dateInput) return;
+    const widget=$('scheduleAddDateHost')?.__rocDate;
+    if(!widget)return;
     const grouped=scope!=='single';
-    dateInput.disabled=grouped;
-    dateInput.title=grouped?'整組或後續修改會保留每一班原本的服務日期。':'';
+    widget.input.disabled=grouped;
+    const toggle=widget.element.querySelector('.rdk-toggle');
+    if(toggle)toggle.disabled=grouped;
+    widget.input.title=grouped?'整組或後續修改會保留每一班原本的服務日期。':'';
   }
 
   function updateScheduleStaffingActionUI(row){
@@ -473,7 +483,7 @@
                 <div id="scheduleStaffingHint" class="schedule-recurrence-preview"></div>
               </div>`:''
             }
-            <div class="field"><label>服務日期 *</label><input id="scheduleAddDate" type="date" value="${row.service_date}"></div>
+            <div class="field"><label>服務日期 *</label><div id="scheduleAddDateHost" class="roc-inline-date"></div></div>
             <div class="field"><label>班表狀態 *</label><select id="scheduleAddStatus">
               <option value="confirmed" ${row.schedule_status==='confirmed'?'selected':''}>已確認</option>
               <option value="unnotified" ${row.schedule_status==='unnotified'?'selected':''}>尚未照會</option>
@@ -512,6 +522,7 @@
         onConfirm:()=>saveScheduleEdit(scheduleId)
       });
 
+      scheduleMountRocDate(row.service_date);
       if(items.length){
         items.forEach(item=>addScheduleServiceRow(item.service_code,Number(item.quantity)||1));
       }else{
@@ -595,7 +606,7 @@
     const staffingAction=row.staffing_status==='pending_substitute'
       ? ($('scheduleStaffingAction')?.value||'pending')
       : null;
-    const date=$('scheduleAddDate')?.value;
+    const date=scheduleRocDate();
     const start=$('scheduleAddStart')?.value;
     const end=$('scheduleAddEnd')?.value;
     const caseId=$('scheduleAddCase')?.value;
@@ -780,7 +791,7 @@
   }
 
   async function saveNewSchedule(){
-    const date = $('scheduleAddDate')?.value;
+    const date = scheduleRocDate();
     const start = $('scheduleAddStart')?.value;
     const end = $('scheduleAddEnd')?.value;
     const caseId = $('scheduleAddCase')?.value;
