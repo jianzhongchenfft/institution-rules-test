@@ -67,7 +67,7 @@ function renderSensitiveEventFieldsHtml(sd){
 
       <div id="srDateField" class="event-field" style="display:none">
         <label>通報日期 *</label>
-        <input id="srDate" type="date" value="${sd?.external_reported_at?isoDate(new Date(sd.external_reported_at)):''}">
+        <div id="srDateHost" class="event-roc-date"></div>
       </div>
 
       <div id="srTimeField" class="event-field" style="display:none">
