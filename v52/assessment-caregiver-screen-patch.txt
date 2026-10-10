@@ -236,7 +236,7 @@
     window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'高負荷家庭照顧者初篩');
 
     $('content').innerHTML=`<div class="cg-page">
-      <div class="page-head"><div><h1>${escapeHTML(c.case_name)}｜高負荷家庭照顧者初篩</h1><p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p></div>
+      <div class="page-head"><div><h1>${escapeHTML(c.case_name)}｜高負荷家庭照顧者初篩</h1><p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p></div>
       <div class="assessment-head-actions"><button id="cgBack" type="button" class="btn">← 返回評估事件</button></div></div>
       ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
       ${renderSummary()}
