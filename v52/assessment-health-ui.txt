@@ -20,7 +20,7 @@
         <div class="health-event-grid">
           <div>
             <label>日期</label>
-            <input type="date" data-health-event-field="date" value="${escapeHTML(item.date||'')}">
+            <div class="health-roc-date" data-health-event-date></div>
           </div>
           <div>
             <label>類型</label>
@@ -178,7 +178,7 @@
           </div>
           <div>
             <label>預計服用至</label>
-            <input type="date" data-opening-temp-med-field="planned_end_date" value="${escapeHTML(item.planned_end_date||'')}">
+            <div class="health-roc-date" data-health-temp-med-date></div>
           </div>
           <div class="wide">
             <label>備註（選填）</label>
@@ -675,6 +675,17 @@
       </div>
     `;
 
+    document.querySelectorAll('[data-health-event]').forEach(rowEl=>{
+      const index=Number(rowEl.dataset.healthEvent);
+      const item=safeArray(local.medicalInfo.healthcare_events)[index]||{};
+      const host=rowEl.querySelector('[data-health-event-date]');
+      if(host)host.__healthDate=window.rocDateKit.mountDate(host,{value:item.date||'',required:false});
+    });
+    document.querySelectorAll('[data-opening-temp-med]').forEach(rowEl=>{
+      const item=safeArray(local.medicalInfo.opening_temporary_medications).find(x=>x.id===rowEl.dataset.openingTempMed)||{};
+      const host=rowEl.querySelector('[data-health-temp-med-date]');
+      if(host)host.__healthDate=window.rocDateKit.mountDate(host,{value:item.planned_end_date||'',required:false});
+    });
     window.v52AssessmentToolSummary?.mount(local.eventId,'health_medication',currentToolSummarySource,'.health-page','.health-actions');
     $('healthBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
