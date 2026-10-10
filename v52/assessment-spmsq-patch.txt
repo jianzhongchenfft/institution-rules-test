@@ -100,7 +100,7 @@
         ${canEdit(row)&&row.status!=='voided'?`<div class="spmsq-actions">${form.status!=='completed'&&form.status!=='unable'?'<button id="spmsqDraft" class="btn">儲存草稿</button>':''}<button id="spmsqConfirm" class="btn primary">${['completed','unable'].includes(form.status)?'儲存修正並確認':'完成本次確認'}</button></div>`:''}
       </div>`;
 
-    window.v52AssessmentToolSummary?.mount(local.eventId,'spmsq',currentToolSummarySource(),'.spmsq-page','.spmsq-actions');
+    window.v52AssessmentToolSummary?.mount(local.eventId,'spmsq',currentToolSummarySource,'.spmsq-page','.spmsq-actions');
     $('spmsqBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
     document.querySelectorAll('[data-spmsq-note]').forEach(inp=>inp.addEventListener('input',()=>local.notes[inp.dataset.spmsqNote]=inp.value));
     document.querySelectorAll('[data-spmsq-add-note]').forEach(btn=>btn.addEventListener('click',()=>{
