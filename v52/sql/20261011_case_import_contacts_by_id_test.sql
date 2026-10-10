@@ -354,7 +354,7 @@ begin
             ),
             coalesce(item->>'is_primary_caregiver','false')='true',
             coalesce(item->>'is_secondary_caregiver','false')='true',
-            nullif(btrim(item->>'notes','')),'html_import',v_import_id
+            nullif(btrim(item->>'notes'),''),'html_import',v_import_id
           ) returning id into v_import_contact_id;
         end if;
         v_import_keep_ids:=array_append(v_import_keep_ids,v_import_contact_id);
