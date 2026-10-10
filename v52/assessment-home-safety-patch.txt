@@ -268,7 +268,7 @@
         <div class="hs-summary-card">
           <label>前次需改善</label>
           <strong>${local.previous?prev:'—'}</strong>
-          <small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small>
+          <small>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):'無前次完成紀錄'}</small>
         </div>
         <div class="hs-summary-card">
           <label>新增風險</label>
@@ -290,7 +290,7 @@
       <div class="hs-copy-box">
         <div>
           <strong>前次居家環境安全評估：需改善 ${previousRiskKeys().length} 項</strong>
-          <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00')+'｜':''}可帶入住宅概況與21項結果，再逐項確認本次狀況。</span>
+          <span>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date)+'｜':''}可帶入住宅概況與21項結果，再逐項確認本次狀況。</span>
         </div>
         <button id="homeSafetyCopyPrevious" type="button" class="btn sm">帶入前次評估</button>
       </div>
@@ -520,7 +520,7 @@
         <div class="page-head">
           <div>
             <h1>${escapeHTML(c.case_name)}｜居家環境安全評估</h1>
-            <p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p>
+            <p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p>
           </div>
           <div class="assessment-head-actions">
             <button id="homeSafetyBack" type="button" class="btn">← 返回評估事件</button>
