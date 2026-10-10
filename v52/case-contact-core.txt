@@ -17,11 +17,17 @@
     '.cc-check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}.cc-check{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:11.5px;font-weight:700;cursor:pointer}.cc-check input[type="checkbox"]{width:16px!important;height:16px!important;min-width:16px!important;flex:0 0 16px;margin:0!important;accent-color:#dc9479}'+
     '.cc-sat-list{display:grid;gap:10px}.cc-sat-row{border:1px solid var(--line);border-radius:11px;padding:10px;background:#fff}.cc-sat-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.cc-sat-title{font-size:11.5px;font-weight:900;color:#344054}.cc-sat-options{display:flex;flex-wrap:wrap;gap:6px}.cc-sat-choice{cursor:pointer}.cc-sat-choice input{position:absolute;opacity:0;pointer-events:none}.cc-sat-choice span{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:5px 9px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:10.5px;font-weight:800;color:#475467;white-space:nowrap}.cc-sat-choice input:checked+span{background:#fff1eb;border-color:#dc9479;color:#9b4f3d}.cc-sat-note-wrap{display:none;margin-top:8px}.cc-sat-note-wrap.show{display:block}.cc-sat-note-wrap textarea{width:100%}.cc-sat-required{color:#b42318;font-weight:900}'+
     '.cc-time-selects{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:7px;align-items:center}.cc-time-sep{font-size:11px;font-weight:900;color:#667085}.cc-other-people{display:grid;gap:8px;margin-top:8px}.cc-other-person-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--line);border-radius:10px;background:#fafafa}.cc-other-person-row .field{margin:0}.cc-other-person-row .btn{min-height:38px}'+
-    '.cc-directory{display:grid;gap:10px}.cc-person-card{border:1px solid var(--line);border-radius:13px;background:#fff;padding:13px 16px;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}.cc-person-card:hover{background:#fffaf7;border-color:#dc9479;box-shadow:0 2px 10px rgba(16,24,40,.05)}.cc-person-card:focus-visible{outline:2px solid #dc9479;outline-offset:2px}'+
-    '.cc-person-fields{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.cc-person-fields.secondary{grid-template-columns:minmax(155px,1.7fr) minmax(110px,.9fr) repeat(3,minmax(120px,1fr));padding-top:10px;margin-top:10px;border-top:1px dashed var(--line)}.cc-person-field{min-width:0}.cc-person-field label{display:block;font-size:10px;color:#667085;font-weight:800;margin-bottom:5px}.cc-person-value{font-size:12px;font-weight:700;color:#344054;line-height:1.5;overflow-wrap:anywhere}.cc-person-link{color:#a75b44;text-decoration:underline;text-underline-offset:2px}.cc-sex{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:2px 5px;margin-right:5px}.cc-sex.male{color:#245cb0;background:#dcebff}.cc-sex.female{color:#a63569;background:#fce3eb}'+
-    '@media(max-width:1000px){.cc-person-fields,.cc-person-fields.secondary{grid-template-columns:repeat(3,minmax(0,1fr))}.cc-person-field.address{grid-column:span 2}}'+
-    '@media(max-width:700px){.cc-person-fields,.cc-person-fields.secondary{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.cc-person-card{padding:12px}.cc-person-field.address{grid-column:span 2}}'+
-    '@media(max-width:390px){.cc-person-fields,.cc-person-fields.secondary{grid-template-columns:1fr}.cc-person-field.address{grid-column:auto}}'+
+    '.cc-case-table-shell{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;border:1px solid var(--line);border-radius:12px;background:#fff;scrollbar-width:thin}'+
+    '.cc-case-table{width:100%;min-width:1450px;table-layout:fixed;border-collapse:separate;border-spacing:0;background:#fff;font-size:12px;color:#344054}'+
+    '.cc-case-table th,.cc-case-table td{padding:9px 10px;white-space:nowrap;text-align:left;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--line)}'+
+    '.cc-case-table th{font-size:11px;font-weight:900;color:#667085;background:#f9fafb;position:sticky;top:0;z-index:2}'+
+    '.cc-case-table tr:last-child td{border-bottom:none}.cc-case-table tbody tr:hover td{background:#fff8f5}'+
+    '.cc-case-table th:first-child,.cc-case-table td:first-child{position:sticky;left:0;z-index:3;box-shadow:1px 0 0 var(--line);background:#fff}'+
+    '.cc-case-table th:first-child{z-index:4;background:#f9fafb}.cc-case-table tbody tr:hover td:first-child{background:#fff8f5}'+
+    '.cc-case-table .cc-case-link,.cc-case-table .cc-case-name-btn{font:inherit;color:#a75b44;text-decoration:none;cursor:pointer}'+
+    '.cc-case-table .cc-case-link:hover,.cc-case-table .cc-case-name-btn:hover{text-decoration:underline;text-underline-offset:2px}'+
+    '.cc-case-table .cc-case-name-btn{font-weight:900;background:none;border:0;padding:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}'+
+    '.cc-sex{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:2px 5px;margin-right:5px}.cc-sex.male{color:#245cb0;background:#dcebff}.cc-sex.female{color:#a63569;background:#fce3eb}'+
     '@media(max-width:900px){.cc-stats{grid-template-columns:1fr 1fr}.cc-recent-grid{grid-template-columns:1fr}.cc-check-grid{grid-template-columns:1fr}.cc-sat-options{gap:5px}.cc-sat-choice span{padding:5px 8px;font-size:10px}.cc-other-person-row{grid-template-columns:1fr}.cc-other-person-row .btn{justify-self:start}}';
   document.head.appendChild(ccStyle);
 
@@ -257,13 +263,16 @@
 
     var list=$('caseList');
     if(!rows.length){list.innerHTML='<div class="empty"><div class="icon">👤</div><h3>目前沒有可顯示的個案</h3></div>';return;}
-    function field(label,value,extraClass){
-      return '<div class="cc-person-field '+(extraClass||'')+'"><label>'+escapeHTML(label)+'</label><div class="cc-person-value">'+escapeHTML(String(value||'—'))+'</div></div>';
+    function plainCell(value){
+      var valueText=String(value??'').trim()||'—';
+      return '<td title="'+escapeHTML(valueText)+'">'+escapeHTML(valueText)+'</td>';
     }
-    function phoneField(label,number){
-      var digits=String(number||'').replace(/[^0-9+]/g,'');
-      var value=digits?'<a class="cc-person-link" href="tel:'+digits+'">'+escapeHTML(number)+'</a>':'—';
-      return '<div class="cc-person-field"><label>'+escapeHTML(label)+'</label><div class="cc-person-value">'+value+'</div></div>';
+    function phoneCell(number){
+      var valueText=String(number||'').trim();
+      var dial=valueText.replace(/[^0-9+]/g,'');
+      return '<td title="'+escapeHTML(valueText||'—')+'">'+
+        (dial?'<a class="cc-case-link" href="tel:'+escapeHTML(dial)+'">'+escapeHTML(valueText)+'</a>':'—')+
+        '</td>';
     }
     function mapsUrl(raw){
       try{
@@ -275,37 +284,35 @@
       }catch(_){}
       return '';
     }
-    list.innerHTML='<div class="cc-directory">'+rows.map(function(c){
-      var contact=(state.caseDirectoryContacts||[]).find(function(x){return x.case_id===c.id&&x.is_primary_contact;})||null;
-      var gender=c.gender==='男'?'<span class="cc-sex male">男</span>':c.gender==='女'?'<span class="cc-sex female">女</span>':'';
-      var name='<div class="cc-person-field"><label>案名</label><div class="cc-person-value">'+gender+escapeHTML(c.case_name||'—')+'</div></div>';
-      var map=mapsUrl(c.google_maps_url);
-      var mapText=map?'<a class="cc-person-link" href="'+escapeHTML(map)+'" target="_blank" rel="noopener noreferrer">📍 開啟地圖</a>':'—';
-      var mapField='<div class="cc-person-field"><label>Google定位</label><div class="cc-person-value">'+mapText+'</div></div>';
-      return '<article class="cc-person-card" data-case-id="'+escapeHTML(c.id)+'" role="button" tabindex="0" aria-label="開啟個案：'+escapeHTML(c.case_name||'')+'">'+
-        '<div class="cc-person-fields">'+
-          name+
-          field('責任督導',ccStaffName(c.supervisor_id))+
-          field('個管師',c.case_manager_name)+
-          field('開案日期',ccDateText(c.open_date))+
-          field('身分別',c.welfare_identity)+
-          field('CMS',c.cms_level)+
-        '</div><div class="cc-person-fields secondary">'+
-          field('地址',c.address,'address')+
-          mapField+
-          field('主要聯絡人',contact?.contact_name)+
-          phoneField('主要聯絡人電話',contact?.phone)+
-          phoneField('案主電話',c.phone)+
-        '</div></article>';
-    }).join('')+'</div>';
-    list.querySelectorAll('[data-case-id]').forEach(function(card){
-      function openCase(){
-        if(typeof window.openCaseDetailPage==='function')window.openCaseDetailPage(card.dataset.caseId,'basic');
-      }
-      card.addEventListener('click',function(e){if(e.target.closest('a'))return;openCase();});
-      card.addEventListener('keydown',function(e){
-        if(e.target!==card)return;
-        if(e.key==='Enter'||e.key===' '){e.preventDefault();openCase();}
+    var headers=['案名','責任督導','個管師','開案日期','身分別','CMS','地址','Google定位','主要聯絡人','主要聯絡人電話','案主電話'];
+    var widths=[138,112,112,104,100,72,275,110,115,155,157];
+    list.innerHTML='<div class="cc-case-table-shell" role="region" aria-label="個案資料表，可左右捲動" tabindex="0">'+
+      '<table class="cc-case-table"><colgroup>'+
+      widths.map(function(w){return '<col style="width:'+w+'px">';}).join('')+
+      '</colgroup><thead><tr>'+headers.map(function(label){return '<th scope="col">'+escapeHTML(label)+'</th>';}).join('')+
+      '</tr></thead><tbody>'+
+      rows.map(function(c){
+        var contact=(state.caseDirectoryContacts||[]).find(function(x){return x.case_id===c.id&&x.is_primary_contact;})||null;
+        var gender=c.gender==='男'?'<span class="cc-sex male">男</span>':c.gender==='女'?'<span class="cc-sex female">女</span>':'';
+        var map=mapsUrl(c.google_maps_url);
+        return '<tr>'+
+          '<td title="'+escapeHTML(c.case_name||'')+'">'+gender+'<button type="button" class="cc-case-name-btn" data-case-id="'+escapeHTML(c.id)+'">'+escapeHTML(c.case_name||'—')+'</button></td>'+
+          plainCell(ccStaffName(c.supervisor_id))+
+          plainCell(c.case_manager_name)+
+          plainCell(ccDateText(c.open_date))+
+          plainCell(c.welfare_identity)+
+          plainCell(c.cms_level)+
+          plainCell(c.address)+
+          '<td>'+(map?'<a class="cc-case-link" href="'+escapeHTML(map)+'" target="_blank" rel="noopener noreferrer">📍 開啟地圖</a>':'—')+'</td>'+
+          plainCell(contact?.contact_name)+
+          phoneCell(contact?.phone)+
+          phoneCell(c.phone)+
+        '</tr>';
+      }).join('')+
+      '</tbody></table></div>';
+    list.querySelectorAll('[data-case-id]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        if(typeof window.openCaseDetailPage==='function')window.openCaseDetailPage(btn.dataset.caseId,'basic');
       });
     });
   }
