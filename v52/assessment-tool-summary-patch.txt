@@ -101,6 +101,11 @@
     }
   };
   const unique=items=>[...new Set(items.map(value).filter(Boolean))];
+  // 前次備註僅唯讀顯示，標籤與文字同一行；空白不占用畫面。
+  const previousNote=note=>{
+    const content=value(note);
+    return content?'<div class="ats-previous-note"><strong>前次備註：</strong>'+esc(content)+'</div>':'';
+  };
   const normalized=x=>{
     if(Array.isArray(x))return x.map(normalized);
     if(x&&typeof x==='object')return Object.fromEntries(Object.keys(x).sort().map(k=>[k,normalized(x[k])]));
@@ -296,15 +301,29 @@
         <label>照顧服務重點／建議</label>
         <textarea data-ats-input="recommendations" ${editing?'':'readonly'} placeholder="原表單沒有明確照顧建議時可留空，由督導自行補充">${esc(s.recommendations)}</textarea>
         ${editing&&stale?'<div class="ats-buttons"><button type="button" class="btn sm" data-ats-ack>保留目前內容並確認</button></div>':''}
-        ${s.preview?`<div class="ats-compare">
-          <strong>重新整理預覽（兩個欄位可分別取代）</strong>
-          ${[['findings','重要評估發現／問題與需求'],['recommendations','照顧服務重點／建議']].map(([f,title])=>`
-            <div class="ats-compare-row"><label><input type="checkbox" data-ats-replace="${f}" checked> ${title}</label>
-            <div><span>目前內容</span><pre>${esc(s[f]||'—')}</pre></div>
-            <div><span>重新整理後</span><pre>${esc(suggested[f]||'—')}</pre></div></div>`).join('')}
-          <div class="ats-buttons"><button type="button" class="btn sm" data-ats-cancel>取消</button>
-            <button type="button" class="btn sm primary" data-ats-confirm>確認取代所選欄位</button></div>
-          </div>`:''}
+        ${s.preview&&editing?`<div class="ats-preview-overlay">
+          <div class="ats-preview-modal" role="dialog" aria-modal="true" aria-label="重新生成本項總結" tabindex="-1">
+            <div class="ats-preview-head">
+              <strong>重新生成本項總結</strong>
+              <p>以下僅顯示依目前評估備註新生成的內容。勾選要更新的欄位，再決定是否取代。</p>
+            </div>
+            <div class="ats-preview-body">
+              ${[['findings','重要評估發現／問題與需求'],['recommendations','照顧服務重點／建議']].map(([f,title])=>`
+                <div class="ats-preview-item">
+                  <label class="ats-preview-label">
+                    <input type="checkbox" data-ats-replace="${f}" ${value(suggested[f])?'checked':''}>
+                    <strong>${title}</strong>
+                  </label>
+                  <div class="ats-preview-text ${value(suggested[f])?'':'is-empty'}">${value(suggested[f])?esc(suggested[f]):'本次沒有可擷取的內容'}</div>
+                </div>
+              `).join('')}
+            </div>
+            <div class="ats-preview-footer">
+              <button type="button" class="btn" data-ats-cancel>不取代</button>
+              <button type="button" class="btn primary" data-ats-confirm>取代目前內容</button>
+            </div>
+          </div>
+        </div>`:''}
         <div class="ats-tip">完成後請使用本表原有「儲存草稿／完成本次確認」儲存總結。</div>
       </div>
     </section>`;
@@ -344,13 +363,19 @@
         s.pendingFields.add('findings');s.pendingFields.add('recommendations');
         s.generated=true;s.edited=true;s.preview=false;
         refresh();toast('已生成本項總結，可自由修改，請記得儲存','success');
-      }else{s.preview=true;refresh();}
+      }else{
+        s.preview=true;refresh();
+        document.querySelector('[data-ats-root="'+code+'"] .ats-preview-modal')?.focus();
+      }
     });
     root.querySelector('[data-ats-cancel]')?.addEventListener('click',()=>{s.preview=false;refresh();});
     root.querySelector('[data-ats-confirm]')?.addEventListener('click',()=>{
       s.source=source(code,typeof s.readSource==='function'?s.readSource():s.source);
       const suggested=generate(code,s.source),h=sourceFingerprint(code,s.source);
-      root.querySelectorAll('[data-ats-replace]:checked').forEach(el=>{
+
+      const selected=[...root.querySelectorAll('[data-ats-replace]:checked')];
+      if(!selected.length)return toast('請先勾選要取代的欄位','warn');
+      selected.forEach(el=>{
         const f=el.dataset.atsReplace;s[f]=suggested[f];s.sig[f]=h;s.pendingFields.add(f);
       });
       s.generated=true;s.edited=true;s.preview=false;refresh();
@@ -431,13 +456,22 @@
     .ats-buttons{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px}
     .ats-alert{background:#fffaeb;border-bottom:1px solid #fedf89;color:#93370d;padding:10px 13px;font-size:11px}
     .ats-tip{font-size:10px;color:#667085;margin-top:10px}
-    .ats-compare{margin-top:12px;padding:12px;border:1px solid #d0d5dd;border-radius:10px}
-    .ats-compare>strong{font-size:12px}.ats-compare-row{margin-top:10px;border-top:1px solid #eaecf0;padding-top:9px}
-    .ats-compare-row>label{font-size:11px;font-weight:850}
-    .ats-compare-row>div{display:inline-block;width:48%;vertical-align:top;margin:8px 1% 0 0}
-    .ats-compare-row span{font-size:10px;color:#667085}
-    .ats-compare-row pre{white-space:pre-wrap;word-break:break-word;min-height:70px;background:#f8f9fb;border-radius:8px;padding:9px;font-size:11px;font-family:inherit}
-    @media(max-width:720px){.ats-compare-row>div{display:block;width:100%}}
+    .ats-preview-overlay{position:fixed;inset:0;z-index:10050;background:rgba(16,24,40,.56);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+    .ats-preview-modal{width:min(680px,100%);max-height:min(85vh,860px);display:flex;flex-direction:column;overflow:hidden;background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(16,24,40,.25);outline:none}
+    .ats-preview-head{padding:16px 19px 12px;border-bottom:1px solid #eaecf0;flex-shrink:0}
+    .ats-preview-head strong{font-size:15px;color:#344054}
+    .ats-preview-head p{font-size:11px;color:#667085;line-height:1.6;margin:6px 0 0}
+    .ats-preview-body{overflow-y:auto;padding:8px 19px;min-height:0}
+    .ats-preview-item{padding:12px 0;border-bottom:1px solid #eaecf0}
+    .ats-preview-item:last-child{border-bottom:none}
+    .ats-preview-label{display:flex;align-items:center;gap:8px;font-size:12px;color:#344054;cursor:pointer}
+    .ats-preview-label input{width:auto!important;accent-color:#e28762}
+    .ats-preview-text{margin:9px 0 0;background:#f8f9fb;border:1px solid #eaecf0;border-radius:9px;padding:11px;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;max-height:32vh;overflow-y:auto}
+    .ats-preview-text.is-empty{color:#98a2b3}
+    .ats-preview-footer{display:flex;justify-content:flex-end;gap:9px;padding:13px 19px;border-top:1px solid #eaecf0;flex-shrink:0}
+    .ats-previous-note{font-size:11px;line-height:1.55;color:#667085;background:#f8f9fb;border-radius:7px;padding:6px 9px;margin:8px 0 6px;overflow-wrap:anywhere;white-space:pre-wrap}
+    .ats-previous-note strong{color:#475467;font-weight:850}
+    @media(max-width:540px){.ats-preview-modal{max-height:90vh}.ats-preview-head,.ats-preview-body,.ats-preview-footer{padding-left:12px;padding-right:12px}.ats-preview-footer .btn{flex:1}}
   `;document.head.appendChild(style);
-  window.v52AssessmentToolSummary={load,get,render,mount,bind,saveAfterTool,list,merged,trackOverall,printBlock,fingerprint,sourceFingerprint,generate,source,TOOL_TABLE,TITLES};
+  window.v52AssessmentToolSummary={load,get,render,mount,bind,saveAfterTool,list,merged,trackOverall,printBlock,fingerprint,sourceFingerprint,generate,source,previousNote,TOOL_TABLE,TITLES};
 })();
