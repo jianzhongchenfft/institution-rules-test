@@ -19,7 +19,7 @@
           ${alCanReview()?`<button class="al-tab ${state.annualLeaveView==='review'?'active':''}" data-al-view="review">待審核 ${reviewRows.length+cancellationReviewCount}</button>`:''}
         </div>
         <span class="spacer"></span>
-        ${state.annualLeaveView==='mine'?'<label class="schedule-filter-label" for="alMonth">月份</label><input id="alMonth" type="month" value="'+escapeHTML(state.annualLeaveMonth)+'">':''}
+        ${state.annualLeaveView==='mine'?'<div class="al-month-selector"><label class="schedule-filter-label" for="alMonthRoc">月份</label><input id="alMonth" type="hidden" value="'+escapeHTML(state.annualLeaveMonth)+'"><div id="alMonthHost" class="roc-inline-date"></div></div>':''}
         <button id="alReload" class="btn">↻ 重新整理</button>
       </div>
       <div id="alMain">${state.annualLeaveView==='usage'?alUsageTable():state.annualLeaveView==='credits'?alCreditTable():state.annualLeaveView==='review'?(`<section class="ot-rule-card"><h3>特休申請</h3>${alRequestTable(reviewRows,{review:true})}</section><section class="ot-rule-card"><h3>特休銷假申請</h3>${alCancellationReviewHTML()}</section>`):alRequestTable(monthOwn)}</div>`;
@@ -35,7 +35,10 @@
     const openMyUsage=()=>{state.annualLeaveView='usage';state.annualLeaveUsageCreditId=null;renderAnnualLeavePage();};
     usageCard?.addEventListener('click',openMyUsage);
     usageCard?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMyUsage();}});
-    $('alMonth')?.addEventListener('change',e=>{state.annualLeaveMonth=e.target.value||isoDate(new Date()).slice(0,7);renderAnnualLeavePage();});
+    if($('alMonth')){
+      $('alMonth').addEventListener('change',e=>{state.annualLeaveMonth=e.target.value||isoDate(new Date()).slice(0,7);renderAnnualLeavePage();});
+      window.rocDateKit.mountLinkedMonth('alMonth',{value:state.annualLeaveMonth,required:true});
+    }
     $('alReload')?.addEventListener('click',async()=>{await loadAnnualLeaveData();renderAnnualLeavePage();toast('已重新整理特休資料','success');});
     document.querySelectorAll('[data-al-usage-credit]').forEach(btn=>btn.addEventListener('click',()=>{
       state.annualLeaveUsageCreditId=btn.dataset.alUsageCredit;
@@ -104,7 +107,7 @@
     return `<div class="form-grid">
       <div class="field"><label>申請人</label><input class="al-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
       <div class="field"><label>身分</label><input class="al-readonly" value="${escapeHTML(alRoleLabel(state.profile?.role))}" disabled></div>
-      <div class="field"><label>特休日期 *</label><input id="alDate" type="date" value="${escapeHTML(date)}"></div>
+      <div class="field"><label>特休日期 *</label><input id="alDate" type="hidden" value="${escapeHTML(date)}"><div id="alDateHost" class="roc-inline-date"></div></div>
       <div class="field"><label>目前可再申請</label><input id="alBalanceValue" class="al-readonly" value="${escapeHTML(alDays(b.available))}" disabled></div>
       <div class="field"><label>開始時間 *</label><div class="al-time-pair"><select id="alStartHour">${alTimeOptions(sp.hour)}</select><select id="alStartMinute"><option value="00" ${sp.minute==='00'?'selected':''}>00</option><option value="30" ${sp.minute==='30'?'selected':''}>30</option></select></div></div>
       <div class="field"><label>結束時間 *</label><div class="al-time-pair"><select id="alEndHour">${alTimeOptions(ep.hour)}</select><select id="alEndMinute"><option value="00" ${ep.minute==='00'?'selected':''}>00</option><option value="30" ${ep.minute==='30'?'selected':''}>30</option></select></div></div>
@@ -123,6 +126,7 @@
       view:'mine',
       actions:`${!existing?'<button type="button" id="alPageDraft" class="btn">儲存草稿</button>':''}<button type="button" id="alPageSubmit" class="btn primary">送出審核</button>`
     });
+    window.rocDateKit.mountLinkedDate('alDate',{value:existing?.leave_date||isoDate(new Date()),required:true});
     const update=()=>{
       const date=$('alDate')?.value||isoDate(new Date());
       const start=alSelectedTime('alStart'), end=alSelectedTime('alEnd'), mins=alMinutesBetween(start,end);
@@ -163,7 +167,7 @@
   }
 
   async function saveAnnualLeave(existing,status){
-    const leaveDate=$('alDate').value;
+    const leaveDate=window.rocDateKit.linkedISO('alDate');
     const start=alSelectedTime('alStart'), end=alSelectedTime('alEnd');
     const minutes=alMinutesBetween(start,end);
     const reason=$('alReason').value.trim(), notes=$('alNotes').value.trim();
@@ -403,7 +407,7 @@
     const rounded=Math.round(n*100)/100;
     return `${String(rounded).replace(/\.0+$/,'')}天`;
   };
-  const dateText=value=>value?rocDate(String(value).slice(0,10)+'T00:00:00'):'未設定';
+  const dateText=value=>value?window.rocDateKit.formatDateCompact(String(value).slice(0,10)):'未設定';
   const roleText=role=>roleLabels?.[role]||role||'—';
   const daysUntil=value=>{
     if(!value)return null;
