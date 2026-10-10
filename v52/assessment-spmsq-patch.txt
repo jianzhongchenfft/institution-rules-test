@@ -70,11 +70,11 @@
     window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'SPMSQ 短簡易智能狀態問卷');
     $('content').innerHTML=`
       <div class="spmsq-page">
-        <div class="page-head"><div><h1>${escapeHTML(c.case_name)}｜SPMSQ</h1><p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}</p></div><div><button id="spmsqBack" class="btn">← 返回評估事件</button></div></div>
+        <div class="page-head"><div><h1>${escapeHTML(c.case_name)}｜SPMSQ</h1><p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}</p></div><div><button id="spmsqBack" class="btn">← 返回評估事件</button></div></div>
         ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}
         <section class="spmsq-summary">
           <div class="spmsq-summary-card"><label>本次錯誤題數</label><strong>${local.isUnable?'—':(count?err:'—')}</strong><small>${local.isUnable?'本次標示無法評估':(complete?'正式結果':'暫計｜已完成 '+count+'/10 題')}</small></div>
-          <div class="spmsq-summary-card"><label>前次錯誤題數</label><strong>${local.previous?.error_count??'—'}</strong><small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small></div>
+          <div class="spmsq-summary-card"><label>前次錯誤題數</label><strong>${local.previous?.error_count??'—'}</strong><small>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):'無前次完成紀錄'}</small></div>
           <div class="spmsq-summary-card"><label>結果說明</label><strong style="font-size:14px">${local.isUnable?'無法評估':(!complete?'尚未完成':err<=2?'0–2題錯誤':'3題以上')}</strong><small>${local.isUnable?'請填寫原因':(!complete?'完成10題後顯示':err<=2?'多屬正常範圍':'建議持續觀察並視需要進一步評估')}</small></div>
         </section>
         ${local.hasLaterCompleted?'<div class="spmsq-notice">此筆評估日期早於個案較新的已完成 SPMSQ；系統只會將本次日期以前最近一筆已完成 SPMSQ 視為「前次評估」。</div>':''}
