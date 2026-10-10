@@ -57,8 +57,7 @@
   }
 
   function leaveDateLabel(value){
-    const d = new Date(value + 'T00:00:00');
-    return `${d.getMonth()+1}/${d.getDate()}`;
+    return window.rocDateKit.formatDateCompact(value);
   }
 
   function leaveWorkerName(id){
