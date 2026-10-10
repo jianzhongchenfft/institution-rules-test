@@ -27,6 +27,12 @@ EVSTYLE.textContent=`
 .event-field.full{grid-column:1/-1}
 .event-field label{display:block;font-size:12px;font-weight:850;color:#475467;margin-bottom:7px}
 .event-field input,.event-field select,.event-field textarea{width:100%;box-sizing:border-box}
+.event-roc-date .rdk{display:flex;width:100%;max-width:100%;flex-wrap:wrap}
+.event-roc-date .rdk .rdk-text{flex:1 1 120px;min-width:0;width:calc(100% - 48px)}
+.event-roc-date .rdk .rdk-toggle{width:42px;flex:0 0 42px}
+.event-roc-date .rdk .rdk-year{width:67px;flex:0 0 67px}
+.event-roc-date .rdk .rdk-month-select{width:58px;flex:0 0 58px}
+.event-roc-date .rdk input[type="hidden"]{display:none}
 .event-time-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}.event-time-pair span{font-weight:800;color:#667085;text-align:center}
 .event-field textarea{resize:vertical;line-height:1.65}
 .event-field .event-help{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45}
