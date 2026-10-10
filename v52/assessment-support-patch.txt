@@ -474,7 +474,7 @@
   function syncDynamicRows(){syncFamilyMembers();syncSocialResources();syncNeeds();}
 
   function bindEvents(row){
-    window.v52AssessmentToolSummary?.mount(local.eventId,'support',currentToolSummarySource(),'.support-page','.support-actions');
+    window.v52AssessmentToolSummary?.mount(local.eventId,'support',currentToolSummarySource,'.support-page','.support-actions');
     $('supportBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
     document.querySelectorAll('[data-support-household]').forEach(el=>{
