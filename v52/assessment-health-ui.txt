@@ -503,6 +503,22 @@
         </div>
         <div class="health-section-body">
           <div class="health-subsection">
+            <div class="health-subtitle"><strong>目前健康基準資料</strong><small>預先帶入個案主檔，可由督導修正</small></div>
+            <div class="health-notice" style="background:#f7fbff;border-color:#d9e9f7;color:#475467">
+              本區預先帶入個案主檔。若修改疾病史或固定治療內容，儲存時會詢問是否同步更新主檔；若不更新，僅儲存本次評估內容。
+            </div>
+            <div class="health-grid">
+              <div class="health-field">
+                <label>目前重要疾病／慢性病史</label>
+                <textarea data-health-medical="baseline_important_conditions" placeholder="由個案主檔帶入，例如：高血壓、糖尿病">${escapeHTML(local.medicalInfo.baseline_important_conditions||'')}</textarea>
+              </div>
+              <div class="health-field">
+                <label>固定治療／特殊醫療安排</label>
+                <textarea data-health-medical="baseline_ongoing_treatments" placeholder="由個案主檔帶入，例如：每週固定血液透析">${escapeHTML(local.medicalInfo.baseline_ongoing_treatments||'')}</textarea>
+              </div>
+            </div>
+          </div>
+          <div class="health-subsection">
             <div class="health-subtitle">
               <strong>1. 本期就醫事件</strong>
               <small>門診、急診、住院、手術／處置皆可分筆記錄</small>
