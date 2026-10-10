@@ -81,6 +81,7 @@
     .assessment-head-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .assessment-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
     .assessment-toolbar .spacer{flex:1}
+    .assessment-roc-date .rdk{display:flex;width:100%;flex-wrap:wrap}.assessment-roc-date .rdk .rdk-text{flex:1;min-width:0;width:calc(100% - 46px)}.assessment-roc-date .rdk .rdk-year{width:67px;flex:0 0 67px}.assessment-roc-date .rdk .rdk-month-select{width:58px;flex:0 0 58px}.assessment-roc-date .rdk input[type="hidden"]{display:none}
     .assessment-segment{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:2px;background:#fff}
     .assessment-segment button{border:0;background:transparent;padding:7px 10px;border-radius:8px;font-size:11.5px;font-weight:900;color:#667085;cursor:pointer}
     .assessment-segment button.active{background:#fff1eb;color:#a45d49}
@@ -819,7 +820,7 @@
           </div>
           <div class="field half">
             <label>預定評估日期 *</label>
-            <input id="assessmentPlannedDate" type="date" value="${existing?.planned_date||assessmentToday()}">
+            <div id="assessmentPlannedDateHost" class="assessment-roc-date"></div>
           </div>
           <div class="field half">
             <label>評估原因 *</label>
@@ -827,7 +828,7 @@
           </div>
           <div class="field half" id="assessmentProblemFollowupField">
             <label>問題追蹤日期</label>
-            <input id="assessmentProblemFollowupDate" type="date" value="${existing?.problem_followup_date||''}">
+            <div id="assessmentProblemFollowupDateHost" class="assessment-roc-date"></div>
             <div style="font-size:10.5px;color:#667085;margin-top:5px">僅用於本次狀況／特定問題後續確認，不會直接改變完整評估週期。</div>
           </div>
           <div class="field full">
@@ -849,11 +850,13 @@
       onConfirm:async()=>{
         const caseId=existing?.case_id||$('assessmentCase')?.value;
         const type=$('assessmentType')?.value;
-        const plannedDate=$('assessmentPlannedDate')?.value;
+        const plannedDate=assessmentPlannedField.getISO();
+         const problemDate=['condition_change','specific_problem'].includes(type)?assessmentProblemField.getISO():'';
         const reasonCode=$('assessmentReason')?.value;
         if(!caseId)return toast('請選擇個案','warn');
         if(!type)return toast('請選擇評估類型','warn');
-        if(!plannedDate)return toast('請填寫預定評估日期','warn');
+        if(!plannedDate)return toast('請填寫有效的預定評估日期','warn');
+         if(problemDate===null)return toast('問題追蹤日期格式不正確','warn');
         if(!reasonCode)return toast('請選擇評估原因','warn');
 
         const newerCompletedAssessment=[...state.assessmentEvents]
@@ -887,7 +890,7 @@
             reason_code:reasonCode,
             reason_note:$('assessmentReasonNote')?.value.trim()||null,
             problem_followup_date:['condition_change','specific_problem'].includes(type)
-              ?($('assessmentProblemFollowupDate')?.value||null)
+              ?(problemDate||null)
               :null,
             updated_by:state.user.id,
             updated_at:new Date().toISOString()
@@ -980,7 +983,7 @@
             reason_code:reasonCode,
             reason_note:$('assessmentReasonNote')?.value.trim()||null,
             problem_followup_date:['condition_change','specific_problem'].includes(type)
-              ?($('assessmentProblemFollowupDate')?.value||null)
+              ?(problemDate||null)
               :null,
             responsible_staff_id:c.supervisor_id||null,
             status:'pending',
@@ -1042,6 +1045,13 @@
       }
     });
 
+    if(!window.rocDateKit)throw new Error('民國日期共用元件尚未載入');
+    const assessmentPlannedField=window.rocDateKit.mountDate($('assessmentPlannedDateHost'),{
+      id:'assessmentPlannedDate',value:existing?.planned_date||assessmentToday(),required:true
+    });
+    const assessmentProblemField=window.rocDateKit.mountDate($('assessmentProblemFollowupDateHost'),{
+      id:'assessmentProblemFollowupDate',value:existing?.problem_followup_date||'',required:false
+    });
     const toggleProblemFollowupField=()=>{
       const type=$('assessmentType')?.value;
       const field=$('assessmentProblemFollowupField');
