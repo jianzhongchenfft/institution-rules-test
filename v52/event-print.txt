@@ -25,20 +25,9 @@ const printText=value=>{
   return escapeHTML(text).replace(/\n/g,'<br>');
 };
 
-const printDate=value=>value?rocDate(value+'T00:00:00'):'—';
+const printDate=value=>window.rocDateKit.formatPrintDate(value);
 const printTime=value=>value?String(value).slice(0,5):'—';
-const printDateTime=value=>{
-  if(!value)return '—';
-  try{
-    const d=new Date(value);
-    if(Number.isNaN(d.getTime()))return String(value);
-    const date=rocDate(isoDate(d)+'T00:00:00');
-    const time=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    return `${date} ${time}`;
-  }catch{
-    return String(value);
-  }
-};
+const printDateTime=value=>window.rocDateKit.formatPrintDateTime(value);
 const shortEventId=id=>id?String(id).replace(/-/g,'').slice(0,10).toUpperCase():'—';
 
 const printAttachmentList=(eventId,type,recordId)=>{
@@ -81,7 +70,7 @@ function buildEventPrintHtml(eventId){
   const closures=printGetClosures(eventId);
   const sensitive=printGetSensitiveDetails(eventId);
   const isSensitive=printIsSensitiveCategory(event.category);
-  const today=rocDate(isoDate(new Date())+'T00:00:00');
+  const today=window.rocDateKit.formatPrintDate(isoDate(new Date()));
 
   const basicRows=[
     ['事件發生日期',printDate(event.event_date),'事件發生時間',printTime(event.event_time)],
