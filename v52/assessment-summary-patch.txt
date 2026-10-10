@@ -124,6 +124,14 @@
     .asum-field label{display:block;font-size:10.5px;font-weight:900;color:#667085;margin-bottom:5px}
     .asum-field input,.asum-field select,.asum-field textarea{width:100%;box-sizing:border-box}
     .asum-field textarea{min-height:96px;resize:vertical}
+    .asum-choice-row{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+    .asum-field label.asum-choice-option{display:inline-flex;align-items:center;gap:8px;box-sizing:border-box;
+      margin:0;padding:11px 15px;border:1px solid var(--line);border-radius:10px;background:#fff;
+      color:#344054;font-size:12px;font-weight:800;cursor:pointer;min-height:44px;flex:1 1 145px}
+    .asum-field label.asum-choice-option:has(input:checked){border-color:#dc9479;background:#fff8f5}
+    .asum-field label.asum-choice-option:focus-within{outline:2px solid #dc9479;outline-offset:2px}
+    .asum-field .asum-choice-option input[type="radio"]{width:auto;flex:0 0 auto;accent-color:#dc9479;margin:0}
+    @media(max-width:560px){.asum-field label.asum-choice-option{flex-basis:calc(50% - 5px);padding:10px 12px}}
     .asum-help{border:1px solid #d9e9f7;background:#f7fbff;border-radius:10px;padding:10px 11px;font-size:10.5px;color:#475467;line-height:1.55;margin-bottom:12px}
     .asum-track-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
     .asum-track-box{border:1px solid var(--line);border-radius:11px;background:#fafafa;padding:11px}
@@ -651,12 +659,18 @@
     `).join('')}</div>`;
   }
 
-  function boolSelect(value){
-    const val=value===true?'yes':value===false?'no':'';
-    return `<option value="">請選擇</option>
-      <option value="no" ${val==='no'?'selected':''}>否</option>
-      <option value="yes" ${val==='yes'?'selected':''}>是</option>`;
+  // 沿用原本欄位 ID 與 change 事件：改呈現，不改資料值及條件展開規則。
+  function renderSummaryChoice(id,options,selected){
+    const current=selected===null||selected===undefined?'':String(selected);
+    return `<input type="hidden" id="${id}" value="${escapeHTML(current)}">
+      <div class="asum-choice-row" role="radiogroup">
+        ${options.map(([v,label])=>`<label class="asum-choice-option">
+          <input type="radio" name="${id}_choice" data-asum-choice="${id}"
+            value="${v}" ${current===v?'checked':''}><span>${escapeHTML(label)}</span>
+        </label>`).join('')}
+      </div>`;
   }
+  const YES_NO=[['yes','是'],['no','否']];
 
   function render(){
     const row=eventById(local.eventId),c=row?caseById(row.case_id):null;
@@ -691,21 +705,22 @@
         <div class="asum-section-head"><strong>三、本次督導整體評估</strong><small>完成評估前，請依工具結果、前次追蹤與實際服務情形進行專業整合。</small></div>
         <div class="asum-body">
           <div class="asum-form-grid">
-            <div class="asum-field full"><label>整體狀況 *</label><select id="asumOverall">
-              <option value="">請選擇</option>
-              ${Object.entries(OVERALL_LABELS).map(([v,l])=>`<option value="${v}" ${s.overall_status===v?'selected':''}>${l}</option>`).join('')}
-            </select></div>
+            <div class="asum-field full"><label>整體狀況 *</label>
+              ${renderSummaryChoice('asumOverall',Object.entries(OVERALL_LABELS),s.overall_status)}</div>
             <div class="asum-field full">${renderOverallMergeTools()}</div>
             <div class="asum-field full"><label>主要評估發現／問題與需求 *</label><textarea id="asumFindings" placeholder="請整合功能、健康、認知／情緒、環境、家庭支持與照顧者狀況。">${escapeHTML(s.key_findings||'')}</textarea></div>
             <div class="asum-field full"><label>照顧服務重點／建議 *</label><textarea id="asumRecommendations" placeholder="請記錄後續居家服務需注意、維持或調整的重點。">${escapeHTML(s.care_recommendations||'')}</textarea></div>
 
-            <div class="asum-field full"><label>是否需調整服務／照顧安排 *</label><select id="asumAdjust">${boolSelect(s.service_adjustment_required)}</select></div>
+            <div class="asum-field full"><label>是否需調整服務／照顧安排 *</label>
+              ${renderSummaryChoice('asumAdjust',YES_NO,s.service_adjustment_required===true?'yes':s.service_adjustment_required===false?'no':'')}</div>
             ${s.service_adjustment_required===true?`<div class="asum-field full"><label>服務／照顧調整內容 *</label><textarea id="asumAdjustNote" placeholder="請說明需調整的服務項目、頻率、照顧方式或其他安排。">${escapeHTML(s.service_adjustment_note||'')}</textarea></div>`:''}
 
-            <div class="asum-field full"><label>是否需後續追蹤 *</label><select id="asumFollowup">${boolSelect(s.followup_required)}</select></div>
+            <div class="asum-field full"><label>是否需後續追蹤 *</label>
+              ${renderSummaryChoice('asumFollowup',YES_NO,s.followup_required===true?'yes':s.followup_required===false?'no':'')}</div>
             ${s.followup_required===true?`<div class="asum-field full"><label>後續追蹤計畫 *</label><textarea id="asumFollowupPlan" placeholder="請說明追蹤重點、方式或預計時程。">${escapeHTML(s.followup_plan||'')}</textarea></div>`:''}
 
-            <div class="asum-field full"><label>是否需對外協調／轉介 *</label><select id="asumExternal">${boolSelect(s.external_coordination_required)}</select></div>
+            <div class="asum-field full"><label>是否需對外協調／轉介 *</label>
+              ${renderSummaryChoice('asumExternal',YES_NO,s.external_coordination_required===true?'yes':s.external_coordination_required===false?'no':'')}</div>
             ${s.external_coordination_required===true?`<div class="asum-field full"><label>對外協調／轉介內容 *</label><textarea id="asumExternalNote" placeholder="例如：A 單位、個管師、醫療端、社福或家庭照顧者支持服務。">${escapeHTML(s.external_coordination_note||'')}</textarea></div>`:''}
           </div>
         </div>
@@ -762,6 +777,13 @@
         rerenderWithScroll();toast('已確認保留原有整體總結','success');
       }catch(e){local.overallSignature=old;toast('確認失敗：'+(e?.message||e),'error');}
     });
+    document.querySelectorAll('[data-asum-choice]').forEach(radio=>radio.addEventListener('change',()=>{
+      if(!radio.checked)return;
+      const field=$(radio.dataset.asumChoice);
+      if(!field)return;
+      field.value=radio.value;
+      field.dispatchEvent(new Event('change',{bubbles:true}));
+    }));
     $('asumOverall')?.addEventListener('change',e=>local.summary.overall_status=e.target.value||null);
     $('asumFindings')?.addEventListener('input',e=>local.summary.key_findings=e.target.value);
     $('asumRecommendations')?.addEventListener('input',e=>local.summary.care_recommendations=e.target.value);
