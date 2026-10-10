@@ -640,6 +640,8 @@ function htmlOpenManualModal(){
     openModal({title:'手動建立個案',confirmText:'建立個案',large:true,html:`
       <div class="import-preview-grid">
         <div class="field"><label>個案編號 *</label><input id="hmCaseNo" placeholder="例如：115C00001"></div>
+        <div class="field"><label>開案日期 *</label><input id="hmOpenDate" type="date" value="${htmlTodayLocal()}"></div>
+        <div class="field full"><label>Google定位（選填）</label><input id="hmGoogleMaps" type="url" placeholder="貼上 Google Maps 分享連結"></div>
         <div class="field"><label>負責督導 *</label><select id="hmSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions('')}</select></div>
         <div class="field"><label>服務類別 *</label><select id="hmUsageType"><option value="">請選擇</option><option value="居家">居家</option><option value="喘息">喘息</option><option value="居家+喘息">居家+喘息</option></select></div>
         <div class="field"><label>繳款方式</label><select id="hmPaymentMethod">${htmlPaymentOptions('')}</select></div>
@@ -652,6 +654,8 @@ function htmlOpenManualModal(){
         <div class="field full"><label>地址</label><input id="hmAddress"></div>
         <div class="field"><label>電話</label><input id="hmPhone"></div>
         <div class="field"><label>CMS</label><input id="hmCms"></div>
+        <div class="field"><label>個管師</label><input id="hmManager"></div>
+        <div class="field"><label>個管師電話</label><input id="hmManagerPhone"></div>
         <div class="field"><label>是否身障</label><select id="hmDisability"><option value="">未設定</option><option value="true">是</option><option value="false">否</option></select></div>
         <div class="field"><label>是否原住民</label><select id="hmIndigenous"><option value="">未設定</option><option value="true">是</option><option value="false">否</option></select></div>
         <div class="field"><label>原住民族別</label><input id="hmIndigenousGroup"></div>
