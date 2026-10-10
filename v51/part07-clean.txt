@@ -17,7 +17,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
   async function loadCaseVisitsModulePatch(){
     try{
       // 民國日期元件共用載入點；個案表單需要先載入，再進行其他模組初始化。
-      const rocDateKitRes=await fetch('v52/roc-date-kit.js?v=roc-event-time-v3-20261011',{cache:'no-store'});
+      const rocDateKitRes=await fetch('v52/roc-date-kit.js?v=roc-staff-schedule-v4-20261011',{cache:'no-store'});
       if(!rocDateKitRes.ok)throw new Error('民國日期共用元件載入失敗（'+rocDateKitRes.status+'）');
       eval(await rocDateKitRes.text());
       if(!window.rocDateKit||typeof window.rocDateKit.mountDate!=='function')throw new Error('民國日期共用元件初始化失敗');
@@ -68,23 +68,23 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       }
       eval(caseContactCode);
 
-      const staffManagementRes = await fetch('v52/staff-management.txt?v=work-hours-timeline-v1-20261008',{cache:'no-store'});
+      const staffManagementRes = await fetch('v52/staff-management.txt?v=roc-staff-v2-20261011',{cache:'no-store'});
       if(!staffManagementRes.ok) throw new Error(`v52/staff-management.txt 載入失敗（${staffManagementRes.status}）`);
       eval(await staffManagementRes.text());
 
-      const staffScheduleRes = await fetch('v52/staff-work-schedule-ui.txt?v=comp-leave-earned-v1-20261008',{cache:'no-store'});
+      const staffScheduleRes = await fetch('v52/staff-work-schedule-ui.txt?v=roc-work-schedule-v2-20261011',{cache:'no-store'});
       if(!staffScheduleRes.ok) throw new Error(`v52/staff-work-schedule-ui.txt 載入失敗（${staffScheduleRes.status}）`);
       eval(await staffScheduleRes.text());
 
-      const scheduleRes = await fetch('v52/schedule-patch.txt',{cache:'no-store'});
+      const scheduleRes = await fetch('v52/schedule-patch.txt?v=roc-schedule-v1-20261011',{cache:'no-store'});
       if(!scheduleRes.ok) throw new Error(`v52/schedule-patch.txt 載入失敗（${scheduleRes.status}）`);
       eval(await scheduleRes.text());
 
-      const recurrenceRes = await fetch('v52/schedule-recurrence-patch.txt',{cache:'no-store'});
+      const recurrenceRes = await fetch('v52/schedule-recurrence-patch.txt?v=roc-recurrence-v1-20261011',{cache:'no-store'});
       if(!recurrenceRes.ok) throw new Error(`v52/schedule-recurrence-patch.txt 載入失敗（${recurrenceRes.status}）`);
       eval(await recurrenceRes.text());
 
-      const leaveRes = await fetch('v52/schedule-leave-patch.txt',{cache:'no-store'});
+      const leaveRes = await fetch('v52/schedule-leave-patch.txt?v=roc-leave-v1-20261011',{cache:'no-store'});
       if(!leaveRes.ok) throw new Error(`v52/schedule-leave-patch.txt 載入失敗（${leaveRes.status}）`);
       eval(await leaveRes.text());
 
