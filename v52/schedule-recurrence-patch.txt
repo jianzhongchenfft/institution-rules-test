@@ -53,6 +53,13 @@
     }).join('');
   }
 
+  function recurringMountRocDate(id,value,onChange){
+    const host=$(id+'Host');
+    if(!host)throw new Error('找不到排班日期欄位：'+id);
+    host.__rocDate=window.rocDateKit.mountDate(host,{id,value:value||'',required:true,onChange:onChange});
+  }
+  function recurringDateISO(id){return $(id+'Host')?.__rocDate?.getISO()??null;}
+
   function recurringGroupFromCode(code){
     const match=String(code||'').trim().toUpperCase().match(/^[A-Z]+/);
     return match?.[0] || 'OTHER';
@@ -151,8 +158,8 @@
     if(!preview) return;
     const mode=document.querySelector('input[name="scheduleCreateMode"]:checked')?.value||'single';
     if(mode!=='weekly'){preview.textContent='';return;}
-    const start=$('recurrenceStart')?.value;
-    const end=$('recurrenceEndDate')?.value;
+    const start=recurringDateISO('recurrenceStart');
+    const end=recurringDateISO('recurrenceEndDate');
     const weekdays=recurringSelectedWeekdays();
     if(!start || !end || !weekdays.length){preview.textContent='請設定期間與每週服務日。';return;}
     if(end<start){preview.textContent='結束日期不可早於起始日期。';return;}
@@ -193,14 +200,14 @@
               </div>
             </div>
 
-            <div class="field" id="singleDateField"><label>服務日期 *</label><input id="recurringSingleDate" type="date" value="${today}"></div>
+            <div class="field" id="singleDateField"><label>服務日期 *</label><div id="recurringSingleDateHost" class="roc-inline-date"></div></div>
             <div class="field"><label>班表狀態 *</label><select id="recurringStatus"><option value="confirmed">已確認</option><option value="unnotified">尚未照會</option><option value="planned">已排定</option></select></div>
 
             <div class="field full">
               <div id="recurrenceBox" class="schedule-recurrence-box">
                 <div class="form-grid">
-                  <div class="field"><label>起始日期 *</label><input id="recurrenceStart" type="date" value="${today}"></div>
-                  <div class="field"><label>結束日期 *</label><input id="recurrenceEndDate" type="date" value="${endDefaultISO}"></div>
+                  <div class="field"><label>起始日期 *</label><div id="recurrenceStartHost" class="roc-inline-date"></div></div>
+                  <div class="field"><label>結束日期 *</label><div id="recurrenceEndDateHost" class="roc-inline-date"></div></div>
                   <div class="field full"><label>每週服務日 *</label>
                     <div class="schedule-weekdays">
                       ${[['一',1],['二',2],['三',3],['四',4],['五',5],['六',6],['日',0]].map(([label,value])=>`<label class="schedule-weekday"><input type="checkbox" data-recurring-weekday value="${value}"> 週${label}</label>`).join('')}
@@ -229,13 +236,14 @@
         onConfirm:saveRecurringSchedule
       });
 
+      recurringMountRocDate('recurringSingleDate',today);
+      recurringMountRocDate('recurrenceStart',today,recurringUpdatePreview);
+      recurringMountRocDate('recurrenceEndDate',endDefaultISO,recurringUpdatePreview);
       recurringAddServiceRow();
       document.querySelectorAll('input[name="scheduleCreateMode"]').forEach(x=>x.addEventListener('change',recurringToggleMode));
       $('recurringStart').addEventListener('input',recurringUpdateEndTime);
       $('recurringStart').addEventListener('change',recurringUpdateEndTime);
       $('recurringAddServiceItem').addEventListener('click',()=>recurringAddServiceRow());
-      $('recurrenceStart').addEventListener('change',recurringUpdatePreview);
-      $('recurrenceEndDate').addEventListener('change',recurringUpdatePreview);
       document.querySelectorAll('[data-recurring-weekday]').forEach(x=>x.addEventListener('change',recurringUpdatePreview));
       recurringToggleMode();
       recurringUpdateEndTime();
@@ -262,12 +270,12 @@
     let dates=[];
     let recurrenceGroupId=null;
     if(mode==='single'){
-      const date=$('recurringSingleDate')?.value;
+      const date=recurringDateISO('recurringSingleDate');
       if(!date){toast('請選擇服務日期。','error');return;}
       dates=[date];
     }else{
-      const startDate=$('recurrenceStart')?.value;
-      const endDate=$('recurrenceEndDate')?.value;
+      const startDate=recurringDateISO('recurrenceStart');
+      const endDate=recurringDateISO('recurrenceEndDate');
       const weekdays=recurringSelectedWeekdays();
       if(!startDate||!endDate){toast('請設定固定排班的起始與結束日期。','error');return;}
       if(endDate<startDate){toast('結束日期不可早於起始日期。','error');return;}
