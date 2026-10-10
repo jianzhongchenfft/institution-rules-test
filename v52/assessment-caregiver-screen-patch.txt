@@ -191,6 +191,7 @@
         <label class="cg-option no ${cur==='no'?'selected':''}"><input type="radio" name="cg_${key}" value="no" ${cur==='no'?'checked':''}>未符合</label>
         <label class="cg-option yes ${cur==='yes'?'selected':''}"><input type="radio" name="cg_${key}" value="yes" ${cur==='yes'?'checked':''}>符合</label>
       </div>
+      ${window.v52AssessmentToolSummary?.previousNote(local.previous?.notes?.[key])||''}
       ${!showNote?`<div class="cg-note"><button type="button" class="btn sm" data-cg-add-note="${key}">＋ 補充備註</button></div>`:''}
       ${showNote?`<div class="cg-note"><label>說明${positive?' *':''}</label><textarea data-cg-note="${key}" placeholder="${positive?'請簡要說明符合情形與目前已知狀況':'補充備註（選填）'}">${escapeHTML(note)}</textarea></div>`:''}
     </div>`;
