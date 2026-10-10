@@ -201,7 +201,7 @@
   function staffName(id){return (L.staff.find(function(s){return s.id===id;})||{}).display_name||'尚未指派';}
   function eventName(e){return ({opening:'開案評估',periodic:'定期再評估',condition_change:'狀況變化評估',specific_problem:'特定問題評估'})[e.assessment_type]||e.assessment_type;}
   function planName(p){return ({opening:'初次擬定',periodic:'定期重擬',change:'狀況變化'})[p.plan_type]||'照顧計畫';}
-  function fmt(d){return d?rocDate(d+'T00:00:00'):'—';}
+  function fmt(d){return window.rocDateKit.formatDateCompact(d);}
   function status(c){
     var ev=eventFor(c)[0],ps=plansFor(c.id),same=ev?ps.find(function(p){return p.assessment_event_id===ev.id && !p.root_plan_id;}):null,latest=ps[0];
     if(ps.some(function(p){return p.root_plan_id && p.status==='draft';}))return '修訂草稿';
@@ -267,7 +267,7 @@
     }else if(L.tab==='history'){
       html+='<div class="icp-card"><h3>計畫版本紀錄</h3>'+
         '<div class="icp-table-shell"><table class="icp-table"><thead><tr><th>計畫日期</th><th>版本與類型</th><th>評估日期</th><th>狀態</th><th>完成／修改時間</th><th></th></tr></thead><tbody>'+
-        (ps.length?ps.map(function(p){return '<tr><td>'+fmt(p.plan_date)+'</td><td>'+h(planVersionLabel(p))+'</td><td>'+fmt(p.assessment_date)+'</td><td>'+(p.status==='draft'?'草稿':'已完成')+'</td><td>'+h(p.completed_at||p.updated_at?new Date(p.completed_at||p.updated_at).toLocaleString('zh-TW',{hour12:false}):'—')+'</td><td><button class="btn sm" data-icp-open="'+h(p.id)+'">'+(p.status==='draft'?'繼續填寫':'查看')+'</button></td></tr>';}).join(''):'<tr><td colspan="6">目前沒有計畫版本</td></tr>')+
+        (ps.length?ps.map(function(p){return '<tr><td>'+fmt(p.plan_date)+'</td><td>'+h(planVersionLabel(p))+'</td><td>'+fmt(p.assessment_date)+'</td><td>'+(p.status==='draft'?'草稿':'已完成')+'</td><td>'+h(p.completed_at||p.updated_at?window.rocDateKit.formatDateTimeCompact(p.completed_at||p.updated_at):'—')+'</td><td><button class="btn sm" data-icp-open="'+h(p.id)+'">'+(p.status==='draft'?'繼續填寫':'查看')+'</button></td></tr>';}).join(''):'<tr><td colspan="6">目前沒有計畫版本</td></tr>')+
         '</tbody></table></div></div>';
     }else{
       html+='<div class="icp-card"><h3>目前有效計畫</h3>'+
