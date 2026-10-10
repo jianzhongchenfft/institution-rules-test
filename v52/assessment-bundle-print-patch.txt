@@ -498,7 +498,7 @@
       const record=local.records?.[f.form_code],s=(local.toolSummaries||[]).find(x=>x.tool_code===f.form_code);
       if(!record||!s)return false;
       let sig={};try{sig=JSON.parse(s.source_signature||'{}')||{};}catch(_){}
-      const hash=api.fingerprint(api.source(f.form_code,record));
+      const hash=api.sourceFingerprint(f.form_code,record);
       return sig.findings!==hash||sig.recommendations!==hash;
     });
     const byCode=new Map((local.toolSummaries||[]).map(x=>[x.tool_code,x]));
