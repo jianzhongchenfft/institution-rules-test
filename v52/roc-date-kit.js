@@ -1,4 +1,4 @@
-/* 劉信子內部管理系統：共用民國日期工具 V1.2（獨立測試，尚未接入既有表單） */
+/* 劉信子內部管理系統：共用民國日期工具 V1.3（已逐步導入個案表單） */
 (function(root){
  'use strict';
  if(root.rocDateKit)return;
@@ -23,6 +23,7 @@
    return y!==null&&valid(y,m,d)?makeISO(y,m,month?null:d):null;
  }
  function formatDate(v){var p=isoDate(v);return p?yText(p.y)+'/'+pad(p.m)+'/'+pad(p.d):'—';}
+ function formatDateCompact(v){var p=isoDate(v);return p?yText(p.y)+'/'+p.m+'/'+p.d:'—';}
  function formatMonth(v){var p=isoMonth(v)||isoDate(v);return p?yText(p.y)+'年'+p.m+'月':'—';}
  function formatPrintDate(v){var p=isoDate(v);return p?yText(p.y)+'年'+p.m+'月'+p.d+'日':'—';}
  function formatDateTime(v){
@@ -163,7 +164,7 @@
  }
  root.rocDateKit=Object.freeze({
    parseDate:s=>parse(s,false),parseMonth:s=>parse(s,true),
-   formatDate:formatDate,formatMonth:formatMonth,formatPrintDate:formatPrintDate,formatDateTime:formatDateTime,
+   formatDate:formatDate,formatDateCompact:formatDateCompact,formatMonth:formatMonth,formatPrintDate:formatPrintDate,formatDateTime:formatDateTime,
    mountDate:(el,opt)=>mount(el,opt,false),mountMonth:(el,opt)=>mount(el,opt,true),todayISO:today
  });
 })(typeof window!=='undefined'?window:globalThis);
