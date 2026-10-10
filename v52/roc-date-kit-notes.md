@@ -143,3 +143,14 @@ const month = rocDateKit.mountMonth(monthContainer, {
 - **本批次未處理**特休日期、特休月份、特休遞延同意日期，以及薪資費率生效日；這些保留在下一階段。
 - 已完成整份出勤／加班／特休模組合併後的 JS 語法檢查、共用元件 ISO 轉換與 onchange 同步模擬、無效輸入阻止、既有加班／換休／月結函式相依性檢查。使用者登入後的實際新增、編輯與審核仍待驗收。
 - 限測試版 GitHub 前端，**沒有變更正式版、Supabase 資料庫、RLS 或計薪公式**。
+
+## 特休與薪資費率民國日期整合（測試版，2026-10-11）
+
+- 特休申請日期：民國日期元件以 `alDate` 隱藏 ISO 欄位同步；按日期變更仍觸發特休餘額、當日工時時段及扣抵天數的既有更新監聽，送出草稿／申請前經 `linkedISO` 再次驗證。
+- 特休申請月份：民國月份元件以 `alMonth` 隱藏 ISO 月份同步；原 `state.annualLeaveMonth` 為 `YYYY-MM`，不變更原有月範圍與列表篩選。
+- 特休到期遞延：`aleAgreementDate` 改民國日期輸入並保留 `max:today()` 與必填；送到 `resolve_annual_leave_expiry` 的 `p_agreement_date` 仍為西元 ISO 日期。
+- 薪資計算設定：`prRateDate` 改民國日期元件；新增薪資基數所用 `save_staff_payroll_rate` RPC 仍由 `p_effective_from` 接收 ISO 日期，不改金額及約定每日工時計算、版本保存。
+- 特休日期、到期日、遞延處理歷史及薪資費率歷史／薪資結算明細的日期顯示改為 `115/10/10`，操作時間使用 `115/10/10 14:30`。結算月份顯示保留 `115年10月`。
+- 共用 `roc-date-kit.js` 加入 `mountLinkedDate`、`mountLinkedMonth` 及 `linkedISO`，將原先分散在出勤模組的西元隱藏欄位同步規則集中至單一元件，並回收既有加班／換休日期的重複 helper 邏輯。
+- 已驗證完整出勤／特休／薪資前端組合 JS 語法、7個相連日期／月份欄位、民國日期轉西元、日期變更觸發監聽、無效日期拒絕、遞延最大日期限制傳入、既有薪資 RPC 日期欄位未變更。登入後實際操作驗收尚待使用者確認。
+- 僅修改 GitHub TEST 前端，無正式版 GitHub、Supabase DB/Function/RPC/SQL、權限或計薪公式變動。
