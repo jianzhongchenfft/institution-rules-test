@@ -240,7 +240,7 @@ begin
             coalesce(item->>'is_primary_contact','false')='true',
             coalesce(item->>'is_primary_caregiver','false')='true',
             coalesce(item->>'is_secondary_caregiver','false')='true',
-            nullif(btrim(item->>'notes','')),'manual',null
+            nullif(btrim(item->>'notes'),''),'manual',null
           ) returning id into v_contact_id;
           v_keep_contact_ids:=array_append(v_keep_contact_ids,v_contact_id);
         end if;
