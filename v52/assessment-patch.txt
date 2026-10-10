@@ -724,7 +724,7 @@
     });
     input.addEventListener('keydown',e=>{
       if(e.key==='Escape'){
-        if(opened){e.preventDefault();hide();}
+        if(opened){e.preventDefault();e.stopPropagation();hide();}
       }else if(e.key==='ArrowDown'||e.key==='ArrowUp'){
         e.preventDefault();
         if(!opened){show();return;}
