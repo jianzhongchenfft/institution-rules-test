@@ -102,7 +102,7 @@
     var otherPeople=[...root.querySelectorAll('[data-cc-other-row]')].map(function(row){
       return {name:row.querySelector('[data-cc-other-name]')?.value||'',relation:row.querySelector('[data-cc-other-relation]')?.value||''};
     });
-    var payload=ccReadDraftPayload();
+    var payload=ccReadDraftPayload(true);
     window.__ccPageDraftStore[s.key]={
       controls:ccPageControlsSnapshot(),
       other_people:otherPeople,
@@ -537,11 +537,11 @@
     return parts.join('');
   }
 
-  function ccReadDraftPayload(){
+  function ccReadDraftPayload(includeEmpty){
     var newFollowups=[...document.querySelectorAll('[data-cc-new-follow-content]')].map(function(input){
       var wrap=input.closest('.cc-follow-row');
       return {content:input.value.trim(),due_date:ccRocDatePeek(wrap.querySelector('[data-cc-new-follow-host]'))||null,responsible_staff_id:wrap.querySelector('[data-cc-new-follow-staff]')?.value||state.profile.id};
-    }).filter(function(x){return x.content;});
+    }).filter(function(x){return includeEmpty||x.content;});
     var prior=[...document.querySelectorAll('[data-cc-prior-follow]')].map(function(row){
       return {id:row.dataset.ccPriorFollow,result:row.querySelector('[data-cc-follow-result]')?.value||'not_followed',note:row.querySelector('[data-cc-follow-note]')?.value||'',next_due_date:ccRocDatePeek(row.querySelector('[data-cc-follow-next-host]'))||null};
     });
