@@ -43,7 +43,7 @@ a{color:#a35e44}
 <div class="demo-field">
 <label for="rocOpeningDate">開案日期（必填）</label>
 <div id="date-required"></div>
-<small>可以直接鍵入1151010或115/10/10，離開欄位後自動整理。</small>
+<small>輸入1151010、0840306或840306，離開欄位後自動轉成民國日期。</small>
 </div>
 <div class="demo-field">
 <label for="rocFollowupDate">後續追蹤日期（選填）</label>
@@ -53,7 +53,7 @@ a{color:#a35e44}
 <div class="demo-field">
 <label for="rocSalaryMonth">薪資月份</label>
 <div id="month-required"></div>
-<small>輸入115年10月，或使用月份選擇器。</small>
+<small>輸入11510會自動轉成115年10月，也可使用月份選擇器。</small>
 </div>
 <div class="demo-field">
 <label for="rocLimitDate">允許區間內的日期</label>
@@ -63,7 +63,10 @@ a{color:#a35e44}
 </div>
 <div class="actions">
 <button id="check" class="primary">驗證輸入與ISO儲存值</button>
-<button id="compact">測試連續數字1151010</button>
+<button id="compact">測試日期1151010</button>
+<button id="older">測試日期840306</button>
+<button id="older-padded">測試日期0840306</button>
+<button id="compact-month">測試月份11510</button>
 <button id="invalid">測試無效日期115/02/29</button>
 <button id="restore">恢復範例</button>
 </div>
@@ -78,7 +81,7 @@ a{color:#a35e44}
 </section>
 <p class="note">此獨立測試頁的輸入不會傳送至伺服器。完成後可返回原本的測試版首頁。</p>
 </main>
-<script src="roc-date-kit.js?v=roc-kit-v1-1-20261010"></script>
+<script src="roc-date-kit.js?v=roc-kit-v1-2-20261010"></script>
 <script>
 (function(){
 'use strict';
@@ -106,6 +109,10 @@ function formats(){
 var specs=[
  ['一般日期',kit.parseDate('115/10/10'),'2026-10-10'],
  ['連續數字日期',kit.parseDate('1151010'),'2026-10-10'],
+ ['民國84年6碼日期',kit.parseDate('840306'),'1995-03-06'],
+ ['民國84年7碼日期',kit.parseDate('0840306'),'1995-03-06'],
+ ['民國99年補零日期',kit.parseDate('0991231'),'2010-12-31'],
+ ['民國084年斜線日期',kit.parseDate('084/03/06'),'1995-03-06'],
  ['連續數字自動補零',kit.parseDate('1150102'),'2026-01-02'],
  ['連續數字閏年',kit.parseDate('1130229'),'2024-02-29'],
  ['連續數字無效日期',kit.parseDate('1150230'),null],
@@ -117,6 +124,10 @@ var specs=[
  ['平年2月29日拒絕',kit.parseDate('115/02/29'),null],
  ['閏年2月29日',kit.parseDate('113/02/29'),'2024-02-29'],
  ['月份輸入',kit.parseMonth('115年10月'),'2026-10'],
+ ['連續數字薪資月份',kit.parseMonth('11510'),'2026-10'],
+ ['民國84年4碼月份',kit.parseMonth('8403'),'1995-03'],
+ ['民國84年5碼月份',kit.parseMonth('08403'),'1995-03'],
+ ['無效連續月份',kit.parseMonth('11513'),null],
  ['西元月份誤輸入拒絕',kit.parseMonth('2026年10月'),null],
  ['一般列表顯示',kit.formatDate('2026-10-10'),'115/10/10'],
  ['月份顯示',kit.formatMonth('2026-10'),'115年10月'],
@@ -133,6 +144,15 @@ document.getElementById('compact').addEventListener('click',function(){
  openDate.input.value='1151010';
  openDate.validate();
  render();
+});
+document.getElementById('older').addEventListener('click',function(){
+ openDate.input.value='840306';openDate.validate();render();
+});
+document.getElementById('older-padded').addEventListener('click',function(){
+ openDate.input.value='0840306';openDate.validate();render();
+});
+document.getElementById('compact-month').addEventListener('click',function(){
+ salary.input.value='11510';salary.validate();render();
 });
 document.getElementById('invalid').addEventListener('click',function(){
  openDate.input.value='115/02/29';
