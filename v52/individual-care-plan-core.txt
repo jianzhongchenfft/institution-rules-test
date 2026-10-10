@@ -150,6 +150,7 @@
   var style=document.createElement('style');
   style.id='individual-care-plan-style';
   style.textContent='.icp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.icp-table-shell{overflow:auto;border:1px solid var(--line);background:#fff;border-radius:14px}.icp-table{border-collapse:collapse;min-width:800px;width:100%}.icp-table th,.icp-table td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px}.icp-table th{background:#faf8f7;color:#667085}.icp-table tbody tr{cursor:pointer}.icp-table tbody tr:hover{background:#fffaf8}.icp-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.icp-toolbar .icp-spacer{flex:1}.icp-segment{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:10px}.icp-segment button{padding:7px 10px;border:0;border-radius:8px;background:transparent;cursor:pointer}.icp-segment button.active{background:#fff1eb;color:#a45d49;font-weight:bold}.icp-shell{max-width:1180px;margin:0 auto;padding-bottom:90px}.icp-card{border:1px solid var(--line);background:#fff;border-radius:14px;padding:18px;margin:12px 0}.icp-card h3{margin:0 0 12px;font-size:15px}.icp-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.icp-field label{font-size:12px;font-weight:800;color:#344054}.icp-field input,.icp-field textarea,.icp-field select{width:100%;min-height:36px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13px;box-sizing:border-box}.icp-field textarea{min-height:75px;resize:vertical}.icp-field textarea::placeholder,.icp-field input::placeholder{color:#98a2b3;opacity:1}.icp-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.icp-problem{border:1px solid #e2d6d0;border-radius:12px;padding:14px;margin:10px 0;background:#fffdfb}.icp-goal{border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0;background:#fff}.icp-measure{display:block;border:1px solid var(--line);border-radius:10px;padding:12px;margin:9px 0}.icp-muted{color:#667085;font-size:11px;line-height:1.6}.icp-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.icp-footer{position:sticky;bottom:10px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;padding:11px;display:flex;justify-content:flex-end;gap:9px;z-index:10}.icp-note{background:#fff7ed;border-radius:9px;padding:10px;font-size:12px;color:#92502e}.icp-tab{margin-bottom:12px}.icp-tab button{padding:8px 14px;border:1px solid var(--line);background:#fff;cursor:pointer}.icp-tab button.active{background:#fff1eb;color:#a45d49;font-weight:900}@media(max-width:750px){.icp-grid{grid-template-columns:repeat(2,1fr)}.icp-cols{grid-template-columns:1fr}.icp-card{padding:12px}}';
+  style.textContent+='.icp-date-host .rdk{display:flex;width:100%;flex-wrap:wrap}.icp-date-host .rdk .rdk-text{flex:1 1 130px;min-width:0;width:calc(100% - 46px)}.icp-date-host .rdk .rdk-year{width:67px;flex:0 0 67px}.icp-date-host .rdk .rdk-month-select{width:58px;flex:0 0 58px}.icp-date-host .rdk input[type="hidden"]{display:none}';
   document.head.appendChild(style);
 
   function usable(){return !!state.profile&&ROLES.includes(state.profile.role);}
@@ -161,6 +162,7 @@
     });
   }
   function today(){return isoDate(new Date());}
+  function rocDateField(label,id){return '<div class="icp-field"><label for="'+h(id)+'">'+h(label)+'</label><div id="'+h(id)+'Host" class="icp-date-host"></div></div>';}
   function field(label,value,attr){return '<div class="icp-field"><label>'+h(label)+'</label><input '+(attr||'')+' value="'+h(value||'')+'"></div>';}
   // Placeholder text is only a hint; it is never saved as a field value.
   function area(label,value,attr,example){
@@ -342,7 +344,7 @@
       var candidates=activeGoals(plan);
       var selected=editing.type==='interim'?candidates.filter(function(x){return x.goal.id===editing.goalId;}):candidates;
       controls+='<div class="icp-card"><h3>'+(editing.type==='periodic'?'定期完整評值':'臨時評值')+'</h3>'+
-        '<div class="icp-cols">'+field('評值日期 *',editing.review_date,'type="date" id="icpReviewDate"')+
+        '<div class="icp-cols">'+rocDateField('評值日期 *','icpReviewDate')+
         (editing.type==='interim'?'<div class="icp-field"><label>選擇照顧目標</label><select id="icpReviewGoal">'+
           candidates.map(function(x){return '<option value="'+h(x.goal.id)+'"'+(editing.goalId===x.goal.id?' selected':'')+'>'+h(x.problem.title+'｜'+x.goal.title)+'</option>';}).join('')+'</select></div>':
           '<div class="icp-muted">本次需完成全部 '+selected.length+' 項有效目標的評值，才能送出。</div>')+'</div>'+
@@ -375,7 +377,13 @@
     if($('icpReviewPeriodic'))$('icpReviewPeriodic').onclick=function(){startReview(plan,'periodic');};
     if($('icpReviewInterim'))$('icpReviewInterim').onclick=function(){startReview(plan,'interim');};
     var editing=L.reviewing;if(!editing||editing.planId!==plan.id)return;
-    if($('icpReviewDate'))$('icpReviewDate').onchange=function(){editing.review_date=this.value;};
+    const reviewHost=$('icpReviewDateHost');
+    if(reviewHost){
+      reviewHost.__icpDate=window.rocDateKit.mountDate(reviewHost,{
+        id:'icpReviewDate',value:editing.review_date||'',required:true,
+        onChange:function(iso){editing.review_date=iso;}
+      });
+    }
     if($('icpReviewGoal'))$('icpReviewGoal').onchange=function(){editing.goalId=this.value;renderCase();};
     document.querySelectorAll('[data-review-goal]').forEach(function(block){
       var goalId=block.dataset.reviewGoal;
@@ -389,6 +397,11 @@
   }
   async function saveReviews(plan){
     var editing=L.reviewing;if(!editing||editing.planId!==plan.id)return;
+    if($('icpReviewDateHost')){
+      var reviewDate=$('icpReviewDateHost').__icpDate?.getISO();
+      if(!reviewDate){toast('請填寫有效的評值日期','error');return;}
+      editing.review_date=reviewDate;
+    }
     var all=activeGoals(plan),targets=editing.type==='interim'?all.filter(function(x){return x.goal.id===editing.goalId;}):all;
     if(!editing.review_date||!targets.length){toast('請選擇評值日期及照顧目標','error');return;}
     if(editing.review_date<plan.plan_date){toast('評值日期不能早於計畫日期','error');return;}
@@ -607,7 +620,7 @@
       '<button id="icpFormBack" class="btn">← 返回個案</button>',
       (p.revision_type?'<div class="icp-note">此為'+h(planVersionLabel(p))+'，完成後會自動保留前一版本及本次修改人員、時間。</div>':'')+
       '<div class="icp-card"><h3>一、基本資料與本次評估摘要</h3><div class="icp-cols">'+
-      field('計畫擬定日期 *',p.plan_date,'type="date" data-header="plan_date" '+(locked||correction?'disabled':''))+
+      rocDateField('計畫擬定日期 *','icpPlanDate')+
       field('負責督導',staffName(p.responsible_staff_id||c.supervisor_id),'disabled')+
       '</div><div class="icp-muted">主要評估發現／問題與需求</div><p style="white-space:pre-wrap">'+h(snap.key_findings||'未填寫')+'</p>'+
       '<div class="icp-muted">照顧服務重點／建議</div><p style="white-space:pre-wrap">'+h(snap.care_recommendations||'未填寫')+'</p>'+
@@ -629,10 +642,16 @@
       '<div class="icp-muted" data-icp-quarterly>下次定期完整評值：'+fmt(dueFromMonths(p.plan_date,3))+'（依計畫日期預設3個月後，個別目標可設定不同評值月份。）</div></div>'+
       (locked?'<div class="icp-note">此版本已完成。如需修改請回到「目前計畫」點選「修改計畫」，系統會自動保留歷史版本。</div>':
       '<div class="icp-footer"><span class="icp-muted" style="margin-right:auto">'+(L.dirty?'尚有未儲存變更':'可儲存草稿後再繼續')+'</span><button id="icpSaveDraft" class="btn">儲存草稿</button><button id="icpComplete" class="btn primary">完成計畫</button></div>'));
+    const planDateHost=$('icpPlanDateHost');
+    if(planDateHost){
+      planDateHost.__icpDate=window.rocDateKit.mountDate(planDateHost,{
+        id:'icpPlanDate',value:p.plan_date||'',required:true,disabled:locked||correction,
+        onChange:function(iso){p.plan_date=iso;L.dirty=true;updateDueLabels();}
+      });
+    }
     $('icpFormBack').onclick=function(){if(leaveOK()){L.editing=null;L.dirty=false;renderCase();}};
     if(locked){window.scrollTo(0,originalScroll);return;}
     document.querySelectorAll('[data-path]').forEach(function(el){el.addEventListener('input',onField);el.addEventListener('change',onField);});
-    document.querySelectorAll('[data-header]').forEach(function(el){el.addEventListener('input',function(){p[el.dataset.header]=el.value;L.dirty=true;updateDueLabels();});});
     document.querySelectorAll('[data-issue]').forEach(function(el){
       el.onchange=function(){
         var x=body.problems[Number(el.dataset.issue)],v=el.value;
@@ -730,6 +749,12 @@
   }
   async function save(finish){
     var p=L.editing;if(!p||p.status==='completed')return;
+    const planWidget=$('icpPlanDateHost')?.__icpDate;
+    if(planWidget){
+      const iso=planWidget.getISO();
+      if(!iso){toast('請填寫有效的計畫擬定日期','error');return;}
+      if(p.plan_date!==iso){p.plan_date=iso;L.dirty=true;updateDueLabels();}
+    }
     if(finish){var err=validate(p);if(err){toast(err,'error');return;}}
     syncReviewDates(p);
     // Older pending drafts could store proposals in service_code: keep the proposal, but never treat as approved service.
