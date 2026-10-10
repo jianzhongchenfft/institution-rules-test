@@ -545,6 +545,8 @@ async function htmlLoadExistingSnapshot(caseId){
       <div class="import-section">機構管理資料</div>
       <div class="import-preview-grid">
         <div class="field"><label>個案編號 *</label><input id="hiCaseNo" value="${escapeHTML(d.case_no||'')}"></div>
+        <div class="field"><label>開案日期（新案必填）</label><input id="hiOpenDate" type="date" value="${escapeHTML(d._existing?.caseData?.open_date||htmlTodayLocal())}"></div>
+        <div class="field full"><label>Google定位（選填）</label><input id="hiGoogleMaps" type="url" placeholder="貼上 Google Maps 分享連結" value="${escapeHTML(d._existing?.caseData?.google_maps_url||'')}"><div class="help">僅在建立新個案時寫入；既有個案請由「編輯個案」修改。</div></div>
         <div class="field"><label>負責督導 *</label><select id="hiSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions(d.supervisor_id||'')}</select></div>
         <div class="field"><label>服務類別 *</label><select id="hiUsageType"><option value="">請選擇</option><option value="居家" ${d.service_usage_type==='居家'?'selected':''}>居家</option><option value="喘息" ${d.service_usage_type==='喘息'?'selected':''}>喘息</option><option value="居家+喘息" ${d.service_usage_type==='居家+喘息'?'selected':''}>居家+喘息</option></select></div>
         <div class="field"><label>繳款方式</label><select id="hiPaymentMethod">${htmlPaymentOptions(d.payment_method||'')}</select></div>
@@ -600,6 +602,8 @@ async function htmlSavePreview(d,exactMatchId){
     if((welfare==='中低收入戶'||welfare==='一般戶')&&paymentMethod==='不收費'){toast('第二類／第三類個案不可設定為不收費','warn');return false;}
     const potential=$('hiPotentialMatch')?.value||'';
     const matchId=exactMatchId||potential||'';
+    if(!matchId&&!$('hiOpenDate').value){toast('新案必須填寫開案日期','warn');return false;}
+    if(!htmlValidMapsUrl($('hiGoogleMaps').value)){toast('請輸入有效的 Google Maps 分享連結','warn');return false;}
     const file=d._file; showLoading(true); let path='';
     try{
       const safeNo=caseNo.replace(/[^A-Za-z0-9_-]/g,'_');
@@ -607,7 +611,7 @@ async function htmlSavePreview(d,exactMatchId){
       path=`${safeNo}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
       const up=await db.storage.from(CASE_HTML_BUCKET).upload(path,file,{contentType:'text/html',upsert:false}); if(up.error)throw up.error;
       const payload={
-        case_no:caseNo,case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,
+        case_no:caseNo,open_date:$('hiOpenDate').value,google_maps_url:$('hiGoogleMaps').value.trim(),case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,
         address:$('hiAddress').value.trim(),phone:$('hiPhone').value.trim(),cms_level:$('hiCms').value.trim(),
         lives_alone:livesAlone==='true',has_dementia:dementia==='true',
         identity_type:$('hiIdentity').value.trim(),has_disability:$('hiDisability').value,is_indigenous:$('hiIndigenous').value,
