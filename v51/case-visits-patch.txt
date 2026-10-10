@@ -301,6 +301,15 @@
     toast('個案詳細頁模組尚未載入，請重新整理頁面後再試。','error');
   }
 
+  function ccLegacyVisitDate(hostId){
+    return $(hostId)?.__rocVisitDate?.getISO()??null;
+  }
+  function ccLegacyMountDate(hostId,inputId,value,required){
+    var host=$(hostId);
+    if(!host||!window.rocDateKit)throw new Error('民國日期共用元件尚未載入');
+    host.__rocVisitDate=window.rocDateKit.mountDate(host,{id:inputId,value:value||'',required:!!required});
+  }
+
   function openVisitModal(c){
     const pending = pendingFollowUpsFor(c.id);
     const prior = pending[0] || null;
@@ -309,7 +318,7 @@
       ${prior?`<div class="prior-followup"><strong>前次尚有追蹤事項</strong><span>${prior.follow_up_date?rocDate(prior.follow_up_date+'T00:00:00'):'未排日期'}｜${escapeHTML(prior.follow_up_item||'未填內容')}</span><div style="margin-top:9px"><label class="inline-check"><input id="resolvePrior" type="checkbox"> 本次一併完成此追蹤</label></div><div id="priorResultWrap" class="field-note"><select id="priorResult"><option value="improved">已改善</option><option value="ongoing">持續追蹤</option><option value="worse">情況惡化</option><option value="referred">已轉介／處理</option></select></div></div>`:''}
       <div class="form-grid">
         <div class="field"><label>訪視類型 *</label><select id="visitType"><option value="home">家訪</option><option value="phone">電訪</option><option value="new_case">新案家訪</option><option value="other">其他</option></select></div>
-        <div class="field"><label>訪視日期 *</label><input id="visitDate" type="date" value="${today}"></div>
+        <div class="field"><label>訪視日期 *</label><div id="visitDateHost" class="cc-roc-date-host"></div></div>
         <div class="field full"><label>聯絡／在場對象</label><input id="contactPerson" placeholder="例如：個案、案女、案子、主要照顧者"></div>
         <div class="field"><label>身體狀況</label><select id="physicalStatus"><option value="stable">穩定</option><option value="changed">有變化</option></select><input id="physicalNote" class="field-note" placeholder="請簡述變化"></div>
         <div class="field"><label>精神／認知</label><select id="mentalStatus"><option value="stable">穩定</option><option value="changed">有變化</option></select><input id="mentalNote" class="field-note" placeholder="請簡述變化"></div>
@@ -318,11 +327,14 @@
         <div class="field"><label>目前服務是否符合需求</label><select id="serviceFit"><option value="fit">符合</option><option value="adjust">部分需調整</option><option value="reassess">建議重新評估</option></select></div>
         <div class="field"><label>居服員服務情形</label><select id="workerStatus"><option value="stable">穩定</option><option value="improve">有需要改善事項</option></select></div>
         <div class="field"><label>個案／家屬是否有意見</label><select id="familyFeedback"><option value="none">無</option><option value="yes">有</option></select><input id="familyFeedbackNote" class="field-note" placeholder="請簡述意見"></div>
-        <div class="field"><label>下次訪視日期</label><input id="nextVisitDate" type="date"></div>
+        <div class="field"><label>下次訪視日期</label><div id="nextVisitDateHost" class="cc-roc-date-host"></div></div>
         <div class="field full"><label class="inline-check"><input id="followNeeded" type="checkbox"> 本次需要後續追蹤</label></div>
-        <div id="followWrap" class="field full field-note"><div class="form-grid"><div class="field"><label>追蹤事項</label><input id="followItem" placeholder="例如：確認回診結果"></div><div class="field"><label>預計追蹤日期</label><input id="followDate" type="date"></div></div></div>
+        <div id="followWrap" class="field full field-note"><div class="form-grid"><div class="field"><label>追蹤事項</label><input id="followItem" placeholder="例如：確認回診結果"></div><div class="field"><label>預計追蹤日期</label><div id="followDateHost" class="cc-roc-date-host"></div></div></div></div>
         <div class="field full"><label>訪談摘要</label><textarea id="visitSummary" style="min-height:130px" placeholder="可自行輸入，或按下方按鈕依目前選項產生初稿"></textarea><div class="summary-tools"><button id="buildVisitSummary" type="button" class="btn sm">自動整理紀錄</button></div></div>
       </div>`,onConfirm:()=>saveVisit(c,prior)});
+    ccLegacyMountDate('visitDateHost','visitDate',today,true);
+    ccLegacyMountDate('nextVisitDateHost','nextVisitDate','',false);
+    ccLegacyMountDate('followDateHost','followDate','',false);
 
     const toggleNote=(selectId,noteId,trigger)=>{const fn=()=>$(noteId).classList.toggle('show',$(selectId).value===trigger);$(selectId).addEventListener('change',fn);fn();};
     toggleNote('physicalStatus','physicalNote','changed');
@@ -337,7 +349,7 @@
 
   function buildVisitSummary(c,prior){
     const type=$('visitType').value;
-    const date=$('visitDate').value;
+    const date=ccLegacyVisitDate('visitDateHost');
     const contact=$('contactPerson').value.trim();
     const intro = type==='phone' ? `${date?rocDate(date+'T00:00:00'):''}電聯${contact||'個案／家屬'}了解近期生活及居家服務情形。` : `${date?rocDate(date+'T00:00:00'):''}進行${caseTypeLabel(type)}，了解個案近期狀況及居家服務情形。`;
     const parts=[intro];
@@ -355,8 +367,12 @@
   }
 
   async function saveVisit(c,prior){
-    const visitDate=$('visitDate').value;
-    if(!visitDate){toast('請填寫訪視日期','warn');return false;}
+    const visitDate=ccLegacyVisitDate('visitDateHost');
+    if(!visitDate){toast('請填寫有效的訪視日期','warn');return false;}
+    const nextVisitDate=ccLegacyVisitDate('nextVisitDateHost');
+    if(nextVisitDate===null){toast('下次訪視日期格式不正確','warn');return false;}
+    const followDate=ccLegacyVisitDate('followDateHost');
+    if($('followNeeded').checked&&followDate===null){toast('預計追蹤日期格式不正確','warn');return false;}
     const followNeeded=$('followNeeded').checked;
     if(followNeeded && !$('followItem').value.trim()){toast('已勾選需要追蹤，請填寫追蹤事項','warn');return false;}
     let summary=$('visitSummary').value.trim();
@@ -386,8 +402,8 @@
         previous_follow_up_result:prior && $('resolvePrior')?.checked ? $('priorResult').value : null,
         follow_up_needed:followNeeded,
         follow_up_item:followNeeded ? ($('followItem').value.trim()||null) : null,
-        follow_up_date:followNeeded ? ($('followDate').value||null) : null,
-        next_visit_date:$('nextVisitDate').value||null,
+        follow_up_date:followNeeded ? (followDate||null) : null,
+        next_visit_date:nextVisitDate||null,
         created_by:state.user.id
       });
       if(error) throw error;
