@@ -12,6 +12,9 @@
     .ot-summary-action{cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;user-select:none}.ot-summary-action:hover{border-color:#dc9479;box-shadow:0 3px 10px rgba(16,24,40,.08)}.ot-summary-action:focus{outline:2px solid rgba(220,148,121,.35);outline-offset:2px}.ot-summary-action.active{border-color:#dc9479;box-shadow:0 0 0 2px rgba(220,148,121,.14);background:#fff8f5}
     .ot-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
     .ot-toolbar .spacer{flex:1}
+    .ot-month-selector{display:flex;align-items:center;gap:7px;min-width:206px}
+    .ot-month-selector .roc-inline-date{flex:1;min-width:0}
+    .ot-page-form .roc-inline-date{width:100%}
     .ot-tabs{display:flex;gap:7px;flex-wrap:wrap}
     .ot-tab{border:1px solid var(--line);background:#fff;color:#667085;border-radius:999px;padding:7px 11px;font-size:11.5px;font-weight:900;cursor:pointer}
     .ot-tab.active{background:var(--green-700);border-color:var(--green-700);color:#fff}
@@ -59,6 +62,29 @@
     @media(max-width:560px){.ot-summary{grid-template-columns:1fr}.ot-toolbar>*{width:100%}.ot-tabs{width:100%}.ot-tab{flex:1}.ot-actions{flex-direction:column}.ot-actions .btn{width:100%}}
   `;
   document.head.appendChild(overtimeStyle);
+
+  // 相容既有薪資／換休判斷：可見輸入為共用民國元件，原欄位 ID 持續提供 ISO。
+  function otMountRocField(id,value,month=false){
+    const source=$(id),host=$(id+'Host');
+    if(!source||!host||!window.rocDateKit)throw new Error('民國日期欄位未準備完成：'+id);
+    const mount=month?window.rocDateKit.mountMonth:window.rocDateKit.mountDate;
+    host.__otRocDate=mount(host,{
+      id:id+'Roc',value:value||'',required:true,
+      onChange:iso=>{
+        source.value=iso;
+        source.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+    });
+    return host.__otRocDate;
+  }
+  function otRocISO(id){
+    const source=$(id),field=$(id+'Host')?.__otRocDate;
+    if(!source||!field)return null;
+    const iso=field.getISO();
+    if(!iso){source.value='';return null;}
+    source.value=iso;
+    return iso;
+  }
 
   const regIndex = modules.findIndex(m=>m.id==='regulations');
   if(!modules.some(m=>m.id==='overtime')){
@@ -816,7 +842,7 @@
           ${canReview?`<button class="ot-tab ${state.overtimeView==='review'?'active':''}" data-ot-view="review">待審核 ${reviewCount}</button><button class="ot-tab ${state.overtimeView==='payroll'?'active':''}" data-ot-view="payroll">薪資結算</button>`:''}
         </div>
         <span class="spacer"></span>
-        ${['mine','payroll'].includes(state.overtimeView)?`<label class="schedule-filter-label" for="otMonth">月份</label><input id="otMonth" type="month" value="${escapeHTML(state.overtimeMonth)}">`:''}
+        ${['mine','payroll'].includes(state.overtimeView)?`<div class="ot-month-selector"><label class="schedule-filter-label" for="otMonthRoc">月份</label><input id="otMonth" type="hidden" value="${escapeHTML(state.overtimeMonth)}"><div id="otMonthHost" class="roc-inline-date"></div></div>`:''}
         <button id="otReload" class="btn">↻ 重新整理</button>
       </div>
       <div id="otMain">
@@ -835,7 +861,10 @@
     $('otAddBtn')?.addEventListener('click',()=>openOvertimeModal());
     $('clAddBtn')?.addEventListener('click',()=>openCompLeaveUsageModal());
     document.querySelectorAll('[data-ot-view]').forEach(btn=>btn.addEventListener('click',()=>{state.overtimeView=btn.dataset.otView;renderOvertimePage();}));
-    $('otMonth')?.addEventListener('change',e=>{state.overtimeMonth=e.target.value||isoDate(new Date()).slice(0,7);renderOvertimePage();});
+    if($('otMonth')){
+      $('otMonth').addEventListener('change',e=>{state.overtimeMonth=e.target.value||isoDate(new Date()).slice(0,7);renderOvertimePage();});
+      otMountRocField('otMonth',state.overtimeMonth,true);
+    }
     $('otReload').addEventListener('click',async()=>{await loadOvertimeRows();renderOvertimePage();toast('已重新整理加班／換休資料','success');});
     wireOvertimeTableActions();
     wireCompLeaveActions();
@@ -905,7 +934,7 @@
       <div class="form-grid">
         <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
         <div class="field"><label>身分</label><input class="ot-readonly" value="${escapeHTML(overtimeRoleLabel(state.profile?.role))}" disabled></div>
-        <div class="field"><label>日期 *</label><input id="otWorkDate" type="date" value="${escapeHTML(today)}"></div>
+        <div class="field"><label>日期 *</label><input id="otWorkDate" type="hidden" value="${escapeHTML(today)}"><div id="otWorkDateHost" class="roc-inline-date"></div></div>
         <div class="field"><label>申請類型 *</label><select id="otType"><option value="" ${!type?'selected':''} disabled>請選擇</option><option value="overtime" ${type==='overtime'?'selected':''}>平日加班</option><option value="rest_day_overtime" ${type==='rest_day_overtime'?'selected':''}>休息日加班</option><option value="national_holiday_overtime" ${type==='national_holiday_overtime'?'selected':''}>國定假日出勤</option><option value="holiday_visit_comp" ${type==='holiday_visit_comp'?'selected':''}>假日家訪換休</option></select></div>
         <div id="otTimeFields" class="field full">
           <div class="form-grid">
@@ -932,6 +961,7 @@
     const title=existing?'編輯申請':'新增申請';
     const subtitle=existing?'修改既有申請內容；送出後依原審核流程處理。':'請先選擇一般加班或假日家訪換休，再填寫對應資料後送出審核。';
     otRenderPageForm(title,subtitle,overtimeFormHTML(existing),{existing,kind:'overtime'});
+    otMountRocField('otWorkDate',existing?.work_date||isoDate(new Date()));
     const typeEl=$('otType');
     const compensationEl=$('otCompensation');
     const updateFields=()=>{
@@ -987,7 +1017,7 @@
 
   async function saveOvertime(existing,status){
     const type=$('otType').value;
-    const workDate=$('otWorkDate').value;
+    const workDate=otRocISO('otWorkDate');
     const reason=$('otReason').value.trim();
     const notes=$('otNotes').value.trim();
     const start=overtimeSelectedTime('otStart');
@@ -1068,7 +1098,7 @@
     return `
       <div class="form-grid">
         <div class="field"><label>申請人</label><input class="ot-readonly" value="${escapeHTML(state.profile?.display_name||'—')}" disabled></div>
-        <div class="field"><label>換休日期 *</label><input id="clDate" type="date" value="${escapeHTML(today)}"></div>
+        <div class="field"><label>換休日期 *</label><input id="clDate" type="hidden" value="${escapeHTML(today)}"><div id="clDateHost" class="roc-inline-date"></div></div>
         <div class="field"><label>換休類型 *</label><select id="clLeaveType"><option value="ordinary" ${existing?.leave_type!=='holiday_visit'?'selected':''}>一般加班換休</option><option value="holiday_visit" ${existing?.leave_type==='holiday_visit'?'selected':''}>假日家訪換休</option></select></div>
         <div class="field"><label>所選類型可用</label><input id="clBalanceValue" class="ot-readonly" value="${escapeHTML(overtimeDurationLabel(existing?.leave_type==='holiday_visit'?sourceAvailable.holidayVisit:sourceAvailable.ordinary))}" disabled></div>
         <div class="field"><label>開始時間 *</label><div class="ot-time-pair"><select id="clStartHour">${overtimeTimeOptions(23,startParts.hour,'時')}</select><select id="clStartMinute"><option value="00" ${startParts.minute==='00'?'selected':''}>00</option><option value="30" ${startParts.minute==='30'?'selected':''}>30</option></select></div></div>
@@ -1086,6 +1116,7 @@
     const title=existing?'編輯換休使用申請':'使用換休';
     const subtitle=existing?'修改既有換休使用申請；送出後依原審核流程處理。':'填寫換休類型、日期與起訖時間；一般加班換休為預設，兩種類型不會混用。';
     otRenderPageForm(title,subtitle,compLeaveUsageFormHTML(existing),{existing,kind:'comp_leave'});
+    otMountRocField('clDate',existing?.leave_date||isoDate(new Date()));
     const updateDuration=()=>{
       const start=overtimeSelectedTime('clStart');
       const end=overtimeSelectedTime('clEnd');
@@ -1124,7 +1155,7 @@
   }
 
   async function saveCompLeaveUsage(existing,status){
-    const leaveDate=$('clDate').value;
+    const leaveDate=otRocISO('clDate');
     const start=overtimeSelectedTime('clStart');
     const end=overtimeSelectedTime('clEnd');
     const clockMinutes=overtimeMinutesBetween(start,end);
