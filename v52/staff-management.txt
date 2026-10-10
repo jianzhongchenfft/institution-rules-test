@@ -20,7 +20,7 @@
   const canEditSystem=()=>SYSTEM_EDIT_ROLES.includes(state.profile?.role);
   const canEditWorkers=()=>WORKER_EDIT_ROLES.includes(state.profile?.role);
   const roleText=role=>roleLabels?.[role]||role||'—';
-  const dateText=value=>value?rocDate(String(value).slice(0,10)+'T00:00:00'):'—';
+  const dateText=value=>window.rocDateKit.formatDateCompact(value?String(value).slice(0,10):'');
   const weekdayText=value=>value===null||value===undefined?'—':(WEEKDAYS[Number(value)]||'—');
   const hoursText=value=>{
     const n=Number(value);
@@ -29,6 +29,12 @@
   const workerStatusText=value=>WORKER_STATUS[value]||value||'—';
   const systemActiveText=value=>value===false?'停用':'啟用';
   const esc=value=>escapeHTML(value??'');
+  function smMountRocDate(id,value,required){
+    const host=$(id+'Host');
+    if(!host)throw new Error('日期欄位尚未建立：'+id);
+    host.__rocDate=window.rocDateKit.mountDate(host,{id,value:value||'',required:!!required});
+  }
+  function smRocISO(id){return $(id+'Host')?.__rocDate?.getISO()??null;}
 
   if(!document.getElementById('v52-staff-management-style')){
     const style=document.createElement('style');
@@ -288,7 +294,7 @@
           <div class="sm-form-grid">
             <div class="sm-field">
               <label>到職日 *</label>
-              ${editable?`<input id="smHireDate" type="date" value="${esc(s.hire_date||'')}">`:`<div class="sm-readonly">${esc(dateText(s.hire_date))}</div>`}
+              ${editable?`<div id="smHireDateHost" class="roc-inline-date"></div>`:`<div class="sm-readonly">${esc(dateText(s.hire_date))}</div>`}
             </div>
             <div class="sm-field">
               <label>目前約定每日工時 *</label>
@@ -297,7 +303,7 @@
             </div>
             <div class="sm-field">
               <label>工時生效日</label>
-              ${editable?`<input id="smHoursEffectiveFrom" type="date" value="${today}">`:`<div class="sm-readonly">—</div>`}
+              ${editable?`<div id="smHoursEffectiveFromHost" class="roc-inline-date"></div>`:`<div class="sm-readonly">—</div>`}
               <div class="sm-help">只有工時數值變更時才會新增一筆歷程；不會覆蓋舊紀錄。</div>
             </div>
             <div class="sm-field">
@@ -318,7 +324,7 @@
           ${hoursHistory.length?`
             <div class="sm-history">
               <div class="sm-history-row sm-history-head"><span>生效日</span><span>每日工時</span><span>說明</span></div>
-              ${hoursHistory.map(h=>`<div class="sm-history-row"><span>${esc(dateText(h.effective_from))}</span><strong>${esc(hoursText(h.agreed_daily_hours))}</strong><span>${esc(h.note||'—')}<div class="sm-sub">${esc(h.created_by_name||'—')}・建立 ${esc(rocDate(h.created_at))}</div></span></div>`).join('')}
+              ${hoursHistory.map(h=>`<div class="sm-history-row"><span>${esc(dateText(h.effective_from))}</span><strong>${esc(hoursText(h.agreed_daily_hours))}</strong><span>${esc(h.note||'—')}<div class="sm-sub">${esc(h.created_by_name||'—')}・建立 ${esc(window.rocDateKit.formatDateTimeCompact(h.created_at))}</div></span></div>`).join('')}
             </div>`
             :'<div class="sm-empty" style="padding:18px">目前尚無工時歷程；下一次調整工時時會從這裡開始保留。</div>'}
         </section>
@@ -331,16 +337,23 @@
     `;
     $('smBack')?.addEventListener('click',renderStaffManagement);
     $('smCancel')?.addEventListener('click',renderStaffManagement);
+    if(editable){
+      smMountRocDate('smHireDate',s.hire_date||'',false);
+      smMountRocDate('smHoursEffectiveFrom',today,false);
+    }
     $('smSaveSystem')?.addEventListener('click',()=>saveSystemStaff(s));
     window.scrollTo({top:0,behavior:'auto'});
   }
 
   async function saveSystemStaff(s){
     if(!canEditSystem()){toast('目前帳號沒有修改此資料的權限','warn');return;}
-    const hireDate=$('smHireDate')?.value||null;
+    const hireValue=smRocISO('smHireDate');
+    const hireDate=hireValue||null;
     const dailyRaw=$('smDailyHours')?.value;
     const dailyHours=dailyRaw===''||dailyRaw===null?null:Number(dailyRaw);
-    const hoursEffectiveFrom=$('smHoursEffectiveFrom')?.value||null;
+    const hoursValue=smRocISO('smHoursEffectiveFrom');
+    const hoursEffectiveFrom=hoursValue||null;
+    if(hireValue===null||hoursValue===null){toast('請輸入有效的民國日期','warn');return;}
     const weekday=Number($('smRegularDay')?.value);
     const oldHours=Number(s.agreed_daily_hours);
     const hoursChanged=(dailyHours===null&&s.agreed_daily_hours!==null&&s.agreed_daily_hours!==undefined)
@@ -426,8 +439,8 @@
             <div class="sm-field"><label>姓名 *</label>${editable?`<input id="smWorkerName" value="${esc(w.worker_name||'')}">`:`<div class="sm-readonly">${esc(w.worker_name||'—')}</div>`}</div>
             <div class="sm-field"><label>電話</label>${editable?`<input id="smWorkerPhone" value="${esc(w.phone||'')}">`:`<div class="sm-readonly">${esc(w.phone||'—')}</div>`}</div>
             <div class="sm-field"><label>任職狀態 *</label>${editable?`<select id="smWorkerStatus">${Object.entries(WORKER_STATUS).map(([v,t])=>`<option value="${v}" ${w.employment_status===v?'selected':''}>${t}</option>`).join('')}</select>`:`<div class="sm-readonly">${esc(workerStatusText(w.employment_status))}</div>`}</div>
-            <div class="sm-field"><label>到職日</label>${editable?`<input id="smWorkerHire" type="date" value="${esc(w.hire_date||'')}">`:`<div class="sm-readonly">${esc(dateText(w.hire_date))}</div>`}</div>
-            <div class="sm-field"><label>離職／留停日期</label>${editable?`<input id="smWorkerLeave" type="date" value="${esc(w.leave_date||'')}">`:`<div class="sm-readonly">${esc(dateText(w.leave_date))}</div>`}</div>
+            <div class="sm-field"><label>到職日</label>${editable?`<div id="smWorkerHireHost" class="roc-inline-date"></div>`:`<div class="sm-readonly">${esc(dateText(w.hire_date))}</div>`}</div>
+            <div class="sm-field"><label>離職／留停日期</label>${editable?`<div id="smWorkerLeaveHost" class="roc-inline-date"></div>`:`<div class="sm-readonly">${esc(dateText(w.leave_date))}</div>`}</div>
             <div class="sm-field"><label>交通方式</label>${editable?`<input id="smWorkerTransport" value="${esc(w.transportation||'')}" placeholder="例如：機車">`:`<div class="sm-readonly">${esc(w.transportation||'—')}</div>`}</div>
             <div class="sm-field full"><label>服務區域</label>${editable?`<input id="smWorkerAreas" value="${esc(w.service_areas||'')}" placeholder="例如：觀音區、大園區">`:`<div class="sm-readonly">${esc(w.service_areas||'—')}</div>`}</div>
             <div class="sm-field full"><label>備註</label>${editable?`<textarea id="smWorkerNotes">${esc(w.notes||'')}</textarea>`:`<div class="sm-readonly" style="white-space:pre-wrap">${esc(w.notes||'—')}</div>`}</div>
@@ -442,6 +455,10 @@
     `;
     $('smWorkerBack')?.addEventListener('click',renderStaffManagement);
     $('smWorkerCancel')?.addEventListener('click',renderStaffManagement);
+    if(editable){
+      smMountRocDate('smWorkerHire',w.hire_date||'',false);
+      smMountRocDate('smWorkerLeave',w.leave_date||'',false);
+    }
     $('smWorkerSave')?.addEventListener('click',()=>saveWorker(w,isNew));
     window.scrollTo({top:0,behavior:'auto'});
   }
@@ -452,13 +469,14 @@
       worker_name:String($('smWorkerName')?.value||'').trim(),
       phone:String($('smWorkerPhone')?.value||'').trim()||null,
       employment_status:$('smWorkerStatus')?.value||'active',
-      hire_date:$('smWorkerHire')?.value||null,
-      leave_date:$('smWorkerLeave')?.value||null,
+      hire_date:smRocISO('smWorkerHire')||null,
+      leave_date:smRocISO('smWorkerLeave')||null,
       transportation:String($('smWorkerTransport')?.value||'').trim()||null,
       service_areas:String($('smWorkerAreas')?.value||'').trim()||null,
       notes:String($('smWorkerNotes')?.value||'').trim()||null,
       updated_at:new Date().toISOString()
     };
+    if(smRocISO('smWorkerHire')===null||smRocISO('smWorkerLeave')===null){toast('請輸入有效的到職日或離職／留停日期','warn');return;}
     if(!payload.worker_name){toast('請填寫居服員姓名','warn');return;}
     if(!Object.prototype.hasOwnProperty.call(WORKER_STATUS,payload.employment_status)){
       toast('任職狀態不正確','warn');return;
