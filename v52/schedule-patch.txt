@@ -104,7 +104,7 @@
 
   function scheduleWeekLabel(start){
     const end = scheduleAddDays(start, 6);
-    return `${start.getFullYear()}年${start.getMonth()+1}月${start.getDate()}日－${end.getFullYear()}年${end.getMonth()+1}月${end.getDate()}日`;
+    return `${window.rocDateKit.formatDateCompact(scheduleDateISO(start))}－${window.rocDateKit.formatDateCompact(scheduleDateISO(end))}`;
   }
 
   function scheduleTimeLabel(value){
