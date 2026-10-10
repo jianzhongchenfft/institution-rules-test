@@ -87,19 +87,12 @@
     care_impact_note:'照顧影響',comment:'補充說明',
     planned_end_date:'預計結束日期'
   };
-  const MAX_ADL={feeding:10,transfer:15,grooming:5,toileting:10,bathing:5,walking:15,
-    stairs:10,dressing:10,bowel:10,bladder:10};
   const local=new Map();
   const esc=x=>String(x??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const obj=x=>x&&typeof x==='object'&&!Array.isArray(x)?x:{};
   const arr=x=>Array.isArray(x)?x:[];
   const value=x=>String(x??'').trim();
   const label=(code,key)=>LABELS[code]?.[key]||COMMON_LABELS[key]||'其他說明';
-  const fromNotes=(list,notes,code)=>{
-    for(const [key,v] of Object.entries(obj(notes))){
-      if(value(v))list.push('【'+label(code,key)+'】'+value(v));
-    }
-  };
   const unique=items=>[...new Set(items.map(value).filter(Boolean))];
   // 前次備註僅唯讀顯示，標籤與文字同一行；空白不占用畫面。
   const previousNote=note=>{
@@ -326,7 +319,6 @@
     if(toolRes.error)throw toolRes.error;
     const data=summaryRes.data;
     const saved=source(code,toolRes.data),src=source(code,record);
-    const hash=sourceFingerprint(code,src);
     const prior=local.get(key(eventId,code));
     const keepDraft=!!prior?.edited;
     const state={
