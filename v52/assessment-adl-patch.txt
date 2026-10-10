@@ -330,6 +330,7 @@
             </label>
           `).join('')}
         </div>
+        ${window.v52AssessmentToolSummary?.previousNote(local.previous?.notes?.[item.key])||''}
         ${!showNote?`
           <div class="adl-note"><button type="button" class="btn sm" data-adl-add-note="${item.key}">＋ 補充備註</button></div>
         `:''}
