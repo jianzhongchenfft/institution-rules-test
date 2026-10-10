@@ -39,12 +39,48 @@
       '.cc-plan-date-host .rdk{display:flex;width:100%;flex-wrap:wrap}'+
       '.cc-plan-date-host .rdk-text{flex:1;min-width:0;width:calc(100% - 46px)}'+
       '.cc-plan-date-host .rdk input[type="hidden"]{display:none}'+
+      '.cc-roc-date-host .rdk{display:flex;width:100%;flex-wrap:wrap}'+
+      '.cc-roc-date-host .rdk-text{flex:1;min-width:0;width:calc(100% - 46px)}'+
+      '.cc-roc-date-host .rdk input[type="hidden"]{display:none}'+
       '@media(max-width:760px){.cc-page-form-head{display:block}.cc-page-form-title-wrap{display:block}.cc-page-form-back{margin-bottom:10px}.cc-page-form-card{padding:12px}.cc-page-form-footer{bottom:6px;flex-wrap:wrap}.cc-page-form-footer .spacer{display:none}}';
     document.head.appendChild(ccPageStyle);
   }
 
   window.__ccPageDraftStore=window.__ccPageDraftStore||{};
   window.__ccPageFormState=window.__ccPageFormState||null;
+
+  // 民國日期在輸入介面中處理；業務資料仍一律使用西元 ISO。
+  function ccMountRocDate(host,iso,required){
+    if(!host||!window.rocDateKit)throw new Error('民國日期共用元件尚未載入');
+    host.__ccRocDate=window.rocDateKit.mountDate(host,{
+      value:iso||'',required:!!required,onChange:ccPageMarkDirty
+    });
+    return host.__ccRocDate;
+  }
+  function ccRocDateValue(host){return host?.__ccRocDate?.getISO()??null;}
+  function ccRocDatePeek(host){return host?.querySelector('.rdk input[type="hidden"]')?.value||'';}
+  function ccSyncRestoredDates(){
+    var root=$('ccPageFormBody');if(!root)return;
+    root.querySelectorAll('[data-cc-roc-date]').forEach(function(host){
+      var widget=host.__ccRocDate;if(!widget)return;
+      var raw=widget.input.value.trim(),iso=raw?window.rocDateKit.parseDate(raw):'';
+      if(iso!==null)widget.setISO(iso);
+    });
+  }
+  function ccValidateRocDates(type){
+    if(!ccRocDateValue($('ccRecordDateHost')))return '請填寫有效的家訪／聯繫日期';
+    if(type!=='home_visit'&&$('ccContactSuccess')?.value==='false'&&$('ccNeedsRecontact')?.value==='true'&&
+       ccRocDateValue($('ccRecontactDateHost'))===null)return '預計再次聯繫日期格式不正確';
+    for(var prior of document.querySelectorAll('[data-cc-prior-follow]')){
+      if((prior.querySelector('[data-cc-follow-result]')?.value||'not_followed')!=='not_followed'&&
+         ccRocDateValue(prior.querySelector('[data-cc-follow-next-host]'))===null)return '下次追蹤日期格式不正確';
+    }
+    for(var row of document.querySelectorAll('.cc-follow-row')){
+      if(row.querySelector('[data-cc-new-follow-content]')?.value.trim()&&
+         ccRocDateValue(row.querySelector('[data-cc-new-follow-host]'))===null)return '預計追蹤日期格式不正確';
+    }
+    return null;
+  }
 
   function ccPageDraftKey(c,type,recordId){
     return String(c.id)+'|'+String(type)+'|'+String(recordId||'new');
@@ -53,7 +89,7 @@
   function ccPageControlsSnapshot(){
     var root=$('ccPageFormBody');
     if(!root)return [];
-    return [...root.querySelectorAll('input,select,textarea')].map(function(el){
+    return [...root.querySelectorAll('input,select,textarea')].filter(function(el){return !el.closest('.rdk-popup');}).map(function(el){
       return {value:el.value,checked:!!el.checked};
     });
   }
@@ -85,7 +121,7 @@
       newFollow.innerHTML='';
       draft.new_followups.forEach(function(x){ccAddFollowupRow(x);});
     }
-    var controls=[...($('ccPageFormBody')?.querySelectorAll('input,select,textarea')||[])];
+    var controls=[...($('ccPageFormBody')?.querySelectorAll('input,select,textarea')||[])].filter(function(el){return !el.closest('.rdk-popup');});
     (draft.controls||[]).forEach(function(x,i){
       var el=controls[i];if(!el)return;
       if(['checkbox','radio'].includes(el.type))el.checked=!!x.checked;
@@ -95,8 +131,9 @@
       var row=document.querySelector('[data-cc-prior-follow="'+x.id+'"]');if(!row)return;
       var result=row.querySelector('[data-cc-follow-result]');if(result)result.value=x.result||'not_followed';
       var note=row.querySelector('[data-cc-follow-note]');if(note)note.value=x.note||'';
-      var next=row.querySelector('[data-cc-follow-next]');if(next)next.value=x.next_due_date||'';
+      var next=row.querySelector('[data-cc-follow-next-host]')?.__ccRocDate;if(next&&x.next_due_date)next.setISO(x.next_due_date);
     });
+    ccSyncRestoredDates();
     return true;
   }
 
@@ -341,7 +378,7 @@
         ?'<div class="case-empty-inline">此為已完成紀錄的內容修正，不重新處理目前待追蹤事項。</div>'
         :(pending.length?'<div class="cc-follow-list">'+pending.map(function(x){
           return '<div class="cc-follow-row" data-cc-prior-follow="'+x.id+'"><strong>'+escapeHTML(x.content)+'</strong><small>'+(x.due_date?'原訂 '+rocDate(x.due_date+'T00:00:00'):'未設定日期')+'｜負責 '+escapeHTML(api.staffName(x.responsible_staff_id))+'</small>'+
-            '<div class="form-grid" style="margin-top:7px"><div class="field"><label>本次結果</label><select data-cc-follow-result>'+FOLLOW_RESULTS.map(function(o){return ccOpt(o[0],o[1],'not_followed');}).join('')+'</select></div><div class="field"><label>下次追蹤日期</label><input type="date" data-cc-follow-next></div><div class="field full"><label>本次追蹤狀況</label><input data-cc-follow-note placeholder="有追蹤時請簡述"></div></div></div>';
+            '<div class="form-grid" style="margin-top:7px"><div class="field"><label>本次結果</label><select data-cc-follow-result>'+FOLLOW_RESULTS.map(function(o){return ccOpt(o[0],o[1],'not_followed');}).join('')+'</select></div><div class="field"><label>下次追蹤日期</label><div class="cc-roc-date-host" data-cc-roc-date data-cc-follow-next-host></div></div><div class="field full"><label>本次追蹤狀況</label><input data-cc-follow-note placeholder="有追蹤時請簡述"></div></div></div>';
         }).join('')+'</div>':'<div class="case-empty-inline">目前無待追蹤事項</div>'))+
 
       '<div class="import-section">評估與後續處理</div>'+
@@ -380,7 +417,7 @@
       '<div class="field" id="ccFailureReasonWrap"><label>未成功原因</label><select id="ccFailureReason">'+ccOpt('no_answer','未接聽',d.failure_reason)+ccOpt('off','關機',d.failure_reason)+ccOpt('busy','忙線',d.failure_reason)+ccOpt('invalid','電話錯誤／無效',d.failure_reason)+ccOpt('other','其他',d.failure_reason)+'</select></div>'+
       '<div class="field" id="ccFailureNoteWrap"><label>其他未成功原因 *</label><input id="ccFailureNote" value="'+escapeHTML(d.failure_note||'')+'" placeholder="請說明其他未成功原因"></div>'+
       '<div class="field" id="ccRecontactWrap"><label>是否需再次聯繫？</label><select id="ccNeedsRecontact">'+ccOpt('false','否',String(!!d.needs_recontact))+ccOpt('true','是',String(!!d.needs_recontact))+'</select></div>'+
-      '<div class="field" id="ccRecontactDateWrap"><label>預計再次聯繫日期</label><input id="ccRecontactDate" type="date" value="'+escapeHTML(d.recontact_date||'')+'"></div>'+
+      '<div class="field" id="ccRecontactDateWrap"><label>預計再次聯繫日期</label><div id="ccRecontactDateHost" class="cc-roc-date-host" data-cc-roc-date></div></div>'+
       '<div class="field full"><label id="ccContactContentLabel">'+(type==='general_phone'?'聯繫內容／結果':(d.contact_success===false?'未成功聯繫補充說明':'本次通話內容／重點'))+'</label><textarea id="ccContactContent" rows="3" placeholder="'+(type==='general_phone'?'請簡述本次聯繫內容與結果':(d.contact_success===false?'選填，例如：另以LINE留言、電話顯示停用等':'請簡述本次與個案／家屬實際討論的內容與重點'))+'">'+escapeHTML(d.contact_content||'')+'</textarea></div>'+
     '</div>';
   }
@@ -389,10 +426,12 @@
     var box=$('ccNewFollowups');if(!box)return;
     var div=document.createElement('div');div.className='cc-follow-row';div.innerHTML=
       '<div class="form-grid"><div class="field"><label>追蹤事項 *</label><input data-cc-new-follow-content value="'+escapeHTML(values?.content||'')+'" placeholder="例如：確認個管師服務調整結果"></div>'+
-      '<div class="field"><label>預計追蹤日期</label><input type="date" data-cc-new-follow-date value="'+escapeHTML(values?.due_date||'')+'"></div>'+
+      '<div class="field"><label>預計追蹤日期</label><div class="cc-roc-date-host" data-cc-roc-date data-cc-new-follow-host></div></div>'+
       '<div class="field"><label>負責人</label><select data-cc-new-follow-staff>'+(state.caseStaff||[]).filter(function(s){return s.is_active!==false;}).map(function(s){return ccOpt(s.id,s.display_name,values?.responsible_staff_id||state.profile.id);}).join('')+'</select></div>'+
       '<div class="field" style="align-self:end"><button type="button" class="btn sm" data-cc-remove-follow>刪除</button></div></div>';
-    box.appendChild(div);div.querySelector('[data-cc-remove-follow]').addEventListener('click',function(){div.remove();});
+    box.appendChild(div);
+    ccMountRocDate(div.querySelector('[data-cc-new-follow-host]'),values?.due_date||'',false);
+    div.querySelector('[data-cc-remove-follow]').addEventListener('click',function(){div.remove();});
   }
 
   function ccToggleForm(type){
@@ -476,7 +515,7 @@
   }
 
   function ccBuildSummary(type){
-    var date=$('ccRecordDate')?.value||'',reason=api.reasonLabel(type,$('ccReason')?.value),parts=[];
+    var date=ccRocDateValue($('ccRecordDateHost'))||'',reason=api.reasonLabel(type,$('ccReason')?.value),parts=[];
     if(type==='home_visit')parts.push((date?rocDate(date+'T00:00:00'):'')+'進行'+reason+'。');
     else if(type==='formal_phone')parts.push((date?rocDate(date+'T00:00:00'):'')+'進行'+reason+'。');
     else parts.push((date?rocDate(date+'T00:00:00'):'')+'進行電話聯繫，原因為'+reason+'。');
@@ -499,10 +538,10 @@
   function ccReadDraftPayload(){
     var newFollowups=[...document.querySelectorAll('[data-cc-new-follow-content]')].map(function(input){
       var wrap=input.closest('.cc-follow-row');
-      return {content:input.value.trim(),due_date:wrap.querySelector('[data-cc-new-follow-date]')?.value||null,responsible_staff_id:wrap.querySelector('[data-cc-new-follow-staff]')?.value||state.profile.id};
+      return {content:input.value.trim(),due_date:ccRocDatePeek(wrap.querySelector('[data-cc-new-follow-host]'))||null,responsible_staff_id:wrap.querySelector('[data-cc-new-follow-staff]')?.value||state.profile.id};
     }).filter(function(x){return x.content;});
     var prior=[...document.querySelectorAll('[data-cc-prior-follow]')].map(function(row){
-      return {id:row.dataset.ccPriorFollow,result:row.querySelector('[data-cc-follow-result]')?.value||'not_followed',note:row.querySelector('[data-cc-follow-note]')?.value||'',next_due_date:row.querySelector('[data-cc-follow-next]')?.value||null};
+      return {id:row.dataset.ccPriorFollow,result:row.querySelector('[data-cc-follow-result]')?.value||'not_followed',note:row.querySelector('[data-cc-follow-note]')?.value||'',next_due_date:ccRocDatePeek(row.querySelector('[data-cc-follow-next-host]'))||null};
     });
     return {new_followups:newFollowups,prior_followups:prior};
   }
@@ -513,7 +552,7 @@
       var row=document.querySelector('[data-cc-prior-follow="'+x.id+'"]');if(!row)return;
       var result=row.querySelector('[data-cc-follow-result]');if(result)result.value=x.result||'not_followed';
       var note=row.querySelector('[data-cc-follow-note]');if(note)note.value=x.note||'';
-      var next=row.querySelector('[data-cc-follow-next]');if(next)next.value=x.next_due_date||'';
+      var next=row.querySelector('[data-cc-follow-next-host]')?.__ccRocDate;if(next&&x.next_due_date)next.setISO(x.next_due_date);
     });
   }
 
@@ -543,7 +582,7 @@
   }
 
   function ccValidate(type,status,contacts,c){
-    if(!$('ccRecordDate')?.value)return '請填寫日期';
+    var dateErr=ccValidateRocDates(type);if(dateErr)return dateErr;
     var visitTime=ccReadTime();
     if(!visitTime)return '請選擇時間';
     if(!$('ccReason')?.value)return '請選擇原因';
@@ -553,7 +592,7 @@
     if(type!=='home_visit'&&$('ccContactSuccess')?.value==='false'){
       if(!$('ccFailureReason')?.value)return '請選擇未成功聯繫原因';
       if($('ccFailureReason')?.value==='other'&&!$('ccFailureNote')?.value.trim())return '選擇其他未成功原因時請補充說明';
-      if($('ccNeedsRecontact')?.value==='true'&&!$('ccRecontactDate')?.value)return '請填寫預計再次聯繫日期';
+      if($('ccNeedsRecontact')?.value==='true'&&!ccRocDateValue($('ccRecontactDateHost')))return '請填寫預計再次聯繫日期';
       return null;
     }
     if(type==='general_phone'){
@@ -598,8 +637,8 @@
     for(var row of rows){
       var result=row.querySelector('[data-cc-follow-result]')?.value||'not_followed';
       if(result==='not_followed')continue;
-      var itemId=row.dataset.ccPriorFollow,note=row.querySelector('[data-cc-follow-note]')?.value.trim()||null,next=row.querySelector('[data-cc-follow-next]')?.value||null;
-      var ins=await db.from('case_followup_updates').insert({followup_item_id:itemId,update_date:$('ccRecordDate').value,result_code:result,note:note,next_due_date:next,source_type:'case_contact_record',source_id:recordId,updated_by_staff_id:state.profile.id});
+      var itemId=row.dataset.ccPriorFollow,note=row.querySelector('[data-cc-follow-note]')?.value.trim()||null,next=ccRocDatePeek(row.querySelector('[data-cc-follow-next-host]'))||null;
+      var ins=await db.from('case_followup_updates').insert({followup_item_id:itemId,update_date:ccRocDateValue($('ccRecordDateHost')),result_code:result,note:note,next_due_date:next,source_type:'case_contact_record',source_id:recordId,updated_by_staff_id:state.profile.id});
       if(ins.error)throw ins.error;
       var status=['completed','improved'].includes(result)?'completed':result==='close_report'?'closed':'in_progress';
       var payload={status:status,updated_at:new Date().toISOString()};
@@ -612,7 +651,7 @@
   async function ccInsertNewFollowups(c,recordId,type){
     var rows=[...document.querySelectorAll('[data-cc-new-follow-content]')].map(function(input){
       var wrap=input.closest('.cc-follow-row');
-      return {content:input.value.trim(),due_date:wrap.querySelector('[data-cc-new-follow-date]')?.value||null,responsible_staff_id:wrap.querySelector('[data-cc-new-follow-staff]')?.value||state.profile.id};
+      return {content:input.value.trim(),due_date:ccRocDatePeek(wrap.querySelector('[data-cc-new-follow-host]'))||null,responsible_staff_id:wrap.querySelector('[data-cc-new-follow-staff]')?.value||state.profile.id};
     }).filter(function(x){return x.content;});
     if($('ccAssessmentAction')?.value==='schedule_later')rows.push({content:'安排評估',due_date:null,responsible_staff_id:state.profile.id});
     if(!rows.length)return;
@@ -630,7 +669,7 @@
       var successful=type==='home_visit'||$('ccContactSuccess')?.value!=='false';
       var counts=(type==='home_visit'||type==='formal_phone'&&successful);
       var mainPayload={
-        case_id:c.id,record_type:type,record_date:$('ccRecordDate').value,record_time:ccReadTime()||null,
+        case_id:c.id,record_type:type,record_date:ccRocDateValue($('ccRecordDateHost')),record_time:ccReadTime()||null,
         performed_by_staff_id:$('ccPerformedBy')?.value||bundle?.main.performed_by_staff_id||state.profile.id,
         performed_by_name_snapshot:api.staffName($('ccPerformedBy')?.value||bundle?.main.performed_by_staff_id||state.profile.id),
         supervisor_staff_id:c.supervisor_id||null,supervisor_name_snapshot:api.staffName(c.supervisor_id),
@@ -653,7 +692,7 @@
       if(people.length){var pr=await db.from('case_contact_record_people').insert(people);if(pr.error)throw pr.error;}
 
       if(type!=='home_visit'){
-        var phone={record_id:recordId,contact_success:$('ccContactSuccess').value!=='false',failure_reason:$('ccContactSuccess').value==='false'?$('ccFailureReason').value:null,failure_note:$('ccContactSuccess').value==='false'&&$('ccFailureReason').value==='other'?$('ccFailureNote').value.trim()||null:null,needs_recontact:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true',recontact_date:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true'?$('ccRecontactDate').value:null,contact_content:$('ccContactContent').value.trim()||null,updated_at:new Date().toISOString()};
+        var phone={record_id:recordId,contact_success:$('ccContactSuccess').value!=='false',failure_reason:$('ccContactSuccess').value==='false'?$('ccFailureReason').value:null,failure_note:$('ccContactSuccess').value==='false'&&$('ccFailureReason').value==='other'?$('ccFailureNote').value.trim()||null:null,needs_recontact:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true',recontact_date:$('ccContactSuccess').value==='false'&&$('ccNeedsRecontact').value==='true'?(ccRocDateValue($('ccRecontactDateHost'))||null):null,contact_content:$('ccContactContent').value.trim()||null,updated_at:new Date().toISOString()};
         var pu=await db.from('case_phone_details').upsert(phone,{onConflict:'record_id'});if(pu.error)throw pu.error;
       }
 
@@ -750,7 +789,7 @@
       var staffLabel=type==='home_visit'?'家訪人員':type==='formal_phone'?'電訪人員':'聯繫人員';
       var currentStaff=bundle?.main.performed_by_staff_id||state.profile.id;
       var staffControl='<select id="ccPerformedBy">'+ccStaffOptions(currentStaff)+'</select>';
-      var main='<div class="form-grid"><div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'日期 *</label><input id="ccRecordDate" type="date" value="'+escapeHTML(date)+'"></div><div class="field"><label>時間（24小時制）*</label>'+ccTimeSelectHtml(time)+'</div>'+
+      var main='<div class="form-grid"><div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'日期 *</label><div id="ccRecordDateHost" class="cc-roc-date-host" data-cc-roc-date></div></div><div class="field"><label>時間（24小時制）*</label>'+ccTimeSelectHtml(time)+'</div>'+
         '<div class="field"><label>'+staffLabel+'</label>'+staffControl+'</div><div class="field"><label>負責督導</label><input value="'+escapeHTML(bundle?.main.supervisor_name_snapshot||api.staffName(c.supervisor_id))+'" disabled></div>'+
         '<div class="field"><label>'+(type==='home_visit'?'家訪':'聯繫')+'原因 *</label><select id="ccReason">'+ccReasonOptions(type,reason)+'</select></div><div class="field" id="ccReasonNoteWrap"><label>其他原因</label><input id="ccReasonNote" value="'+escapeHTML(bundle?.main.reason_note||'')+'"></div>'+
         '<div class="field full"><button type="button" id="ccToggleNotes" class="btn sm">＋ 補充備註</button><div id="ccNotesWrap" class="cc-notes-wrap '+(bundle?.main.notes?'show':'')+'"><textarea id="ccNotes" rows="3" placeholder="選填">'+escapeHTML(bundle?.main.notes||'')+'</textarea></div></div></div>';
@@ -786,6 +825,9 @@
         '</div>';
 
       window.__ccFormCtx={c:c,contacts:contacts,bundle:bundle,type:type};
+      ccMountRocDate($('ccRecordDateHost'),date,true);
+      if(type!=='home_visit')ccMountRocDate($('ccRecontactDateHost'),bundle?.phone?.recontact_date||'',false);
+      document.querySelectorAll('[data-cc-follow-next-host]').forEach(function(host){ccMountRocDate(host,'',false);});
       ccBindForm(type);
       if(bundle?.main?.status==='draft')ccApplyDraftPayload(bundle.main.draft_payload||{});
       if(bundle?.links?.length){
