@@ -42,6 +42,8 @@
       '.cc-roc-date-host .rdk{display:flex;width:100%;flex-wrap:wrap}'+
       '.cc-roc-date-host .rdk-text{flex:1;min-width:0;width:calc(100% - 46px)}'+
       '.cc-roc-date-host .rdk input[type="hidden"]{display:none}'+
+      '.cc-roc-date-host .rdk .rdk-year{width:67px;flex:0 0 67px}'+
+      '.cc-roc-date-host .rdk .rdk-month-select{width:58px}'+
       '@media(max-width:760px){.cc-page-form-head{display:block}.cc-page-form-title-wrap{display:block}.cc-page-form-back{margin-bottom:10px}.cc-page-form-card{padding:12px}.cc-page-form-footer{bottom:6px;flex-wrap:wrap}.cc-page-form-footer .spacer{display:none}}';
     document.head.appendChild(ccPageStyle);
   }
