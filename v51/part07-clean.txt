@@ -17,7 +17,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
   async function loadCaseVisitsModulePatch(){
     try{
       // 民國日期元件共用載入點；個案表單需要先載入，再進行其他模組初始化。
-      const rocDateKitRes=await fetch('v52/roc-date-kit.js?v=roc-staff-schedule-v4-20261011',{cache:'no-store'});
+      const rocDateKitRes=await fetch('v52/roc-date-kit.js?v=roc-annual-payroll-v5-20261011',{cache:'no-store'});
       if(!rocDateKitRes.ok)throw new Error('民國日期共用元件載入失敗（'+rocDateKitRes.status+'）');
       eval(await rocDateKitRes.text());
       if(!window.rocDateKit||typeof window.rocDateKit.mountDate!=='function')throw new Error('民國日期共用元件初始化失敗');
@@ -102,7 +102,7 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
       ];
       let attendanceV2Code='';
       for(const path of attendanceV2Files){
-        const res=await fetch(`${path}?v=roc-overtime-leave-month-v1-20261011`,{cache:'no-store'});
+        const res=await fetch(`${path}?v=roc-annual-payroll-v2-20261011`,{cache:'no-store'});
         if(!res.ok) throw new Error(`${path} 載入失敗（${res.status}）`);
         attendanceV2Code+='\n'+await res.text();
       }
