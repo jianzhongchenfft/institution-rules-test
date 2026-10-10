@@ -222,6 +222,7 @@
             </label>
           `).join('')}
         </div>
+        ${window.v52AssessmentToolSummary?.previousNote(local.previous?.notes?.[item.key])||''}
         ${!showNote?`
           <div class="iadl-note"><button type="button" class="btn sm" data-iadl-add-note="${item.key}">＋ 補充備註</button></div>
         `:''}
