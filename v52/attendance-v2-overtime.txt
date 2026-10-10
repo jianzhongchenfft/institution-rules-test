@@ -404,7 +404,7 @@
       ${review?'<th>申請人</th>':''}<th>日期</th><th>類型</th><th>認列</th><th>事由</th><th>狀態</th><th>操作</th>
       </tr></thead><tbody>${rows.map(r=>`<tr>
         ${review?`<td><div class="ot-review-name">${escapeHTML(r.applicant_name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.applicant_role))}</div></td>`:''}
-        <td>${rocDate(r.work_date+'T00:00:00')}</td>
+        <td>${window.rocDateKit.formatDateCompact(r.work_date)}</td>
         <td><div class="ot-type">${overtimeTypeLabel(r.request_type)}</div>${overtimeRowDetail(r)}</td>
         <td><span class="ot-amount">${overtimeAmount(r)}</span></td>
         <td><div>${escapeHTML(r.reason||'—')}</div>${r.notes?`<div class="ot-detail ot-note">備註：${escapeHTML(r.notes)}</div>`:''}${r.review_note?`<div class="ot-reject">審核說明：${escapeHTML(r.review_note)}</div>`:''}</td>
@@ -462,7 +462,7 @@
         ${usable.length
           ? `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>取得日期</th><th>來源</th><th>原始額度</th><th>剩餘</th><th>到期日</th><th>狀態</th></tr></thead><tbody>${usable.map(c=>{
               const holiday=compLeaveIsHolidayVisitCredit(c);
-              const expiryText=holiday?'無到期限制':(c.expires_on?rocDate(String(c.expires_on)+'T00:00:00'):'待設定');
+              const expiryText=holiday?'無到期限制':(c.expires_on?window.rocDateKit.formatDateCompact(String(c.expires_on)):'待設定');
               let status='有效';
               if(holiday)status='無到期限制';
               else if(c.expires_on){
@@ -471,7 +471,7 @@
                 else if(d<=30)status=`${d}天內到期`;
               }
               return `<tr>
-                <td>${rocDate(String(c.earned_date)+'T00:00:00')}</td>
+                <td>${window.rocDateKit.formatDateCompact(String(c.earned_date))}</td>
                 <td>${escapeHTML(c.source_label||'換休')}</td>
                 <td>${escapeHTML(overtimeDurationLabel(c.earned_minutes))}</td>
                 <td><strong>${escapeHTML(overtimeDurationLabel(c.remaining_minutes))}</strong></td>
@@ -516,7 +516,7 @@
     if(!rows.length)return '<div class="ot-empty"><div class="icon">✓</div><h3>目前沒有換休銷假申請</h3></div>';
     return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>申請人</th><th>休假日期</th><th>時數</th><th>銷假原因</th><th>操作</th></tr></thead><tbody>${rows.map(x=>`<tr>
       <td><div class="ot-review-name">${escapeHTML(x.applicant_name||'—')}</div></td>
-      <td>${rocDate(String(x.leave_date)+'T00:00:00')}</td>
+      <td>${window.rocDateKit.formatDateCompact(String(x.leave_date))}</td>
       <td><span class="ot-amount">${overtimeDurationLabel(x.minutes)}</span></td>
       <td>${escapeHTML(x.reason||'—')}</td>
       <td><div class="ot-actions"><button class="btn sm primary" data-cl-cancel-approve="${x.id}">核准銷假</button><button class="btn sm" data-cl-cancel-reject="${x.id}">退回</button></div></td>
@@ -531,7 +531,7 @@
       ${review?'<th>申請人</th>':''}<th>換休日期</th><th>換休時間</th><th>換休類型</th><th>使用時數</th><th>事由</th><th>狀態</th><th>操作</th>
       </tr></thead><tbody>${rows.map(r=>{const ds=compLeaveDisplayStatus(r);return `<tr>
         ${review?`<td><div class="ot-review-name">${escapeHTML(r.applicant_name)}</div><div class="ot-detail">${escapeHTML(overtimeRoleLabel(r.applicant_role))}</div></td>`:''}
-        <td>${rocDate(r.leave_date+'T00:00:00')}</td>
+        <td>${window.rocDateKit.formatDateCompact(r.leave_date)}</td>
         <td><div class="ot-type">${String(r.start_time||'').slice(0,5)}–${String(r.end_time||'').slice(0,5)}</div></td>
         <td>${escapeHTML(r.leave_type==='holiday_visit'?'假日家訪換休':'一般加班換休')}</td>
         <td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td>
@@ -585,8 +585,7 @@
 
   function payrollMonthLabel(month){
     const safe=/^\d{4}-\d{2}$/.test(month||'')?month:isoDate(new Date()).slice(0,7);
-    const [year,mon]=safe.split('-').map(Number);
-    return `民國 ${year-1911} 年 ${mon} 月`;
+    return window.rocDateKit.formatMonth(safe);
   }
 
   function payrollBuildRows(){
@@ -683,9 +682,9 @@
   function payrollDetailTable(items,kind){
     if(!items?.length) return '<div class="ot-empty"><p>本月無此類紀錄。</p></div>';
     if(kind==='used'){
-      return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>時間</th><th>使用時數</th><th>事由</th></tr></thead><tbody>${items.map(r=>`<tr><td>${rocDate(r.date+'T00:00:00')}</td><td>${escapeHTML((r.startTime||'—')+'–'+(r.endTime||'—'))}</td><td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td><td>${escapeHTML(r.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
+      return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>時間</th><th>使用時數</th><th>事由</th></tr></thead><tbody>${items.map(r=>`<tr><td>${window.rocDateKit.formatDateCompact(r.date)}</td><td>${escapeHTML((r.startTime||'—')+'–'+(r.endTime||'—'))}</td><td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td><td>${escapeHTML(r.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
     }
-    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>類型</th><th>時間</th><th>${kind==='pay'?'待計薪':'取得換休'}</th><th>事由</th></tr></thead><tbody>${items.map(r=>`<tr><td>${rocDate(r.date+'T00:00:00')}</td><td>${escapeHTML(overtimeTypeLabel(r.type))}</td><td>${r.startTime&&r.endTime?escapeHTML(r.startTime+'–'+r.endTime):'—'}</td><td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td><td>${escapeHTML(r.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>類型</th><th>時間</th><th>${kind==='pay'?'待計薪':'取得換休'}</th><th>事由</th></tr></thead><tbody>${items.map(r=>`<tr><td>${window.rocDateKit.formatDateCompact(r.date)}</td><td>${escapeHTML(overtimeTypeLabel(r.type))}</td><td>${r.startTime&&r.endTime?escapeHTML(r.startTime+'–'+r.endTime):'—'}</td><td><span class="ot-amount">${overtimeDurationLabel(r.minutes)}</span></td><td>${escapeHTML(r.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function openPayrollDetail(staffId){
@@ -707,7 +706,7 @@
     const settlement=payrollSettlementForMonth();
     const rows=payrollReportRows();
     const settledInfo=settlement
-      ? `已結算｜${escapeHTML(settlement.settled_by_name||'—')}・${rocDate(settlement.settled_at)}`
+      ? `已結算｜${escapeHTML(settlement.settled_by_name||'—')}・${window.rocDateKit.formatDateTimeCompact(settlement.settled_at)}`
       : '尚未結算';
 
     const compChange=(r)=>{
@@ -1224,7 +1223,7 @@
     if(!row||!canRequestCompLeaveCancellation(row)){toast('此筆換休目前無法申請銷假','warn');return;}
     openModal({
       title:'申請銷假｜換休',
-      html:`<div class="ot-rule-highlight" style="margin-top:0">原核准換休：<strong>${rocDate(row.leave_date+'T00:00:00')}　${String(row.start_time||'').slice(0,5)}–${String(row.end_time||'').slice(0,5)}</strong><br>銷假需由管理者審核；核准後才會將換休時數還回。</div><div class="field" style="margin-top:12px"><label>銷假原因 *</label><textarea id="clCancelReason" placeholder="例如：原行程取消，當日正常上班"></textarea></div>`,
+      html:`<div class="ot-rule-highlight" style="margin-top:0">原核准換休：<strong>${window.rocDateKit.formatDateCompact(row.leave_date)}　${String(row.start_time||'').slice(0,5)}–${String(row.end_time||'').slice(0,5)}</strong><br>銷假需由管理者審核；核准後才會將換休時數還回。</div><div class="field" style="margin-top:12px"><label>銷假原因 *</label><textarea id="clCancelReason" placeholder="例如：原行程取消，當日正常上班"></textarea></div>`,
       confirmText:'送出銷假申請',
       onConfirm:()=>submitCompLeaveCancellation(id)
     });
@@ -1245,7 +1244,7 @@
   async function reviewCompLeaveCancellation(id,action,note=null){
     const req=(state.leaveCancellationRows||[]).find(x=>String(x.id)===String(id)&&x.source_type==='comp_leave');
     if(!req||req.status!=='pending'){toast('此銷假申請目前不是待審核狀態','warn');return false;}
-    if(action==='approve'&&!confirm(`確定核准「${req.applicant_name}」${rocDate(String(req.leave_date)+'T00:00:00')} 的換休銷假嗎？\n\n核准後會將原扣除的換休時數還回。`))return false;
+    if(action==='approve'&&!confirm(`確定核准「${req.applicant_name}」${window.rocDateKit.formatDateCompact(String(req.leave_date))} 的換休銷假嗎？\n\n核准後會將原扣除的換休時數還回。`))return false;
     showLoading(true);
     try{
       const {error}=await db.rpc('review_leave_cancellation',{p_id:id,p_action:action,p_note:note||null});
@@ -1687,13 +1686,10 @@
     return {start,end};
   }
 
-  function monthLabel(month){
-    const [y,m]=String(month||'').split('-').map(Number);
-    return Number.isFinite(y)&&Number.isFinite(m)?`民國 ${y-1911} 年 ${m} 月`:String(month||'');
-  }
+  function monthLabel(month){return window.rocDateKit.formatMonth(month);}
 
   function dateText(value){
-    return value?rocDate(String(value).slice(0,10)+'T00:00:00'):'—';
+    return window.rocDateKit.formatDateCompact(value?String(value).slice(0,10):'');
   }
 
   function typeText(row,kind){
@@ -1879,7 +1875,7 @@
   function ceToday(){return isoDate(new Date());}
 
   function ceDate(value){
-    return value?rocDate(String(value).slice(0,10)+'T00:00:00'):'待設定';
+    return value?window.rocDateKit.formatDateCompact(String(value).slice(0,10)):'待設定';
   }
 
   function ceStaff(staffId){
@@ -2273,12 +2269,12 @@
   function detailHTML(staff,comp,annual){
     const compRows=comp.credits.length
       ? '<div class="ot-table-shell"><table class="ot-table" style="min-width:620px"><thead><tr><th>取得日</th><th>來源</th><th>原始額度</th><th>剩餘</th><th>到期日</th></tr></thead><tbody>'+
-        comp.credits.map(c=>'<tr><td>'+escapeHTML(rocDate(String(c.earned_date)+'T00:00:00'))+'</td><td>'+escapeHTML(c.source_label||c.source_type||'換休')+'</td><td>'+escapeHTML(dur(c.earned_minutes))+'</td><td><strong>'+escapeHTML(dur(c.remaining_minutes))+'</strong></td><td>'+escapeHTML(c.expires_on?rocDate(String(c.expires_on)+'T00:00:00'):'未設定')+'</td></tr>').join('')+
+        comp.credits.map(c=>'<tr><td>'+escapeHTML(window.rocDateKit.formatDateCompact(String(c.earned_date)))+'</td><td>'+escapeHTML(c.source_label||c.source_type||'換休')+'</td><td>'+escapeHTML(dur(c.earned_minutes))+'</td><td><strong>'+escapeHTML(dur(c.remaining_minutes))+'</strong></td><td>'+escapeHTML(c.expires_on?window.rocDateKit.formatDateCompact(String(c.expires_on)):'未設定')+'</td></tr>').join('')+
         '</tbody></table></div>'
       : '<div class="ot-empty"><p>目前沒有有效的換休額度。</p></div>';
     const annualRows=annual.credits.length
       ? '<div class="ot-table-shell"><table class="ot-table" style="min-width:620px"><thead><tr><th>額度</th><th>期間</th><th>原始額度</th><th>剩餘</th></tr></thead><tbody>'+
-        annual.credits.map(c=>'<tr><td>'+escapeHTML(c.label||'特休額度')+'</td><td>'+escapeHTML(rocDate(String(c.period_start)+'T00:00:00'))+'～'+escapeHTML(rocDate(String(c.period_end)+'T00:00:00'))+'</td><td>'+escapeHTML(daysText(c.granted_days))+'<div class="ot-detail">生效時每日 '+escapeHTML(String(Number(c.daily_hours_snapshot)||'—'))+' 小時</div></td><td><strong>'+escapeHTML(daysText(c.remaining_days))+'</strong></td></tr>').join('')+
+        annual.credits.map(c=>'<tr><td>'+escapeHTML(c.label||'特休額度')+'</td><td>'+escapeHTML(window.rocDateKit.formatDateCompact(String(c.period_start)))+'～'+escapeHTML(window.rocDateKit.formatDateCompact(String(c.period_end)))+'</td><td>'+escapeHTML(daysText(c.granted_days))+'<div class="ot-detail">生效時每日 '+escapeHTML(String(Number(c.daily_hours_snapshot)||'—'))+' 小時</div></td><td><strong>'+escapeHTML(daysText(c.remaining_days))+'</strong></td></tr>').join('')+
         '</tbody></table></div>'
       : '<div class="ot-empty"><p>目前沒有有效的特休額度。</p></div>';
     return '<div class="lab-detail-summary"><strong>'+escapeHTML(staff.display_name||'未命名')+'</strong><span>'+escapeHTML(roleLabel(staff.role))+'</span></div>'+
