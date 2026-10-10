@@ -90,6 +90,7 @@
                 <label class="${local.judgments[key]==='unable_answer'?'selected':''}"><input type="radio" name="spmsq_${key}" value="unable_answer" ${local.judgments[key]==='unable_answer'?'checked':''}>無法作答</label>
               </div>
               <div class="spmsq-note">
+                ${window.v52AssessmentToolSummary?.previousNote(local.previous?.notes?.[key])||''}
                 ${local.judgments[key]==='unable_answer'||local.expandedNotes.has(key)||String(local.notes[key]||'').trim()
                   ?`<label>${local.judgments[key]==='unable_answer'?'無法作答原因 *':'備註（選填）'}</label><textarea data-spmsq-note="${key}" placeholder="${local.judgments[key]==='unable_answer'?'請填寫無法作答原因':'需要時補充，例如：僅能回答年份、因失語無法回答'}">${escapeHTML(local.notes[key]||'')}</textarea>`
                   :`<button type="button" class="btn sm" data-spmsq-add-note="${key}">＋ 補充備註</button>`}
