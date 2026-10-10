@@ -6,6 +6,8 @@
     // 沿用原儲存流程的同一支同步函式，避免另外維護兩套欄位映射。
     if(document.querySelector('.health-page'))syncInputs();
     return {
+      assessment_event_id:local.eventId,
+      assessment_mode:healthSectionMode(eventById(local.eventId)),
       medical_info:local.medicalInfo,
       medication_checks:local.medicationChecks,
       health_items:local.healthItems,
