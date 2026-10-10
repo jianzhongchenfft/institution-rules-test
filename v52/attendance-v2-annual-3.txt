@@ -126,8 +126,8 @@
   const today=()=>isoDate(new Date());
   const dur=n=>{n=Math.max(0,Number(n)||0);const h=Math.floor(n/60),m=n%60;return h&&m?`${h}小時${m}分`:h?`${h}小時`:`${m}分鐘`;};
   const daysText=value=>{const n=Math.max(0,Number(value)||0),v=Math.round(n*100)/100;return `${String(v).replace(/\.0+$/,'')}天`;};
-  const dateText=v=>v?rocDate(String(v).slice(0,10)+'T00:00:00'):'—';
-  const dtText=v=>v?rocDate(v):'—';
+  const dateText=v=>v?window.rocDateKit.formatDateCompact(String(v).slice(0,10)):'—';
+  const dtText=v=>window.rocDateKit.formatDateTimeCompact(v);
   const pad=n=>String(n).padStart(2,'0');
   const money=n=>Number.isFinite(Number(n))?`NT$ ${Math.round(Number(n)).toLocaleString('zh-TW')}`:'—';
   const nameMap=()=>new Map((state.annualExpiryStaff||[]).map(s=>[String(s.id),s.display_name||'—']));
@@ -220,7 +220,8 @@
   function openCarry(id){
     const c=getCredit(id);if(!c)return toast('找不到這筆特休額度','warn');if(!canCarry(c))return toast('此筆特休目前只能辦理工資結清','warn');
     const names=nameMap(),nextStart=addDays(c.period_end,1),nextEnd=addOneYear(c.period_end);
-    openModal({title:'協議遞延未休特休',html:`<div class="al-calc">${escapeHTML(names.get(String(c.staff_id))||'—')}｜遞延 ${escapeHTML(daysText(c.remaining_days))}<br>新批次有效期間：${escapeHTML(dateText(nextStart))}～${escapeHTML(dateText(nextEnd))}</div><div class="field" style="margin-top:12px"><label>勞雇雙方同意日期 *</label><input id="aleAgreementDate" type="date" max="${escapeHTML(today())}" value="${escapeHTML(today())}"><div class="ale-form-help">需確認員工與機構已同意將此筆未休特休遞延至下一年度。</div></div><div class="field"><label>備註（選填）</label><textarea id="aleCarryNote" rows="3" placeholder="例如：雙方於面談時同意遞延"></textarea></div><label class="ale-confirm"><input id="aleCarryConfirm" type="checkbox"><span>我確認勞雇雙方已同意遞延。系統會保留原批次，並另建立一筆新的遞延特休。</span></label>`,confirmText:'確認遞延',onConfirm:()=>submitResolution(c.id,'carryover',$('aleAgreementDate')?.value||null,$('aleCarryNote')?.value||'',!!$('aleCarryConfirm')?.checked)});
+    openModal({title:'協議遞延未休特休',html:`<div class="al-calc">${escapeHTML(names.get(String(c.staff_id))||'—')}｜遞延 ${escapeHTML(daysText(c.remaining_days))}<br>新批次有效期間：${escapeHTML(dateText(nextStart))}～${escapeHTML(dateText(nextEnd))}</div><div class="field" style="margin-top:12px"><label>勞雇雙方同意日期 *</label><input id="aleAgreementDate" type="hidden" value="${escapeHTML(today())}"><div id="aleAgreementDateHost" class="roc-inline-date"></div><div class="ale-form-help">需確認員工與機構已同意將此筆未休特休遞延至下一年度。</div></div><div class="field"><label>備註（選填）</label><textarea id="aleCarryNote" rows="3" placeholder="例如：雙方於面談時同意遞延"></textarea></div><label class="ale-confirm"><input id="aleCarryConfirm" type="checkbox"><span>我確認勞雇雙方已同意遞延。系統會保留原批次，並另建立一筆新的遞延特休。</span></label>`,confirmText:'確認遞延',onConfirm:()=>submitResolution(c.id,'carryover',window.rocDateKit.linkedISO('aleAgreementDate'),$('aleCarryNote')?.value||'',!!$('aleCarryConfirm')?.checked)});
+    window.rocDateKit.mountLinkedDate('aleAgreementDate',{value:today(),max:today(),required:true});
   }
 
   async function submitResolution(id,action,agreementDate,note,confirmed){
