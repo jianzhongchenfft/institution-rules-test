@@ -249,7 +249,7 @@
   function rerenderPreservingScroll(){const y=window.scrollY;render();requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'auto'}));}
 
   function bind(row){
-    window.v52AssessmentToolSummary?.mount(local.eventId,'caregiver_burden',currentToolSummarySource(),'.cg-page','.cg-actions');
+    window.v52AssessmentToolSummary?.mount(local.eventId,'caregiver_burden',currentToolSummarySource,'.cg-page','.cg-actions');
     $('cgBack')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
     $('cgApplicability')?.addEventListener('change',e=>{
       local.applicability=e.target.value;
