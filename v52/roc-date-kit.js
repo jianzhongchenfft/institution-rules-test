@@ -40,13 +40,13 @@
  function css(){
    if(document.getElementById('roc-date-kit-style'))return;
    var rules=[
-    '.rdk{position:relative;display:inline-flex;align-items:flex-start;flex-wrap:wrap;gap:4px;max-width:100%;font-family:inherit}',
-    '.rdk-text{box-sizing:border-box;width:152px;max-width:100%;height:36px;border:1px solid #d0d5dd;border-radius:8px;background:white;padding:7px 8px;font:inherit;font-size:13px;color:#344054}',
+    '.rdk{position:relative;display:inline-flex;align-items:stretch;flex-wrap:wrap;gap:4px;max-width:100%;font-family:inherit}',
+    '.rdk-text{box-sizing:border-box;width:152px;max-width:100%;height:auto;border:1px solid #d0d5dd;border-radius:9px;background:white;padding:10px 11px;font:inherit;color:#344054}',
     '.rdk.month .rdk-text{width:145px}',
     '.rdk-text[aria-invalid="true"]{border-color:#d92d20;outline-color:#d92d20}',
     '.rdk-toggle,.rdk-nav,.rdk-small{border:1px solid #d0d5dd;border-radius:7px;background:white;color:#475467;cursor:pointer}',
-    '.rdk-toggle{height:36px;min-width:36px;font-size:17px}.rdk-toggle:disabled{opacity:.5;cursor:default}',
-    '.rdk-error{flex-basis:100%;color:#b42318;font-size:11px}',
+    '.rdk-toggle{align-self:stretch;height:auto;min-width:42px;box-sizing:border-box;border-radius:9px;padding:0 10px;font:inherit;font-size:18px;line-height:1}.rdk-toggle:disabled{opacity:.5;cursor:default}',
+    '.rdk-error{flex-basis:100%;color:#b42318;font-size:11px}.rdk-error:empty{display:none}',
     '.rdk-popup{box-sizing:border-box;position:absolute;z-index:1200;left:0;top:calc(100% + 5px);width:284px;max-width:calc(100vw - 20px);padding:12px;border:1px solid #ebd0c6;border-radius:12px;background:white;color:#344054;box-shadow:0 10px 24px rgba(0,0,0,.16)}',
     '.rdk-popup[hidden]{display:none!important}',
     '.rdk-head{display:flex;gap:5px;align-items:center;justify-content:space-between;margin-bottom:8px}',
@@ -64,7 +64,7 @@
     '.rdk-nav:hover,.rdk-day:hover:not(:disabled),.rdk-month-choice:hover:not(:disabled){background:#fff3ed;border-color:#dc9479}',
     '.rdk-foot{display:flex;justify-content:space-between;gap:6px;margin-top:9px}',
     '.rdk-small{padding:5px 8px;font-size:12px}',
-    '.rdk-text:focus-visible,.rdk-popup button:focus-visible{outline:2px solid #dc9479;outline-offset:1px}'
+    '.rdk-text:focus-visible,.rdk-toggle:focus-visible,.rdk-popup button:focus-visible{outline:2px solid #dc9479;outline-offset:1px}'
    ];
    var style=document.createElement('style');style.id='roc-date-kit-style';style.textContent=rules.join('\n');document.head.append(style);
  }
