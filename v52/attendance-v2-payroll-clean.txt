@@ -295,7 +295,7 @@
         <div class="ot-rule-highlight" style="margin-top:0">「月薪工資總額」與「約定每日工時」共同作為加班費計算基礎。系統以月薪工資總額 ÷ 30 ÷ 約定每日工時試算。</div>
         <div class="form-grid" style="margin-top:12px">
           <div class="field"><label>員工 *</label><select id="prRateStaff">${prRateOptions()}</select></div>
-          <div class="field"><label>生效日期 *</label><input id="prRateDate" type="date" value="${isoDate(new Date()).slice(0,7)}-01"></div>
+          <div class="field"><label>生效日期 *</label><input id="prRateDate" type="hidden" value="${isoDate(new Date()).slice(0,7)}-01"><div id="prRateDateHost" class="roc-inline-date"></div></div>
           <div class="field"><label>月薪工資總額 *</label><input id="prRateAmount" type="number" min="1" step="1" placeholder="例如 36000"></div>
           <div class="field"><label>備註</label><input id="prRateNote" placeholder="例如：年度調薪"></div>
         </div>
@@ -304,7 +304,7 @@
           const s=(state.payrollRateStaff||[]).find(x=>String(x.id)===String(r.staff_id));
           const hours=Number(r.agreed_daily_hours);
           const hourly=Number.isFinite(hours)&&hours>0?Number(r.monthly_wage_base)/30/hours:null;
-          return `<div class="pr-rate-item"><div class="pr-rate-top"><div><div class="pr-rate-main">${escapeHTML(s?.display_name||'未命名')}｜${prMoney(r.monthly_wage_base)}</div><div class="pr-rate-sub">生效：${rocDate(String(r.effective_from)+'T00:00:00')}｜約定每日工時：${Number.isFinite(hours)&&hours>0?escapeHTML(String(hours))+'小時':'待設定'}｜平日時薪基數：約 ${hourly?prMoney(hourly)+'/小時':'待設定'}${r.note?`<br>備註：${escapeHTML(r.note)}`:''}</div></div><div class="pr-rate-sub">建立：${escapeHTML(r.created_by_name||'—')}・${rocDate(r.created_at)}</div></div></div>`;
+          return `<div class="pr-rate-item"><div class="pr-rate-top"><div><div class="pr-rate-main">${escapeHTML(s?.display_name||'未命名')}｜${prMoney(r.monthly_wage_base)}</div><div class="pr-rate-sub">生效：${window.rocDateKit.formatDateCompact(String(r.effective_from))}｜約定每日工時：${Number.isFinite(hours)&&hours>0?escapeHTML(String(hours))+'小時':'待設定'}｜平日時薪基數：約 ${hourly?prMoney(hourly)+'/小時':'待設定'}${r.note?`<br>備註：${escapeHTML(r.note)}`:''}</div></div><div class="pr-rate-sub">建立：${escapeHTML(r.created_by_name||'—')}・${window.rocDateKit.formatDateTimeCompact(r.created_at)}</div></div></div>`;
         }).join(''):'<div class="ot-empty"><p>尚未設定任何薪資計算基數。</p></div>'}</div>`,
       confirmText:'新增薪資基數',
       onConfirm:()=>{
@@ -313,6 +313,7 @@
       },
       large:true
     });
+    window.rocDateKit.mountLinkedDate('prRateDate',{value:isoDate(new Date()).slice(0,7)+'-01',required:true});
   }
 
   function prEnsureSettingsButton(){
@@ -533,12 +534,12 @@
     }
   function simpleItems(items,kind){
     if(!Array.isArray(items)||!items.length)return '<div class="ot-empty"><p>無資料。</p></div>';
-    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>類型／時間</th><th>時數</th><th>事由</th></tr></thead><tbody>${items.map(i=>`<tr><td>${rocDate(String(i.date)+'T00:00:00')}</td><td>${kind==='used'?'換休使用':escapeHTML(typeLabel(i.type))}<div class="ot-detail">${i.startTime||''}${i.startTime&&i.endTime?'–':''}${i.endTime||''}</div></td><td>${escapeHTML(dur(i.minutes))}</td><td>${escapeHTML(i.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>日期</th><th>類型／時間</th><th>時數</th><th>事由</th></tr></thead><tbody>${items.map(i=>`<tr><td>${window.rocDateKit.formatDateCompact(String(i.date))}</td><td>${kind==='used'?'換休使用':escapeHTML(typeLabel(i.type))}<div class="ot-detail">${i.startTime||''}${i.startTime&&i.endTime?'–':''}${i.endTime||''}</div></td><td>${escapeHTML(dur(i.minutes))}</td><td>${escapeHTML(i.reason||'—')}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function paySnapshotItems(items,emptyText='本月沒有領加班費的紀錄。'){
     if(!Array.isArray(items)||!items.length)return `<div class="ot-empty"><p>${escapeHTML(emptyText)}</p></div>`;
-    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>來源日期</th><th>類型／時間</th><th>時數</th><th>薪資基數</th><th>加班費</th><th>計算依據</th></tr></thead><tbody>${items.map(i=>`<tr><td>${rocDate(String(i.date)+'T00:00:00')}${i.expiryDate?`<div class="ot-detail">到期：${rocDate(String(i.expiryDate)+'T00:00:00')}</div>`:''}</td><td>${escapeHTML(typeLabel(i.type))}<div class="ot-detail">${escapeHTML(i.startTime||'')}–${escapeHTML(i.endTime||'')}</div></td><td>${escapeHTML(dur(i.minutes))}${Number(i.usedMinutes)>0?`<div class="ot-detail">原取得 ${escapeHTML(dur(i.sourceEarnedMinutes))}，已休 ${escapeHTML(dur(i.usedMinutes))}</div>`:''}</td><td>${money(i.wageBase)}<div class="ot-detail">生效：${i.rateEffectiveFrom?rocDate(String(i.rateEffectiveFrom)+'T00:00:00'):'—'}<br>時薪基數 ${money(i.hourlyBase)}</div></td><td><strong>${money(i.calculatedAmount)}</strong></td><td><div class="ot-detail">${escapeHTML(i.calculationFormula||'—')}</div></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="ot-table-shell"><table class="ot-table"><thead><tr><th>來源日期</th><th>類型／時間</th><th>時數</th><th>薪資基數</th><th>加班費</th><th>計算依據</th></tr></thead><tbody>${items.map(i=>`<tr><td>${window.rocDateKit.formatDateCompact(String(i.date))}${i.expiryDate?`<div class="ot-detail">到期：${window.rocDateKit.formatDateCompact(String(i.expiryDate))}</div>`:''}</td><td>${escapeHTML(typeLabel(i.type))}<div class="ot-detail">${escapeHTML(i.startTime||'')}–${escapeHTML(i.endTime||'')}</div></td><td>${escapeHTML(dur(i.minutes))}${Number(i.usedMinutes)>0?`<div class="ot-detail">原取得 ${escapeHTML(dur(i.sourceEarnedMinutes))}，已休 ${escapeHTML(dur(i.usedMinutes))}</div>`:''}</td><td>${money(i.wageBase)}<div class="ot-detail">生效：${i.rateEffectiveFrom?window.rocDateKit.formatDateCompact(String(i.rateEffectiveFrom)):'—'}<br>時薪基數 ${money(i.hourlyBase)}</div></td><td><strong>${money(i.calculatedAmount)}</strong></td><td><div class="ot-detail">${escapeHTML(i.calculationFormula||'—')}</div></td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function openSnapshotDetail(staffId){
@@ -663,7 +664,7 @@
     if(!rows.length)return '<div class="ot-empty"><p>尚未設定任何薪資計算基數。</p></div>';
     return rows.map(r=>{
       const s=staffFor(r.staff_id),hours=Number(r.agreed_daily_hours),hourly=Number(r.monthly_wage_base)/30/hours;
-      return `<div class="pr-rate-item"><div class="pr-rate-top"><div><div class="pr-rate-main">${escapeHTML(s?.display_name||'未命名')}｜${money(r.monthly_wage_base)}</div><div class="pr-rate-sub">生效：${rocDate(String(r.effective_from)+'T00:00:00')}｜約定每日工時：${escapeHTML(String(hours))}小時｜平日時薪基數：約 ${money(hourly)}/小時${r.note?`<br>備註：${escapeHTML(r.note)}`:''}</div></div><div class="pr-rate-sub">建立：${escapeHTML(r.created_by_name||'—')}・${rocDate(r.created_at)}</div></div></div>`;
+      return `<div class="pr-rate-item"><div class="pr-rate-top"><div><div class="pr-rate-main">${escapeHTML(s?.display_name||'未命名')}｜${money(r.monthly_wage_base)}</div><div class="pr-rate-sub">生效：${window.rocDateKit.formatDateCompact(String(r.effective_from))}｜約定每日工時：${escapeHTML(String(hours))}小時｜平日時薪基數：約 ${money(hourly)}/小時${r.note?`<br>備註：${escapeHTML(r.note)}`:''}</div></div><div class="pr-rate-sub">建立：${escapeHTML(r.created_by_name||'—')}・${window.rocDateKit.formatDateTimeCompact(r.created_at)}</div></div></div>`;
     }).join('');
   }
 
@@ -705,7 +706,7 @@
   async function saveRateFromModal(){
     if(!canReview()){toast('目前帳號沒有薪資計算設定權限','warn');return;}
     const staffId=document.getElementById('prRateStaff')?.value;
-    const date=document.getElementById('prRateDate')?.value;
+    const date=window.rocDateKit.linkedISO('prRateDate');
     const amount=Number(document.getElementById('prRateAmount')?.value||0);
     const hours=Number(document.getElementById('phDailyHours')?.value||0);
     const note=String(document.getElementById('prRateNote')?.value||'').trim();
