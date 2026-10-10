@@ -277,7 +277,7 @@
       </div>
     `;
 
-    window.v52AssessmentToolSummary?.mount(local.eventId,'gds15',currentToolSummarySource(),'.gds15-page','.gds15-actions');
+    window.v52AssessmentToolSummary?.mount(local.eventId,'gds15',currentToolSummarySource,'.gds15-page','.gds15-actions');
     $('gds15Back')?.addEventListener('click',()=>window.v52AssessmentApi?.renderAssessmentDetail?.(row.id));
 
     document.querySelectorAll('input[name^="gds15_q"]').forEach(input=>{
