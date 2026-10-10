@@ -188,7 +188,7 @@
     var scope=ccCurrentScope(),q=(state.caseQuery||'').trim().toLowerCase();
     var rows=scope.filter(function(c){
       if(!q)return true;
-      return [c.case_no,c.case_name,c.national_id,c.address,ccStaffName(c.supervisor_id),ccServiceSummary(c.id)]
+      return [c.case_no,c.case_name,c.national_id,c.address,c.case_manager_name,c.welfare_identity,c.cms_level,c.phone,ccStaffName(c.supervisor_id),ccServiceSummary(c.id)].concat((state.caseDirectoryContacts||[]).filter(function(x){return x.case_id===c.id;}).flatMap(function(x){return [x.contact_name,x.phone];}))
         .some(function(v){return String(v||'').toLowerCase().includes(q);});
     });
     if(state.caseStatusFilter&&state.caseStatusFilter!=='all'){
@@ -257,21 +257,57 @@
 
     var list=$('caseList');
     if(!rows.length){list.innerHTML='<div class="empty"><div class="icon">👤</div><h3>目前沒有可顯示的個案</h3></div>';return;}
-    list.innerHTML='<div class="case-table-shell"><table class="case-table"><thead><tr><th>個案</th><th>負責督導</th><th>最近家訪</th><th>最近正式電訪</th><th>最近聯繫</th><th>期限／追蹤</th><th>狀態</th></tr></thead><tbody>'+
-      rows.map(function(c){
-        var h=ccLatest(c.id,'home_visit'),p=ccLatest(c.id,'formal_phone'),latest=ccLatestContact(c.id);
-        var hc=ccCycle(c,'home_visit'),pc=ccCycle(c,'formal_phone'),ac=ccAssessmentCycle(c),f=ccPendingFollowups(c.id),status=ccWorstStatus(c);
-        return '<tr>'+
-          '<td><button class="case-name-btn" data-case-id="'+c.id+'">'+escapeHTML(c.case_name)+'</button><div class="visit-item-sub">'+escapeHTML(c.case_no||'—')+'｜'+escapeHTML(ccServiceSummary(c.id))+'</div></td>'+
-          '<td>'+escapeHTML(ccStaffName(c.supervisor_id))+'</td>'+
-          '<td>'+(h?ccDateText(h.record_date):'—')+'</td>'+
-          '<td>'+(p?ccDateText(p.record_date):'—')+'</td>'+
-          '<td>'+(latest?ccDateText(latest.record_date)+' '+escapeHTML(ccTypeLabel(latest.record_type)):'—')+'</td>'+
-          '<td><div class="cc-status-grid"><span class="cc-chip '+hc.key+'">家訪 '+(hc.due?ccDateText(hc.due):hc.text)+'</span><span class="cc-chip '+pc.key+'">電訪 '+(pc.due?ccDateText(pc.due):pc.text)+'</span><span class="cc-chip '+ac.key+'">評估 '+(ac.due?ccDateText(ac.due):ac.text)+'</span>'+(f.length?'<span class="cc-chip followup">追蹤 '+f.length+'</span>':'')+'</div></td>'+
-          '<td><span class="case-status '+status.key+'">'+escapeHTML(status.text)+'</span></td>'+
-        '</tr>';
-      }).join('')+'</tbody></table></div>';
-    list.querySelectorAll('[data-case-id]').forEach(function(btn){btn.addEventListener('click',function(){if(typeof window.openCaseDetailPage==='function')window.openCaseDetailPage(btn.dataset.caseId,'visits');});});
+    function field(label,value,extraClass){
+      return '<div class="cc-person-field '+(extraClass||'')+'"><label>'+escapeHTML(label)+'</label><div class="cc-person-value">'+escapeHTML(String(value||'—'))+'</div></div>';
+    }
+    function phoneField(label,number){
+      var digits=String(number||'').replace(/[^0-9+]/g,'');
+      var value=digits?'<a class="cc-person-link" href="tel:'+digits+'">'+escapeHTML(number)+'</a>':'—';
+      return '<div class="cc-person-field"><label>'+escapeHTML(label)+'</label><div class="cc-person-value">'+value+'</div></div>';
+    }
+    function mapsUrl(raw){
+      try{
+        var u=new URL(String(raw||'').trim());
+        if(u.protocol!=='https:'||u.username||u.password)return '';
+        if(((u.hostname==='google.com'||u.hostname==='www.google.com')&&/^\/maps(?:\/|$)/.test(u.pathname))
+           ||u.hostname==='maps.google.com'||u.hostname==='maps.app.goo.gl'
+           ||(u.hostname==='goo.gl'&&/^\/maps(?:\/|$)/.test(u.pathname)))return u.href;
+      }catch(_){}
+      return '';
+    }
+    list.innerHTML='<div class="cc-directory">'+rows.map(function(c){
+      var contact=(state.caseDirectoryContacts||[]).find(function(x){return x.case_id===c.id&&x.is_primary_contact;})||null;
+      var gender=c.gender==='男'?'<span class="cc-sex male">男</span>':c.gender==='女'?'<span class="cc-sex female">女</span>':'';
+      var name='<div class="cc-person-field"><label>案名</label><div class="cc-person-value">'+gender+escapeHTML(c.case_name||'—')+'</div></div>';
+      var map=mapsUrl(c.google_maps_url);
+      var mapText=map?'<a class="cc-person-link" href="'+escapeHTML(map)+'" target="_blank" rel="noopener noreferrer">📍 開啟地圖</a>':'—';
+      var mapField='<div class="cc-person-field"><label>Google定位</label><div class="cc-person-value">'+mapText+'</div></div>';
+      return '<article class="cc-person-card" data-case-id="'+escapeHTML(c.id)+'" role="button" tabindex="0" aria-label="開啟個案：'+escapeHTML(c.case_name||'')+'">'+
+        '<div class="cc-person-fields">'+
+          name+
+          field('責任督導',ccStaffName(c.supervisor_id))+
+          field('個管師',c.case_manager_name)+
+          field('開案日期',ccDateText(c.open_date))+
+          field('身分別',c.welfare_identity)+
+          field('CMS',c.cms_level)+
+        '</div><div class="cc-person-fields secondary">'+
+          field('地址',c.address,'address')+
+          mapField+
+          field('主要聯絡人',contact?.contact_name)+
+          phoneField('主要聯絡人電話',contact?.phone)+
+          phoneField('案主電話',c.phone)+
+        '</div></article>';
+    }).join('')+'</div>';
+    list.querySelectorAll('[data-case-id]').forEach(function(card){
+      function openCase(){
+        if(typeof window.openCaseDetailPage==='function')window.openCaseDetailPage(card.dataset.caseId,'basic');
+      }
+      card.addEventListener('click',function(e){if(e.target.closest('a'))return;openCase();});
+      card.addEventListener('keydown',function(e){
+        if(e.target!==card)return;
+        if(e.key==='Enter'||e.key===' '){e.preventDefault();openCase();}
+      });
+    });
   }
 
   var ccBaseNavigate=navigate;
