@@ -13,6 +13,11 @@
     .import-section:first-child{margin-top:0;padding-top:0;border-top:0}
     .import-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .import-preview-grid .field.full{grid-column:1/-1}
+    .import-preview-grid .field .rdk{display:flex;width:100%;flex-wrap:wrap}
+    .import-preview-grid .field .rdk .rdk-text{flex:1;width:calc(100% - 44px);min-width:0}
+    .import-preview-grid .field .rdk .rdk-year{width:67px;flex:0 0 67px}
+    .import-preview-grid .field .rdk .rdk-month-select{width:58px}
+    .import-preview-grid .field .rdk input[type="hidden"]{display:none}
     .import-warning{padding:10px 12px;border-radius:9px;background:#fffaeb;border:1px solid #fedf89;color:#93370d;font-size:11.5px;line-height:1.6;margin-bottom:10px}
     .import-diff{display:grid;gap:7px;margin-bottom:10px}.diff-row{display:grid;grid-template-columns:150px 1fr 28px 1fr;gap:8px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:#fff}.diff-label{font-size:10.5px;font-weight:900;color:#475467}.diff-value{font-size:11.5px;word-break:break-word}.diff-arrow{text-align:center;color:#98a2b3;font-weight:900}.diff-empty{padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#f8fafc;font-size:11.5px;color:#667085}.budget-editor{display:grid;gap:8px}.budget-row{display:grid;grid-template-columns:.65fr 1fr 1fr 1fr auto;gap:8px;align-items:end;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
     .contact-editor,.service-editor{display:grid;gap:8px}
@@ -534,6 +539,11 @@ async function htmlLoadExistingSnapshot(caseId){
     return note+'<div class="html-import-status" style="margin:0 0 8px">左側為目前使用資料，右側為本次 HTML 辨識資料。</div><div class="import-diff">'+rows.map(function(r){return '<div class="diff-row"><div class="diff-label">'+escapeHTML(r.label)+'</div><div class="diff-value">'+escapeHTML(r.oldValue)+'</div><div class="diff-arrow">→</div><div class="diff-value">'+escapeHTML(r.newValue)+'</div></div>';}).join('')+'</div>';
   }
   function htmlPlanPreview(plan){const entries=Object.entries(plan?.sections||{});return `<div class="html-plan-preview">${entries.length?entries.map(([k,v])=>`<details><summary>${escapeHTML(k)}</summary><pre>${escapeHTML(v)}</pre></details>`).join(''):'<div class="html-import-status">未辨識到照管平台照顧計畫文字區塊。</div>'}</div>`;}
+  function htmlBindOpenDate(hostId,inputId,value,required){
+    if(!window.rocDateKit||typeof window.rocDateKit.mountDate!=='function')throw new Error('民國日期共用元件尚未載入');
+    return window.rocDateKit.mountDate($(hostId),{id:inputId,value:value||'',required:!!required});
+  }
+
   function htmlOpenPreview(d){
     const exact=d._match; const potential=!exact?(d._potential||[]):[];
     let warning='';
@@ -545,7 +555,7 @@ async function htmlLoadExistingSnapshot(caseId){
       <div class="import-section">機構管理資料</div>
       <div class="import-preview-grid">
         <div class="field"><label>個案編號 *</label><input id="hiCaseNo" value="${escapeHTML(d.case_no||'')}"></div>
-        <div class="field"><label>開案日期（新案必填）</label><input id="hiOpenDate" type="date" value="${escapeHTML(d._existing?.caseData?.open_date||htmlTodayLocal())}"></div>
+        <div class="field"><label for="hiOpenDate">開案日期（新案必填）</label><div id="hiOpenDateHost"></div></div>
         <div class="field full"><label>Google定位（選填）</label><input id="hiGoogleMaps" type="url" placeholder="貼上 Google Maps 分享連結" value="${escapeHTML(d._existing?.caseData?.google_maps_url||'')}"><div class="help">僅在建立新個案時寫入；既有個案請由「編輯個案」修改。</div></div>
         <div class="field"><label>負責督導 *</label><select id="hiSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions(d.supervisor_id||'')}</select></div>
         <div class="field"><label>服務類別 *</label><select id="hiUsageType"><option value="">請選擇</option><option value="居家" ${d.service_usage_type==='居家'?'selected':''}>居家</option><option value="喘息" ${d.service_usage_type==='喘息'?'selected':''}>喘息</option><option value="居家+喘息" ${d.service_usage_type==='居家+喘息'?'selected':''}>居家+喘息</option></select></div>
@@ -559,7 +569,8 @@ async function htmlLoadExistingSnapshot(caseId){
       <div class="import-section">核定服務</div>${htmlServiceEditor(d.services||[])}
       <div class="import-section">額度資料</div>${htmlBudgetEditor(d.budgets||[])}
       <div class="import-section">照管平台照顧計畫</div><div class="html-import-status">計畫日期：${d.care_plan?.plan_date?rocDate(d.care_plan.plan_date+'T00:00:00'):'未辨識'}　家訪：${d.care_plan?.home_visit_date?rocDate(d.care_plan.home_visit_date+'T00:00:00'):'—'}　電聯：${d.care_plan?.phone_contact_date?rocDate(d.care_plan.phone_contact_date+'T00:00:00'):'—'}</div>${htmlPlanPreview(d.care_plan)}`,
-      onConfirm:()=>htmlSavePreview(d,exact?.id||null)});
+      onConfirm:()=>htmlSavePreview(d,exact?.id||null,hiOpenDateField)});
+    const hiOpenDateField=htmlBindOpenDate('hiOpenDateHost','hiOpenDate',d._existing?.caseData?.open_date||htmlTodayLocal(),false);
     htmlBindCaseNoInput('hiCaseNo');
     htmlBindContactEditControls();
     htmlBindServiceEditControls();
@@ -588,7 +599,7 @@ async function htmlLoadExistingSnapshot(caseId){
     }
   }
 
-async function htmlSavePreview(d,exactMatchId){
+async function htmlSavePreview(d,exactMatchId,openDateField){
     const caseNo=htmlNormalizeCaseNo($('hiCaseNo').value), name=$('hiName').value.trim();
     $('hiCaseNo').value=caseNo;
     const supervisor=state.profile?.role==='supervisor'?state.profile.id:$('hiSupervisor').value;
@@ -602,7 +613,9 @@ async function htmlSavePreview(d,exactMatchId){
     if((welfare==='中低收入戶'||welfare==='一般戶')&&paymentMethod==='不收費'){toast('第二類／第三類個案不可設定為不收費','warn');return false;}
     const potential=$('hiPotentialMatch')?.value||'';
     const matchId=exactMatchId||potential||'';
-    if(!matchId&&!$('hiOpenDate').value){toast('新案必須填寫開案日期','warn');return false;}
+    const openDateISO=openDateField.getISO();
+    if(openDateISO===null){toast('請輸入有效的開案日期','warn');return false;}
+    if(!matchId&&!openDateISO){toast('新案必須填寫開案日期','warn');return false;}
     if(!htmlValidMapsUrl($('hiGoogleMaps').value)){toast('請輸入有效的 Google Maps 分享連結','warn');return false;}
     const file=d._file; showLoading(true); let path='';
     try{
@@ -611,7 +624,7 @@ async function htmlSavePreview(d,exactMatchId){
       path=`${safeNo}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
       const up=await db.storage.from(CASE_HTML_BUCKET).upload(path,file,{contentType:'text/html',upsert:false}); if(up.error)throw up.error;
       const payload={
-        case_no:caseNo,open_date:$('hiOpenDate').value,google_maps_url:$('hiGoogleMaps').value.trim(),case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,
+        case_no:caseNo,open_date:openDateISO,google_maps_url:$('hiGoogleMaps').value.trim(),case_name:name,national_id:$('hiNational').value.trim().toUpperCase(),birth_date:$('hiBirth').value,gender:$('hiGender').value,
         address:$('hiAddress').value.trim(),phone:$('hiPhone').value.trim(),cms_level:$('hiCms').value.trim(),
         lives_alone:livesAlone==='true',has_dementia:dementia==='true',
         identity_type:$('hiIdentity').value.trim(),has_disability:$('hiDisability').value,is_indigenous:$('hiIndigenous').value,
@@ -640,7 +653,7 @@ function htmlOpenManualModal(){
     openModal({title:'手動建立個案',confirmText:'建立個案',large:true,html:`
       <div class="import-preview-grid">
         <div class="field"><label>個案編號 *</label><input id="hmCaseNo" placeholder="例如：115C00001"></div>
-        <div class="field"><label>開案日期 *</label><input id="hmOpenDate" type="date" value="${htmlTodayLocal()}"></div>
+        <div class="field"><label for="hmOpenDate">開案日期 *</label><div id="hmOpenDateHost"></div></div>
         <div class="field full"><label>Google定位（選填）</label><input id="hmGoogleMaps" type="url" placeholder="貼上 Google Maps 分享連結"></div>
         <div class="field"><label>負責督導 *</label><select id="hmSupervisor" ${me?'disabled':''}>${htmlSupervisorOptions('')}</select></div>
         <div class="field"><label>服務類別 *</label><select id="hmUsageType"><option value="">請選擇</option><option value="居家">居家</option><option value="喘息">喘息</option><option value="居家+喘息">居家+喘息</option></select></div>
@@ -672,13 +685,14 @@ function htmlOpenManualModal(){
         $('hmCaseNo').value=caseNo;
         if(!caseNo||!name||!supervisor||!usageType){toast('個案編號、姓名、負責督導與服務類別為必填','warn');return false;}
         if(dementia===''||livesAlone===''){toast('失智及獨居狀態為必填','warn');return false;}
-        if(!$('hmOpenDate').value){toast('開案日期為必填','warn');return false;}
+        const openDateISO=hmOpenDateField.getISO();
+        if(!openDateISO){toast('請填寫有效的開案日期','warn');return false;}
         if(!htmlValidMapsUrl($('hmGoogleMaps').value)){toast('請輸入有效的 Google Maps 分享連結','warn');return false;}
         showLoading(true);
         try{
           const r=await db.rpc('create_case_profile',{payload:{
             case_no:caseNo,case_name:name,supervisor_id:supervisor,
-            open_date:$('hmOpenDate').value,google_maps_url:$('hmGoogleMaps').value.trim(),
+            open_date:openDateISO,google_maps_url:$('hmGoogleMaps').value.trim(),
             national_id:$('hmNational').value.trim().toUpperCase(),birth_date:$('hmBirth').value,gender:$('hmGender').value,
             address:$('hmAddress').value.trim(),phone:$('hmPhone').value.trim(),cms_level:$('hmCms').value.trim(),
             case_manager_name:$('hmManager').value.trim(),case_manager_phone:$('hmManagerPhone').value.trim(),
@@ -694,6 +708,7 @@ function htmlOpenManualModal(){
           toast('建立個案失敗：'+(err?.message||err),'error');return false;
         }finally{showLoading(false);}
       }});
+    const hmOpenDateField=htmlBindOpenDate('hmOpenDateHost','hmOpenDate',htmlTodayLocal(),true);
     htmlBindCaseNoInput('hmCaseNo');
     htmlBindWelfareCopay('hmWelfareIdentity','hmCopayRate');
     htmlBindPaymentRules('hmWelfareIdentity','hmPaymentMethod');
@@ -786,7 +801,7 @@ async function htmlViewOriginal(path,fileName){
         '<div class="import-section">機構管理資料</div>',
         '<div class="import-preview-grid">',
           '<div class="field"><label>個案編號 *</label><input id="editCaseNo" value="'+escapeHTML(c.case_no||'')+'"></div>',
-          '<div class="field"><label>開案日期</label><input id="editOpenDate" type="date" value="'+escapeHTML(c.open_date||'')+'"><div class="help">舊案可補登正式受理日期。</div></div>',
+          '<div class="field"><label for="editOpenDate">開案日期</label><div id="editOpenDateHost"></div><div class="help">舊案可補登正式受理日期。</div></div>',
           '<div class="field full"><label>Google定位（選填）</label><input id="editGoogleMaps" type="url" placeholder="貼上 Google Maps 分享連結" value="'+escapeHTML(c.google_maps_url||'')+'"></div>',
           '<div class="field"><label>負責督導 *</label><select id="editSupervisor" '+(lockSupervisor?'disabled':'')+'>'+htmlSupervisorOptions(c.supervisor_id||'')+'</select></div>',
           '<div class="field"><label>服務類別 *</label><select id="editUsage">',
@@ -840,9 +855,11 @@ async function htmlViewOriginal(path,fileName){
       openModal({title:'編輯個案資料',confirmText:'儲存',large:true,html:html,onConfirm:async function(){
         var caseNo=htmlNormalizeCaseNo($('editCaseNo').value);
         $('editCaseNo').value=caseNo;
+        var openDateISO=editOpenDateField.getISO();
+        if(openDateISO===null){toast('請輸入有效的開案日期','warn');return false;}
         var payload={
           case_id:caseId,case_no:caseNo,case_name:$('editName').value.trim(),
-          open_date:$('editOpenDate').value,google_maps_url:$('editGoogleMaps').value.trim(),
+          open_date:openDateISO,google_maps_url:$('editGoogleMaps').value.trim(),
           supervisor_id:lockSupervisor?c.supervisor_id:$('editSupervisor').value,
           service_usage_type:$('editUsage').value,payment_method:$('editPayment').value,
           service_status:$('editStatus').value,national_id:$('editNational').value.trim().toUpperCase(),
@@ -877,6 +894,7 @@ async function htmlViewOriginal(path,fileName){
           toast('更新個案失敗：'+(err&&err.message?err.message:err),'error');return false;
         }finally{showLoading(false);}
       }});
+      const editOpenDateField=htmlBindOpenDate('editOpenDateHost','editOpenDate',c.open_date||'',false);
       htmlBindCaseNoInput('editCaseNo');
       htmlBindWelfareCopay('editWelfareIdentity','editCopayRate');
       htmlBindPaymentRules('editWelfareIdentity','editPayment');
