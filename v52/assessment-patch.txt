@@ -236,7 +236,7 @@
 
   function renderAssessmentContextBar(row,c){
     if(!row||!c)return '';
-    const date=row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—';
+    const date=row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—';
     return `
       <div class="assessment-context-bar">
         <span class="assessment-context-name">${escapeHTML(c.case_name||'未知個案')}</span>
@@ -248,7 +248,7 @@
 
   function setAssessmentFormHeader(row,c,formLabel){
     $('topTitle').textContent='評估管理';
-    const date=row?.planned_date?rocDate(row.planned_date+'T00:00:00'):'—';
+    const date=row?.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—';
     const caseName=c?.case_name||'未知個案';
     $('crumb').textContent=`${caseName}｜${date}｜${formLabel||'評估表單'}`;
   }
@@ -467,7 +467,7 @@
                 const c=assessmentCase(row.case_id);
                 return `
                   <tr data-assessment-id="${row.id}">
-                    <td>${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}</td>
+                    <td>${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}</td>
                     <td><div class="assessment-case-name">${escapeHTML(c?.case_name||'未知個案')}</div><div class="assessment-case-sub">${escapeHTML(c?.case_no||'未編號')}</div></td>
                     <td>${escapeHTML(assessmentTypeLabel(row.assessment_type))}</td>
                     <td class="assessment-reason">${escapeHTML(assessmentReasonText(row))}</td>
@@ -1167,7 +1167,7 @@
       <div class="page-head">
         <div>
           <h1>${escapeHTML(c?.case_name||'未知個案')}｜${escapeHTML(assessmentTypeLabel(row.assessment_type))}</h1>
-          <p>預定評估日：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　${assessmentStatusBadge(row)}</p>
+          <p>預定評估日：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}　${assessmentStatusBadge(row)}</p>
         </div>
         <div class="assessment-head-actions">
           <button id="assessmentBack" class="btn">← 返回評估列表</button>
@@ -1190,7 +1190,7 @@
         <div class="assessment-detail-cell"><label>負責督導</label><div>${escapeHTML(assessmentStaffName(row.responsible_staff_id||c?.supervisor_id))}</div></div>
         <div class="assessment-detail-cell"><label>評估原因</label><div>${escapeHTML(assessmentReasonText(row))}</div></div>
         <div class="assessment-detail-cell"><label>表單進度</label><div>${p.done}／${p.total}</div></div>
-        ${['condition_change','specific_problem'].includes(row.assessment_type)?'<div class="assessment-detail-cell"><label>問題追蹤日期</label><div>'+(row.problem_followup_date?rocDate(row.problem_followup_date+'T00:00:00'):'未設定')+'</div></div>':''}
+        ${['condition_change','specific_problem'].includes(row.assessment_type)?'<div class="assessment-detail-cell"><label>問題追蹤日期</label><div>'+(row.problem_followup_date?window.rocDateKit.formatDateCompact(row.problem_followup_date):'未設定')+'</div></div>':''}
         <div class="assessment-detail-cell"><label>完整評估週期</label><div>${
           ['opening','periodic'].includes(row.assessment_type)
             ?'本次完成後作為完整評估基準'
@@ -1274,7 +1274,7 @@
     const history=rows.length?rows.map(row=>{
       const p=assessmentProgress(row.id);
       return '<tr>'+
-        '<td>'+(row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—')+'</td>'+
+        '<td>'+(row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—')+'</td>'+
         '<td>'+escapeHTML(assessmentTypeLabel(row.assessment_type))+'</td>'+
         '<td>'+escapeHTML(assessmentReasonText(row))+'</td>'+
         '<td>'+escapeHTML(assessmentStaffName(row.responsible_staff_id||c?.supervisor_id))+'</td>'+
@@ -1285,9 +1285,9 @@
     }).join(''):'';
     return [
       '<div class="case-overview-grid">',
-        '<div class="case-overview-card"><label>最近完成評估</label><strong>'+(latest&&latest.planned_date?rocDate(latest.planned_date+'T00:00:00'):'尚無')+'</strong><small>'+(latest?escapeHTML(assessmentTypeLabel(latest.assessment_type)):'尚無已完成評估')+'</small></div>',
+        '<div class="case-overview-card"><label>最近完成評估</label><strong>'+(latest&&latest.planned_date?window.rocDateKit.formatDateCompact(latest.planned_date):'尚無')+'</strong><small>'+(latest?escapeHTML(assessmentTypeLabel(latest.assessment_type)):'尚無已完成評估')+'</small></div>',
         '<div class="case-overview-card"><label>進行中／待評估</label><strong>'+openRows.length+' 筆</strong><small>不含已完成及已作廢</small></div>',
-        '<div class="case-overview-card"><label>下一筆預定</label><strong>'+(next&&next.planned_date?rocDate(next.planned_date+'T00:00:00'):'尚未安排')+'</strong><small>'+(next?escapeHTML(assessmentTypeLabel(next.assessment_type)):'目前無待辦評估')+'</small></div>',
+        '<div class="case-overview-card"><label>下一筆預定</label><strong>'+(next&&next.planned_date?window.rocDateKit.formatDateCompact(next.planned_date):'尚未安排')+'</strong><small>'+(next?escapeHTML(assessmentTypeLabel(next.assessment_type)):'目前無待辦評估')+'</small></div>',
       '</div>',
       '<div class="case-panel-card">',
         '<div class="case-panel-head"><div><strong>歷次評估紀錄</strong><div class="case-panel-note">此處與「評估管理」共用同一份資料，不另外建立第二套評估紀錄。</div></div>',
