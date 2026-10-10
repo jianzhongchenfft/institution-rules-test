@@ -322,7 +322,7 @@
     const action=root.querySelector(actionSelector);
     if(action)action.insertAdjacentHTML('beforebegin',view);
     else root.insertAdjacentHTML('beforeend',view);
-    bind(eventId,code,record);
+    bind(eventId,code,provider());
   }
   function bind(eventId,code,record){
     const root=document.querySelector('[data-ats-root="'+code+'"]');if(!root)return;
