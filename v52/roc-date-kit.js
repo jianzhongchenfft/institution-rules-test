@@ -76,6 +76,12 @@
     '.rdk-nav:hover,.rdk-day:hover:not(:disabled),.rdk-month-choice:hover:not(:disabled){background:#fff3ed;border-color:#dc9479}',
     '.rdk-foot{display:flex;justify-content:space-between;gap:6px;margin-top:9px}',
     '.rdk-small{padding:5px 8px;font-size:12px}',
+    '.roc-inline-date .rdk{display:flex;width:100%;max-width:100%;align-items:stretch;flex-wrap:wrap}',
+    '.roc-inline-date .rdk .rdk-text{flex:1 1 100px;min-width:0;width:calc(100% - 46px)}',
+    '.roc-inline-date .rdk .rdk-toggle{flex:0 0 42px;min-width:42px}',
+    '.roc-inline-date .rdk .rdk-year{width:67px;flex:0 0 67px}',
+    '.roc-inline-date .rdk .rdk-month-select{width:58px;flex:0 0 58px}',
+    '.roc-inline-date .rdk input[type="hidden"]{display:none}',
     '.rdk-text:focus-visible,.rdk-toggle:focus-visible,.rdk-popup button:focus-visible{outline:2px solid #dc9479;outline-offset:1px}'
    ];
    var style=document.createElement('style');style.id='roc-date-kit-style';style.textContent=rules.join('\n');document.head.append(style);
