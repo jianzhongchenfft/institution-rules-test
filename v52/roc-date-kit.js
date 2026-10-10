@@ -36,6 +36,18 @@
    }
    return formatDate(a[1])+' '+a[2]+':'+a[3];
  }
+ function formatDateTimeCompact(value){
+   var result=formatDateTime(value);
+   return result==='—'?result:result.replace(/^(.+?)\/(\d{2})\/(\d{2})(\s\d{2}:\d{2})$/,function(_,y,m,d,time){
+     return y+'/'+Number(m)+'/'+Number(d)+time;
+   });
+ }
+ function formatPrintDateTime(value){
+   var result=formatDateTime(value);
+   return result==='—'?result:result.replace(/^(.+?)\/(\d{2})\/(\d{2}) (\d{2}:\d{2})$/,function(_,y,m,d,time){
+     return y+'年'+Number(m)+'月'+Number(d)+'日 '+time;
+   });
+ }
  function today(){var d=new Date();return makeISO(d.getFullYear(),d.getMonth()+1,d.getDate());}
  function css(){
    if(document.getElementById('roc-date-kit-style'))return;
@@ -164,7 +176,7 @@
  }
  root.rocDateKit=Object.freeze({
    parseDate:s=>parse(s,false),parseMonth:s=>parse(s,true),
-   formatDate:formatDate,formatDateCompact:formatDateCompact,formatMonth:formatMonth,formatPrintDate:formatPrintDate,formatDateTime:formatDateTime,
+   formatDate:formatDate,formatDateCompact:formatDateCompact,formatMonth:formatMonth,formatPrintDate:formatPrintDate,formatDateTime:formatDateTime,formatDateTimeCompact:formatDateTimeCompact,formatPrintDateTime:formatPrintDateTime,
    mountDate:(el,opt)=>mount(el,opt,false),mountMonth:(el,opt)=>mount(el,opt,true),todayISO:today
  });
 })(typeof window!=='undefined'?window:globalThis);
