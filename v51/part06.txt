@@ -32,7 +32,7 @@ nt?.status||'draft';
       <div class="form-grid">
         ${isNew?`<div class="field full"><label>內規名稱 *</label><input id="fTitle" placeholder="例如：派案、排班及服務執行作業辦法"></div><div class="field"><label>分類 *</label><input id="fCategory" placeholder="例如：服務管理"></div>`:`<div class="field full"><label>內規名稱</label><input value="${escapeHTML(existing.title)}" disabled></div>`}
         <div class="field"><label>版本 *</label><input id="fVersion" value="1.0" placeholder="例如 1.0、2.1"></div>
-        <div class="field"><label>生效日期</label><input id="fDate" type="date" value="${today}"></div>
+        <div class="field"><label>生效日期</label><input id="fDate" type="hidden" value="${today}"><div id="fDateHost" class="roc-inline-date"></div></div>
         <div class="field full"><label>修訂說明</label><textarea id="fNotes" placeholder="可簡要說明本版修改重點"></textarea></div>
         <div class="field full"><label>附件檔案 *</label><div class="file-drop"><input id="fFile" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><div class="help">可上傳 PDF、DOC、DOCX；目前 Supabase bucket 單檔上限為 25 MB。</div></div></div>
         <div class="field full"><label class="check-row"><input id="fPublish" type="checkbox"> 上傳完成後立即發布（原已發布版本會改為歷史版本）</label></div>
@@ -40,13 +40,16 @@ nt?.status||'draft';
       confirmText:isNew?'上傳內規':'上傳版本',
       onConfirm:()=>saveRegulation(existing)
     });
+    window.rocDateKit.mountLinkedDate('fDate',{value:today,required:false});
   }
 
   async function saveRegulation(existing){
     const title=existing?.title || $('fTitle')?.value.trim();
     const category=existing?.category || $('fCategory')?.value.trim();
     const version=$('fVersion').value.trim();
-    const effectiveDate=$('fDate').value || null;
+    const effectiveISO=window.rocDateKit.linkedISO('fDate');
+    if(effectiveISO===null){toast('請填寫有效的民國生效日期','warn');return false;}
+    const effectiveDate=effectiveISO||null;
     const notes=$('fNotes').value.trim();
     const file=$('fFile').files[0];
     const publishNow=$('fPublish').checked;
