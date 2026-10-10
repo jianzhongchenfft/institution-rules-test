@@ -589,7 +589,7 @@
         main:current.main,
         detail:current.detail,
         previousMain:hasPrevious?previous.main:'—',
-        previousDate:prevEvent?.planned_date?rocDate(prevEvent.planned_date+'T00:00:00'):'',
+        previousDate:prevEvent?.planned_date?window.rocDateKit.formatDateCompact(prevEvent.planned_date):'',
         change:comparisonText(code,local.records[key],local.previousRecords[key])
       };
     });
@@ -608,7 +608,7 @@
     const s=local.previousSummary,e=local.previousSummaryEvent;
     if(!s&&!e)return '前次已完成評估';
     const parts=[];
-    if(e?.planned_date)parts.push(rocDate(e.planned_date+'T00:00:00'));
+    if(e?.planned_date)parts.push(window.rocDateKit.formatDateCompact(e.planned_date));
     if(e?.assessment_type)parts.push(TYPE_LABELS[e.assessment_type]||e.assessment_type);
     if(s?.overall_status)parts.push(OVERALL_LABELS[s.overall_status]||s.overall_status);
     return parts.join('｜')||'前次已完成評估';
@@ -682,7 +682,7 @@
     window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'評估總結');
     $('content').innerHTML=`<div class="asum-page">
       <div class="page-head">
-        <div><h1>${escapeHTML(c.case_name)}｜整體評估總結</h1><p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　${escapeHTML(TYPE_LABELS[row.assessment_type]||row.assessment_type)}</p></div>
+        <div><h1>${escapeHTML(c.case_name)}｜整體評估總結</h1><p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}　${escapeHTML(TYPE_LABELS[row.assessment_type]||row.assessment_type)}</p></div>
         <div class="assessment-head-actions">
           <button id="asumBack" type="button" class="btn">← 返回評估事件</button>
           <button id="asumBundlePrint" type="button" class="btn">列印完整評估套表</button>
