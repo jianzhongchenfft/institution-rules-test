@@ -392,14 +392,35 @@ async function htmlLoadExistingSnapshot(caseId){
     if(!d._match && d._caseNoConflict)d._match=d._caseNoConflict;
     if(d._match)d._existing=await htmlLoadExistingSnapshot(d._match.id);
   }
+  function htmlTodayLocal(){
+    const d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function htmlValidMapsUrl(value){
+    if(!String(value||'').trim())return true;
+    try{
+      const u=new URL(String(value).trim());
+      if(u.protocol!=='https:'||u.username||u.password)return false;
+      return ((u.hostname==='google.com'||u.hostname==='www.google.com')&&/^\/maps(?:\/|$)/.test(u.pathname))
+        ||u.hostname==='maps.google.com'||u.hostname==='maps.app.goo.gl'
+        ||(u.hostname==='goo.gl'&&/^\/maps(?:\/|$)/.test(u.pathname));
+    }catch(_){return false;}
+  }
+  function htmlGoogleMapsField(value){
+    const url=String(value||'').trim();
+    const link=url&&htmlValidMapsUrl(url)?'<a href="'+escapeHTML(url)+'" target="_blank" rel="noopener noreferrer">📍 開啟地圖</a>':'—';
+    return '<div class="case-data-item"><label>Google定位</label><div>'+link+'</div></div>';
+  }
   function htmlContactRow(r={}){
     return `<div class="contact-row" data-contact-row>
       <div class="mini-field"><label>姓名</label><input data-contact-name value="${escapeHTML(r.contact_name||'')}"></div><div class="mini-field"><label>關係</label><input data-contact-rel value="${escapeHTML(r.relationship||'')}"></div><div class="mini-field"><label>電話</label><input data-contact-phone value="${escapeHTML(r.phone||'')}"></div><button class="btn sm" type="button" data-del-contact>刪除</button>
-      <div class="contact-flags"><label><input type="checkbox" data-contact-primary ${r.is_primary_contact?'checked':''}>主要聯絡人</label><label><input type="checkbox" data-contact-caregiver ${r.is_primary_caregiver?'checked':''}>主要照顧者</label><label><input type="checkbox" data-contact-secondary ${r.is_secondary_caregiver?'checked':''}>次要照顧者</label></div>
+      <div class="contact-flags"><label><input type="radio" name="case-primary-contact" data-contact-primary ${r.is_primary_contact?'checked':''}>主要聯絡人</label><label><input type="checkbox" data-contact-caregiver ${r.is_primary_caregiver?'checked':''}>主要照顧者</label><label><input type="checkbox" data-contact-secondary ${r.is_secondary_caregiver?'checked':''}>次要照顧者</label></div>
     </div>`;
   }
   function htmlContactsEditor(rows){
-    return `<div id="htmlContactEditor" class="contact-editor">${(rows||[]).map(r=>htmlContactRow(r)).join('')}</div><div style="margin-top:7px"><button id="htmlAddContact" class="btn sm" type="button">＋ 新增聯絡人</button></div>`;
+    const items=rows||[];
+    const first=items.findIndex(r=>r.is_primary_contact);
+    return `<div id="htmlContactEditor" class="contact-editor">${items.map((r,i)=>htmlContactRow({...r,is_primary_contact:i===first})).join('')}</div><div style="margin-top:7px"><button id="htmlAddContact" class="btn sm" type="button">＋ 新增聯絡人</button></div>`;
   }
   function htmlReadContacts(){return [...document.querySelectorAll('[data-contact-row]')].map(r=>({contact_name:r.querySelector('[data-contact-name]').value.trim(),relationship:r.querySelector('[data-contact-rel]').value.trim(),phone:r.querySelector('[data-contact-phone]').value.trim(),is_primary_contact:r.querySelector('[data-contact-primary]').checked,is_primary_caregiver:r.querySelector('[data-contact-caregiver]').checked,is_secondary_caregiver:r.querySelector('[data-contact-secondary]').checked,notes:''})).filter(x=>x.contact_name);}
   function htmlServiceEditor(rows){
