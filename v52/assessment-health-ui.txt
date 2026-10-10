@@ -4,7 +4,7 @@
     return `
       <section class="health-summary">
         <div class="health-summary-card"><label>本次健康狀況得分</label><strong>${count?total:'—'}</strong><small>${complete?'正式總分（滿分20分）':'暫計｜已填 '+count+'/10 項'}</small></div>
-        <div class="health-summary-card"><label>前次得分</label><strong>${prev??'—'}</strong><small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small></div>
+        <div class="health-summary-card"><label>前次得分</label><strong>${prev??'—'}</strong><small>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):'無前次完成紀錄'}</small></div>
         <div class="health-summary-card"><label>與前次差異</label><strong style="font-size:14px">${prev==null||!complete?'—':((total-prev)>0?'+':'')+(total-prev)+' 分'}</strong><small>分數越高代表個案整體狀況越好</small></div>
       </section>
     `;
@@ -640,7 +640,7 @@
             <div class="health-copy">
               <div>
                 <strong>前次身體與健康狀況</strong>
-                <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):''}</span>
+                <span>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):''}</span>
               </div>
               <button id="healthCopyPrevious" class="btn sm">帶入前次</button>
             </div>
