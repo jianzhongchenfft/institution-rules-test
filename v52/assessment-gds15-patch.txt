@@ -173,7 +173,7 @@
         <div class="gds15-summary-card">
           <label>前次得分</label>
           <strong>${prev??'—'}</strong>
-          <small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small>
+          <small>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):'無前次完成紀錄'}</small>
         </div>
         <div class="gds15-summary-card">
           <label>篩檢結果</label>
