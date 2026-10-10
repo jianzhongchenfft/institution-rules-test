@@ -265,7 +265,7 @@
   function renderCopyBox(){
     if(!local.previous)return '';
     return `<div class="support-copy"><div><strong>前次支持系統：${escapeHTML(OVERALL_LABELS[local.previous?.summary?.overall_support]||'已完成')}</strong>
-      <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00')+'｜':''}帶入後請重新確認家庭支持、社會資源與尚缺需求。</span></div>
+      <span>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date)+'｜':''}帶入後請重新確認家庭支持、社會資源與尚缺需求。</span></div>
       <button id="supportCopyPrevious" type="button" class="btn sm">帶入前次資料</button></div>`;
   }
 
@@ -428,7 +428,7 @@
     const canEdit=canEditEvent(row)&&row.status!=='voided';
     window.v52AssessmentApi?.setAssessmentFormHeader?.(row,c,'支持系統');
     $('content').innerHTML=`<div class="support-page">
-      <div class="page-head"><div><h1>${escapeHTML(c.case_name)}｜支持系統</h1><p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p></div>
+      <div class="page-head"><div><h1>${escapeHTML(c.case_name)}｜支持系統</h1><p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p></div>
       <div class="assessment-head-actions"><button id="supportBack" type="button" class="btn">← 返回評估事件</button></div></div>
       ${window.v52AssessmentApi?.renderAssessmentContextBar?.(row,c)||''}${renderSummary()}${renderCopyBox()}
       ${local.hasLaterCompleted?'<div class="support-notice">此筆評估日期早於個案較新的已完成支持系統紀錄；前次比較仍以本次日期以前最近一筆已完成紀錄為準。</div>':''}
