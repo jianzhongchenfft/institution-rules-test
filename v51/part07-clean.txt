@@ -16,6 +16,12 @@ class="version-row"><div class="version-info"><div class="version-title">V${esca
 
   async function loadCaseVisitsModulePatch(){
     try{
+      // 民國日期元件共用載入點；個案表單需要先載入，再進行其他模組初始化。
+      const rocDateKitRes=await fetch('v52/roc-date-kit.js?v=case-open-date-v1-20261011',{cache:'no-store'});
+      if(!rocDateKitRes.ok)throw new Error('民國日期共用元件載入失敗（'+rocDateKitRes.status+'）');
+      eval(await rocDateKitRes.text());
+      if(!window.rocDateKit||typeof window.rocDateKit.mountDate!=='function')throw new Error('民國日期共用元件初始化失敗');
+
       const res=await fetch('v51/case-visits-patch.txt',{cache:'no-store'});
       if(!res.ok) throw new Error(`v51/case-visits-patch.txt 載入失敗（${res.status}）`);
       eval(await res.text());
