@@ -281,7 +281,7 @@
         <div class="adl-summary-card">
           <label>前次得分</label>
           <strong>${prevTotal??'—'}</strong>
-          <small>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00'):'無前次完成紀錄'}</small>
+          <small>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date):'無前次完成紀錄'}</small>
         </div>
         <div class="adl-summary-card">
           <label>與前次差異</label>
@@ -298,7 +298,7 @@
       <div class="adl-copy-box">
         <div>
           <strong>前次 ADL：${local.previous.total_score??'—'} 分</strong>
-          <span>${local.previousEvent?.planned_date?rocDate(local.previousEvent.planned_date+'T00:00:00')+'｜':''}${escapeHTML(ADL_LEVELS[local.previous.dependency_level]||'已完成')}</span>
+          <span>${local.previousEvent?.planned_date?window.rocDateKit.formatDateCompact(local.previousEvent.planned_date)+'｜':''}${escapeHTML(ADL_LEVELS[local.previous.dependency_level]||'已完成')}</span>
         </div>
         <button id="adlCopyPrevious" class="btn sm">帶入前次結果</button>
       </div>
@@ -359,7 +359,7 @@
         <div class="page-head">
           <div>
             <h1>${escapeHTML(c.case_name)}｜Barthel ADL</h1>
-            <p>評估日期：${row.planned_date?rocDate(row.planned_date+'T00:00:00'):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p>
+            <p>評估日期：${row.planned_date?window.rocDateKit.formatDateCompact(row.planned_date):'—'}　狀態：${escapeHTML(({pending:'待進行',in_progress:'評估中',forms_completed:'表單完成／待總結',completed:'已完成',voided:'作廢'})[row.status]||row.status)}</p>
           </div>
           <div class="assessment-head-actions">
             <button id="adlBack" class="btn">← 返回評估事件</button>
