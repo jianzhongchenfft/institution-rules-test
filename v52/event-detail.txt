@@ -46,10 +46,7 @@ const canVoidFU=x=>!x.is_voided&&(
   canManageEvents()
 );
 
-const showTs=v=>{
-  if(!v)return '—';
-  try{return new Date(v).toLocaleString('zh-TW',{hour12:false})}catch{return v}
-};
+const showTs=v=>window.rocDateKit.formatDateTimeCompact(v);
 
 function renderEventDetail(id){
   let e=state.ev.find(x=>x.id===id),i=getInitialReport(id),f=getFollowups(id),c=getClosures(id),ats=getAttachments(id),sd=getSensitiveDetails(id),hist=getEventHistory(id),z=[];
