@@ -360,7 +360,7 @@
         var map=mapsUrl(c.google_maps_url);
         return '<tr>'+
           '<td title="'+escapeHTML(c.case_name||'')+'">'+gender+'<button type="button" class="cc-case-name-btn" data-case-id="'+escapeHTML(c.id)+'">'+escapeHTML(c.case_name||'—')+'</button></td>'+
-          plainCell(ccDateText(c.open_date))+
+          plainCell(window.rocDateKit.formatDateCompact(c.open_date))+
           plainCell(c.case_no)+
           plainCell(ccStaffName(c.supervisor_id))+
           plainCell(c.case_manager_name)+
