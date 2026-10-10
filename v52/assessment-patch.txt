@@ -117,6 +117,9 @@
     .assessment-form-option strong{font-size:11.5px;display:block}
     .assessment-form-option small{font-size:10px;color:#667085;display:block;margin-top:3px;line-height:1.4}
     .assessment-supervisor-preview{padding:9px 10px;border-radius:9px;background:#f8fafc;border:1px solid var(--line);font-size:11.5px;color:#475467}
+    .assessment-case-picker{display:flex;flex-direction:column;gap:7px}
+    .assessment-case-picker input[type="search"]{width:100%;box-sizing:border-box}
+    .assessment-case-search-hint{font-size:10.5px;color:#667085;line-height:1.5}
     .assessment-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:14px}
     .assessment-detail-cell{border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}
     .assessment-detail-cell label{display:block;font-size:10px;font-weight:900;color:#667085;margin-bottom:4px}
@@ -617,6 +620,28 @@
     });
   }
 
+  // 個案選擇仍由原生 select 決定 case_id；搜尋欄僅篩選符合的選項，
+  // 不允許將尚未選取的自由輸入文字當成個案，並維持現有權限範圍。
+  function bindAssessmentCaseSearch(cases){
+    const search=$('assessmentCaseSearch'),select=$('assessmentCase');
+    const hint=$('assessmentCaseSearchHint');
+    if(!search||!select)return;
+    search.addEventListener('input',()=>{
+      const words=search.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      const filtered=words.length?cases.filter(c=>{
+        const content=[c.case_name||'',c.case_no||''].join(' ').toLocaleLowerCase();
+        return words.every(word=>content.includes(word));
+      }):cases;
+      // 改變搜尋條件後必須重新選擇，避免舊的選取結果與搜尋文字不一致。
+      select.innerHTML=assessmentCaseOptions(filtered,'');
+      select.value='';
+      if(hint)hint.textContent=words.length
+        ?(filtered.length?'找到 '+filtered.length+' 位符合的個案，請從下拉選單選取。':'沒有符合的個案，請更換搜尋文字。')
+        :'可輸入姓名或案號搜尋，也可直接展開下拉選單選擇。';
+      updateAssessmentSupervisorPreview();
+    });
+  }
+
   function updateAssessmentSupervisorPreview(){
     const c=assessmentCase($('assessmentCase')?.value);
     const target=$('assessmentSupervisorPreview');
@@ -655,7 +680,11 @@
         <div class="form-grid">
           <div class="field half">
             <label>個案 *</label>
-            <select id="assessmentCase" ${existing?'disabled':''}>${assessmentCaseOptions(cases,selectedCase)}</select>
+            <div class="assessment-case-picker">
+              ${!existing?'<input id="assessmentCaseSearch" type="search" autocomplete="off" placeholder="輸入姓名或案號搜尋個案" aria-label="搜尋個案姓名或案號">':''}
+              <select id="assessmentCase" ${existing?'disabled':''}>${assessmentCaseOptions(cases,selectedCase)}</select>
+              ${!existing?'<small id="assessmentCaseSearchHint" class="assessment-case-search-hint">可輸入姓名或案號搜尋，也可直接展開下拉選單選擇。</small>':''}
+            </div>
           </div>
           <div class="field half">
             <label>評估類型 *</label>
@@ -905,31 +934,11 @@
       previousType=next;
       toggleProblemFollowupField();
     });
+    bindAssessmentCaseSearch(cases);
     $('assessmentCase')?.addEventListener('change',updateAssessmentSupervisorPreview);
     updateAssessmentSupervisorPreview();
     applyAssessmentFormRules();
     toggleProblemFollowupField();
-  }
-
-  async function startAssessment(row){
-    if(!assessmentCanEditCase(row.case_id))return toast('您沒有此個案的評估編輯權限','error');
-    showLoading(true);
-    try{
-      const {error}=await db.from('assessment_events').update({
-        status:'in_progress',
-        started_at:row.started_at||new Date().toISOString(),
-        updated_by:state.user.id,
-        updated_at:new Date().toISOString()
-      }).eq('id',row.id).eq('status','pending');
-      if(error)throw error;
-      await loadAssessmentData(false);
-      renderAssessmentDetail(row.id);
-      toast('評估事件已開始','success');
-    }catch(err){
-      toast('開始評估失敗：'+(err?.message||err),'error');
-    }finally{
-      showLoading(false);
-    }
   }
 
   function voidAssessment(row){
@@ -983,7 +992,6 @@
 
   function assessmentFormActionButton(row,form){
     const config=ASSESSMENT_FORM_HANDLERS[form.form_code];
-    if(row.status==='pending')return '<button class="btn sm" disabled>待開始</button>';
     if(row.status==='voided')return '<button class="btn sm" disabled>下一階段開放</button>';
     if(!config||!window[config.api])return '<button class="btn sm" disabled>下一階段開放</button>';
 
@@ -1033,7 +1041,6 @@
             ?'<button id="assessmentSummaryBtn" class="btn '+(row.status==='forms_completed'?'primary':'')+'">'+(row.status==='completed'?'查看總結／列印':'填寫評估總結')+'</button>'
             :''}
           ${canEdit?'<button id="assessmentEdit" class="btn">編輯事件</button>':''}
-          ${canEdit&&row.status==='pending'?'<button id="assessmentStart" class="btn primary">開始評估</button>':''}
           ${canEdit&&row.status!=='voided'?'<button id="assessmentVoid" class="btn">作廢</button>':''}
         </div>
       </div>
@@ -1111,7 +1118,6 @@
       api.open(row.id);
     });
     $('assessmentEdit')?.addEventListener('click',()=>openAssessmentEventModal(row));
-    $('assessmentStart')?.addEventListener('click',()=>startAssessment(row));
     $('assessmentVoid')?.addEventListener('click',()=>voidAssessment(row));
     bindAssessmentFormActions(row);
     window.scrollTo({top:0,behavior:'auto'});
