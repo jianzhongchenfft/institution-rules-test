@@ -79,6 +79,7 @@
             </label>
           `).join('')}
         </div>
+        ${window.v52AssessmentToolSummary?.previousNote(prev.note)||''}
         ${!showNote&&!['improve','not_applicable'].includes(cur.status)
           ?`<div class="health-note"><button type="button" class="btn sm" data-health-med-add-note="${key}">＋ 補充備註</button></div>`
           :''}
@@ -368,6 +369,7 @@
             </label>
           `).join('')}
         </div>
+        ${window.v52AssessmentToolSummary?.previousNote(local.previous?.health_notes?.[key])||''}
         ${!showNote&&!['observe','refer'].includes(cur)
           ?`<div class="health-note"><button type="button" class="btn sm" data-health-add-note="${key}">＋ 補充備註</button></div>`
           :''}
