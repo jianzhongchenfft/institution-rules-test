@@ -127,137 +127,186 @@
       support:['household','family_members','support_domains','resources','summary'],
       caregiver_burden:['applicability','answers','notes','summary']
     }[code]||[];
-    return Object.fromEntries(keys.map(k=>[k,r[k]??null]));
+    const result=Object.fromEntries(keys.map(k=>[k,r[k]??null]));
+    if(code==='health_medication'){
+      const event=typeof state!=='undefined'
+        ?(state.assessmentEvents||[]).find(e=>e.id===r.assessment_event_id)
+        :null;
+      result.assessment_mode=r.assessment_mode
+        ||(event?.assessment_type==='opening'?'baseline':event?'change':'')
+        ||(r.medical_info?.opening_fixed_status?'baseline':'change');
+    }
+    return result;
   };
   // 僅擷取實際填寫的備註與文字說明，不因扣分、異常選項而自行新增敘述。
+  // 依實際表單章節順序整理「目前可見的文字說明」，不自動插入分數、選項或未填項目。
   function generate(code,raw){
     const r=source(code,raw),find=[],recommend=[];
-    const add=(to,title,note)=>{
-      if(value(note))to.push('【'+title+'】'+value(note));
+    const add=(to,title,text)=>{
+      if(value(text))to.push('【'+title+'】'+value(text));
     };
-    const noteItems=(to,notes,kind)=>{
-      const n=obj(notes),order=Object.keys(LABELS[kind]||{});
-      for(const k of [...order,...Object.keys(n).filter(x=>!order.includes(x))]){
-        add(to,label(kind,k),n[k]);
+    const noteItems=(notes,kind,filter=()=>true)=>{
+      const n=obj(notes),ordered=Object.keys(LABELS[kind]||{});
+      for(const key of [...ordered,...Object.keys(n).filter(k=>!ordered.includes(k))]){
+        if(filter(key))add(find,label(kind,key),n[key]);
       }
+    };
+    const numbered=(items,title,fields)=>{
+      arr(items).forEach((item,i)=>{
+        const x=obj(item);
+        for(const [field,fieldTitle] of fields){
+          add(find,title+' '+(i+1)+'（'+fieldTitle+'）',x[field]);
+        }
+      });
     };
     if(code==='adl'||code==='iadl'){
-      // 依照原量表題目順序，不依輸入備註的先後順序排列。
-      noteItems(find,r.notes,code);
+      noteItems(r.notes,code);
     }else if(code==='spmsq'){
-      noteItems(find,r.notes,code);
-      add(find,'無法評估原因',r.unable_reason);
+      if(r.is_unable)add(find,'無法評估原因',r.unable_reason);
+      else noteItems(r.notes,code);
     }else if(code==='gds15'){
-      noteItems(find,r.notes,code);
-      add(find,'無法評估／不適用原因',r.exception_reason);
+      if(r.completion_mode!=='completed')add(find,'無法評估／不適用原因',r.exception_reason);
     }else if(code==='health_medication'){
-      noteItems(find,r.health_notes,code);
-      const checks=obj(r.medication_checks);
-      for(const key of Object.keys(LABELS.health_medication)){
-        if(!Object.prototype.hasOwnProperty.call(checks,key))continue;
-        const item=checks[key];
-        if(item&&typeof item==='object')add(find,label(code,key),item.note);
+      const m=obj(r.medical_info),mode=r.assessment_mode||'change';
+      const baseline=()=>{
+        if(mode==='change'||m.baseline_conditions_status==='yes')
+          add(find,'重要疾病／慢性病史',m.baseline_important_conditions);
+        else if(m.baseline_conditions_status==='unknown')
+          add(find,'疾病史無法確認原因',m.baseline_conditions_unknown_note);
+        if(mode==='change'||m.baseline_treatments_status==='yes')
+          add(find,'固定治療／特殊醫療安排',m.baseline_ongoing_treatments);
+        else if(m.baseline_treatments_status==='unknown')
+          add(find,'特殊治療無法確認原因',m.baseline_treatments_unknown_note);
+      };
+      const followup=()=>{
+        if(['no','unknown'].includes(m.regular_followup))
+          add(find,'回診情形原因',m.regular_followup_reason);
+      };
+      const medUsage=()=>{
+        if(m.medication_use_status==='unknown')
+          add(find,'無法確認用藥情形的原因',m.medication_use_note);
+      };
+      const medicationManagement=()=>{
+        if(m.medication_use_status!=='using')return;
+        if(m.medication_method==='assisted')add(find,'用藥協助者',m.medication_assisted_by);
+        add(find,'服藥異常或注意事項',m.medication_followup);
+        const checks=obj(r.medication_checks);
+        // 依藥物安全現況5項的表單題目順序。
+        for(const key of ['storage_safety','expired_medicine','medicine_recognition',
+          'follow_prescription','medication_management_support']){
+          add(find,label('health_medication',key),obj(checks[key]).note);
+        }
+      };
+      if(mode==='baseline'){
+        // 開案：健康基準 → 回診 → 用藥狀況 → 固定／臨時用藥 → 用藥管理／安全 → 健康10項
+        baseline();
+        followup();
+        medUsage();
+        if(m.opening_fixed_status==='unknown')add(find,'固定用藥無法確認原因',m.opening_fixed_unknown_note);
+        if(m.opening_temporary_status==='unknown')add(find,'臨時用藥無法確認原因',m.opening_temporary_unknown_note);
+        if(m.opening_temporary_status==='yes')numbered(m.opening_temporary_medications,'接案時臨時用藥',[['note','備註']]);
+        medicationManagement();
+      }else{
+        // 後續：主檔帶入的健康基準 → 本期事件 → 未就醫變化 → 用藥修正／異動
+        // → 回診 → 用藥管理／安全 → 對照顧影響 → 健康10項。
+        baseline();
+        numbered(m.healthcare_events,'就醫事件',[
+          ['reason','原因'],['result','結果／處置'],['note','備註']
+        ]);
+        if(arr(m.unvisited_health_changes).length)
+          numbered(m.unvisited_health_changes,'未就醫的重要健康變化',[['note','說明']]);
+        else add(find,'未就醫的重要健康變化',m.unvisited_health_change_note);
+        if(arr(m.medication_corrections).length)
+          numbered(m.medication_corrections,'修正既有固定用藥',[['note','補充備註']]);
+        else add(find,'修正既有固定用藥說明',m.medication_correction_note);
+        if(arr(m.medication_changes).length)
+          numbered(m.medication_changes,'本期用藥變化',[['note','補充備註']]);
+        else add(find,'本期用藥變化說明',m.medication_change_note);
+        followup();
+        medUsage();
+        medicationManagement();
+        add(find,'對照顧需求的影響說明',m.care_impact_note);
       }
-      const m=obj(r.medical_info);
-      // 表單中的文字說明欄以固定章節順序整理；不因健康選項異常而自行增列。
-      const narratives=[
-        ['baseline_important_conditions','重要疾病／慢性病史'],
-        ['baseline_ongoing_treatments','固定治療／特殊醫療安排'],
-        ['baseline_conditions_unknown_note','疾病史無法確認原因'],
-        ['baseline_treatments_unknown_note','特殊治療無法確認原因'],
-        ['regular_followup_reason','回診情形原因'],
-        ['medication_use_note','用藥情形說明'],
-        ['opening_fixed_unknown_note','固定用藥無法確認原因'],
-        ['opening_temporary_unknown_note','臨時用藥無法確認原因'],
-        ['medication_followup','服藥異常或注意事項'],
-        ['health_change_note','健康變化說明'],
-        ['care_impact_note','對照顧需求的影響說明']
-      ];
-      for(const [key,title] of narratives)add(find,title,m[key]);
-      // 舊資料若只有摘要文字仍可顯示；一般用藥異動以個別備註為主，
-      // 避免將儲存時自動組成的「藥物/用法/異動」文字再重複匯入。
-      if(!arr(m.medication_changes).length)add(find,'用藥變化說明',m.medication_change_note);
-      if(!arr(m.medication_corrections).length)add(find,'既有用藥修正說明',m.medication_correction_note);
-      const blocks=[
-        ['healthcare_events','就醫事件'],
-        ['unvisited_health_changes','非例行健康變化'],
-        ['opening_temporary_medications','接案時臨時用藥'],
-        ['medication_changes','用藥異動'],
-        ['medication_corrections','用藥紀錄修正']
-      ];
-      const entryFields=['note','reason','description','impact_note','care_impact_note','response','action_note'];
-      for(const [field,title] of blocks){
-        arr(m[field]).forEach((item,index)=>{
-          const info=obj(item);
-          for(const k of entryFields)add(find,title+' '+(index+1)+'（'+(COMMON_LABELS[k]||'補充說明')+'）',info[k]);
-          // 「就醫結果／處置」是獨立的敘述欄位，並非醫療數值或選項。
-          if(field==='healthcare_events')add(find,title+' '+(index+1)+'（結果／處置）',info.result);
-        });
-      }
+      noteItems(r.health_notes,code,key=>
+        ['consciousness','eating','elimination','mobility','upper_limb','lower_limb',
+          'daily_activity','sleep','appetite_weight','mood'].includes(key)
+      );
     }else if(code==='home_safety'){
-      noteItems(find,r.notes,code);
-      const h=obj(r.home_profile),s=obj(r.summary);
-      for(const [k,title] of [
-        ['level_difference_note','門檻／高低差說明'],
-        ['housing_other','其他住宅類型'],
-        ['mobility_other','其他移動方式']
-      ])add(find,title,h[k]);
-      for(const [k,title] of [
-        ['not_explained_reason','未向個案／家屬說明的原因'],
-        ['family_response_other','個案／家屬其他回應'],
-        ['risk_summary','環境風險摘要'],
-        ['main_risks','主要環境風險'],
-        ['risk_notes','環境風險備註'],
-        ['environment_summary','居家環境概況']
-      ])add(find,title,s[k]);
-      for(const [k,title] of [
-        ['recommendations','主要環境安全問題／改善建議'],
-        ['improvement_plan','改善計畫'],
-        ['care_advice','照顧建議']
-      ])add(recommend,title,s[k]);
-    }else if(code==='support'){
-      const h=obj(r.household),rr=obj(r.resources),s=obj(r.summary);
-      for(const [k,title] of [
-        ['living_other','其他居住安排'],
-        ['family_change_note','重大家庭變化說明'],
-        ['family_summary','家庭狀況摘要'],
-        ['primary_caregiver_availability','主要照顧者可提供時間'],
-        ['primary_caregiver_role','主要照顧者協助內容']
-      ])add(find,title,h[k]);
-      arr(r.family_members).forEach((m,i)=>{
-        const person=obj(m);
-        add(find,'重要支持者 '+(i+1)+'（協助內容）',person.support_role);
-        add(find,'重要支持者 '+(i+1)+'（其他備註）',person.note);
+      // 一、住宅概況 → 二、21項安全題目 → 三、改善／說明與回應。
+      const h=obj(r.home_profile),summary=obj(r.summary);
+      if(h.housing_type==='other')add(find,'其他住宅類型',h.housing_other);
+      if(h.has_level_difference==='yes')add(find,'門檻／高低差說明',h.level_difference_note);
+      if(arr(h.mobility_modes).includes('other'))add(find,'其他移動方式',h.mobility_other);
+      noteItems(r.notes,code,k=>{
+        if(k.startsWith('stairs_'))return h.uses_stairs==='yes';
+        if(k.startsWith('kitchen_'))return h.uses_kitchen==='yes';
+        return true;
       });
-      const domains=obj(r.support_domains);
-      for(const key of Object.keys(LABELS.support))add(find,label(code,key),obj(domains[key]).note);
-      for(const [k,title] of [
-        ['economic_note','經濟狀況說明'],
-        ['income_sources','主要生活／經濟來源'],
-        ['economic_care_impact_note','經濟因素影響照顧的情形'],
-        ['social_interaction_note','社會互動說明'],
-        ['community_participation_note','活動參與補充']
-      ])add(find,title,rr[k]);
+      add(recommend,'主要環境安全問題／改善建議',summary.recommendations);
+      if(summary.explained_to==='not_explained')add(find,'未說明原因',summary.not_explained_reason);
+      if(summary.family_response==='other')add(find,'個案／家屬其他回應',summary.family_response_other);
+      add(find,'環境風險摘要',summary.risk_summary);
+      add(find,'主要環境風險',summary.main_risks);
+      add(find,'環境風險備註',summary.risk_notes);
+      add(find,'居家環境概況',summary.environment_summary);
+      add(recommend,'改善計畫',summary.improvement_plan);
+      add(recommend,'照顧建議',summary.care_advice);
+    }else if(code==='support'){
+      const h=obj(r.household),rr=obj(r.resources),summary=obj(r.summary);
+      // 一、家庭與居住概況
+      if(h.living_arrangement==='other')add(find,'其他居住安排',h.living_other);
+      if(h.family_change_status==='yes')add(find,'重大家庭變化說明',h.family_change_note);
+      add(find,'家庭狀況摘要',h.family_summary);
+      // 二、主要照顧者／支持者
+      if(h.primary_caregiver_status==='present'){
+        add(find,'主要照顧者可提供時間',h.primary_caregiver_availability);
+        add(find,'主要照顧者協助內容',h.primary_caregiver_role);
+      }
+      arr(r.family_members).forEach((person,i)=>{
+        const x=obj(person);
+        add(find,'重要支持者 '+(i+1)+'（協助內容）',x.support_role);
+        add(find,'重要支持者 '+(i+1)+'（其他備註）',x.note);
+      });
+      // 三、家庭支持功能（7項）
+      for(const key of ['daily_care','meal_housework','medical_transport','medication_health',
+        'financial','emotional','decision_contact']){
+        add(find,label(code,key),obj(r.support_domains?.[key]).note);
+      }
+      // 四、經濟狀況
+      if(['watch','difficulty'].includes(rr.economic_status))add(find,'經濟狀況說明',rr.economic_note);
+      add(find,'主要生活／經濟來源',rr.income_sources);
+      if(rr.economic_care_impact==='yes')add(find,'經濟因素影響照顧的情形',rr.economic_care_impact_note);
+      // 五、社會資源及社會互動
       arr(rr.social_resources).forEach((item,i)=>{
         const x=obj(item);
         add(find,'社會資源 '+(i+1)+'（提供協助）',x.assistance);
-        add(find,'社會資源 '+(i+1)+'（不足原因）',x.insufficiency_note);
+        if(['partial','insufficient'].includes(x.sufficiency))
+          add(find,'社會資源 '+(i+1)+'（不足原因）',x.insufficiency_note);
       });
-      arr(rr.unmet_needs).forEach((item,i)=>{
-        const x=obj(item);add(find,'尚缺資源／轉介需求 '+(i+1),x.need);
+      if(['limited','isolated','unable'].includes(rr.social_interaction_status))
+        add(find,'社會互動說明',rr.social_interaction_note);
+      if(rr.community_participation_status&&rr.community_participation_status!=='participates')
+        add(find,'活動參與補充',rr.community_participation_note);
+      // 六、尚缺資源與轉介
+      if(rr.unmet_needs_status==='yes')arr(rr.unmet_needs).forEach((item,i)=>{
+        const x=obj(item);
+        add(find,'尚缺資源／轉介需求 '+(i+1),x.need);
         add(recommend,'尚缺資源處理 '+(i+1),x.action);
       });
-      add(find,'主要支持問題',s.key_issues);
-      add(recommend,'目前支持安排／建議',s.support_plan);
+      // 七、整體支持評估
+      if(['needs_attention','weak'].includes(summary.overall_support))
+        add(find,'主要支持問題',summary.key_issues);
+      add(recommend,'目前支持安排／建議',summary.support_plan);
     }else if(code==='caregiver_burden'){
-      noteItems(find,r.notes,code);
       const s=obj(r.summary);
-      for(const [k,title] of [
-        ['unable_reason','無法評估原因'],
-        ['professional_reason','專業判斷理由'],
-        ['general_note','其他補充']
-      ])add(find,title,s[k]);
-      add(recommend,'處理紀錄',s.action_note);
+      // 一、評估適用性 → 二、10項初篩 → 三、轉介與後續。
+      if(r.applicability==='unable')add(find,'無法評估原因',s.unable_reason);
+      if(r.applicability==='applicable'||!r.applicability){
+        noteItems(r.notes,code);
+        add(find,'專業判斷理由',s.professional_reason);
+        add(recommend,'處理紀錄',s.action_note);
+        add(find,'其他補充',s.general_note);
+      }
     }
     return {findings:unique(find).join('\n'),recommendations:unique(recommend).join('\n')};
   }
